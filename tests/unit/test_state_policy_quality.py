@@ -24,10 +24,13 @@ from breachgazette.policies import load_source_policies
 from breachgazette.publish.builder import (
     SEARCH_PARTITION_SIZE,
     _build_search_assets,
+    _fnv1a,
+    _search_trigrams,
     audit_public_tree,
     build_site_data,
 )
 from breachgazette.quality import DataQualityError, build_quality_report
+from breachgazette.relationships import RelationshipCatalogue
 from breachgazette.state import PrivateStateStore
 
 
@@ -40,6 +43,7 @@ def test_source_policy_catalogue_is_complete() -> None:
         "oaic_regulatory",
         "washington",
         "california",
+        "massachusetts",
         "hhs",
     }
     assert policies["hhs"].implemented is False
@@ -252,6 +256,29 @@ def test_search_assets_are_partitioned_and_bounded(notification_factory) -> None
     assert len(partitions) == 2
     assert sum(partition["count"] for partition in manifest["partitions"]) == len(records)
     assert all(len(payload["records"]) <= SEARCH_PARTITION_SIZE for _, payload in partitions)
+    assert manifest["query_routing"] == {
+        "algorithm": "normalized_trigram_bloom",
+        "encoding": "hex",
+        "bits": 16_384,
+        "hashes": 3,
+        "minimum_query_length": 3,
+    }
+    bloom = bytes.fromhex(manifest["partitions"][0]["query_bloom"])
+    for gram in _search_trigrams("example health"):
+        assert all(
+            bloom[
+                (_fnv1a(f"{seed}|{gram}") % manifest["query_routing"]["bits"]) // 8
+            ]
+            & (
+                1
+                << (
+                    _fnv1a(f"{seed}|{gram}")
+                    % manifest["query_routing"]["bits"]
+                    % 8
+                )
+            )
+            for seed in range(manifest["query_routing"]["hashes"])
+        )
 
 
 def test_production_builder_emits_minimised_real_publication(
@@ -267,6 +294,7 @@ def test_production_builder_emits_minimised_real_publication(
         "oaic_regulatory",
         "washington",
         "california",
+        "massachusetts",
     )
     observed = datetime.now(UTC)
     monitoring = MonitoringCatalogue(
@@ -285,6 +313,10 @@ def test_production_builder_emits_minimised_real_publication(
     monkeypatch.setattr(
         "breachgazette.monitoring.load_monitoring_catalogue",
         lambda: monitoring,
+    )
+    monkeypatch.setattr(
+        "breachgazette.publish.builder.load_relationship_catalogue",
+        lambda: RelationshipCatalogue(decisions=()),
     )
     for index, source_id in enumerate(source_ids):
         normalized = notification_factory(
@@ -316,7 +348,7 @@ def test_production_builder_emits_minimised_real_publication(
     assert result["quality_passed"] is True
     assert result["records"]["notifications"] == len(source_ids)
     assert (output / "publication.json").is_file()
-    assert (output / "notifications.json").is_file()
+    assert not (output / "notifications.json").exists()
     assert (output / "search-manifest.json").is_file()
     assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids)
     assert (output / "source-health.json").is_file()

@@ -93,6 +93,7 @@ SKIP_TEXT_DETECTORS_FOR_FIELDS = {
     "source_checksum",
     "checksum_sha256",
     "publication_checksum",
+    "query_bloom",
 }
 
 

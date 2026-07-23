@@ -27,6 +27,10 @@ const publication = getPublication();
       <label>Entity role<select name="role"><option value="">All roles</option></select></label>
       <label>Publication level<select name="publication"><option value="">All publication levels</option></select></label>
     </div>
+    <div class="result-actions">
+      <button type="button" data-export-results disabled>Export matching CSV</button>
+      <span class="table-note" data-export-status>Apply a filter to enable export.</span>
+    </div>
     <p aria-live="polite" data-result-count>Loading bounded dataset…</p>
     <div data-results>
       <NotificationTable records={publication.latest_notifications} limit={50} />
@@ -64,6 +68,8 @@ const publication = getPublication();
       const role = controls.querySelector<HTMLSelectElement>('[name="role"]')!;
       const publication = controls.querySelector<HTMLSelectElement>('[name="publication"]')!;
       const query = controls.querySelector<HTMLInputElement>('[name="query"]')!;
+      const exportButton = document.querySelector<HTMLButtonElement>("[data-export-results]")!;
+      const exportStatus = document.querySelector<HTMLElement>("[data-export-status]")!;
       const options = (values: string[]) => [...new Set(values)].sort();
       for (const value of options(manifest.facets.jurisdictions)) jurisdiction.add(new Option(value, value));
       for (const value of options(manifest.facets.regulators)) regulator.add(new Option(value, value));
@@ -84,6 +90,7 @@ const publication = getPublication();
       const initialResults = results.cloneNode(true) as HTMLElement;
       const initialCount = results.querySelectorAll("tbody tr").length;
       const partitionCache = new Map<string, Promise<Notification[]>>();
+      let filteredRecords: Notification[] = [];
       const loadPartition = (partition: SearchPartitionMetadata) => {
         const existing = partitionCache.get(partition.id);
         if (existing) return existing;
@@ -102,6 +109,51 @@ const publication = getPublication();
         return pending;
       };
 
+      const normalizeSearch = (value: string) =>
+        value.toLocaleLowerCase().split(/\s+/).filter(Boolean).join(" ");
+      const searchText = (record: Notification) =>
+        normalizeSearch([
+          record.named_entity.source_name,
+          record.source_record_id,
+          record.jurisdiction,
+          record.regulator,
+          record.reporting_scheme,
+          record.named_entity.role,
+        ].filter(Boolean).join(" "));
+      const trigrams = (value: string) => {
+        const normalized = normalizeSearch(value);
+        const grams = new Set<string>();
+        for (let index = 0; index <= normalized.length - 3; index += 1) {
+          grams.add(normalized.slice(index, index + 3));
+        }
+        return grams;
+      };
+      const fnv1a = (value: string) => {
+        let hash = 2_166_136_261;
+        for (const byte of new TextEncoder().encode(value)) {
+          hash ^= byte;
+          hash = Math.imul(hash, 16_777_619) >>> 0;
+        }
+        return hash;
+      };
+      const queryMayMatch = (partition: SearchPartitionMetadata, term: string) => {
+        if (
+          term.length < manifest.query_routing.minimum_query_length ||
+          !partition.query_bloom
+        ) return true;
+        const bloom = Uint8Array.from(
+          partition.query_bloom.match(/.{2}/g) ?? [],
+          (pair) => Number.parseInt(pair, 16),
+        );
+        for (const gram of trigrams(term)) {
+          for (let seed = 0; seed < manifest.query_routing.hashes; seed += 1) {
+            const bit = fnv1a(`${seed}|${gram}`) % manifest.query_routing.bits;
+            if ((bloom[Math.floor(bit / 8)]! & (1 << (bit % 8))) === 0) return false;
+          }
+        }
+        return true;
+      };
+
       const matchesPartition = (partition: SearchPartitionMetadata) =>
         (!jurisdiction.value || partition.jurisdictions.includes(jurisdiction.value)) &&
         (!regulator.value || partition.regulators.includes(regulator.value)) &&
@@ -111,7 +163,8 @@ const publication = getPublication();
         (!information.value || partition.information_categories.includes(information.value)) &&
         (!population.value || partition.population_bands.includes(population.value)) &&
         (!role.value || partition.roles.includes(role.value)) &&
-        (!publication.value || partition.publication_levels.includes(publication.value));
+        (!publication.value || partition.publication_levels.includes(publication.value)) &&
+        queryMayMatch(partition, normalizeSearch(query.value));
 
       const cell = (tag: "th" | "td", value: string) => {
         const element = document.createElement(tag);
@@ -158,6 +211,60 @@ const publication = getPublication();
         results.replaceChildren(container);
       };
 
+      const csvCell = (value: string | number | null | undefined) => {
+        let text = String(value ?? "");
+        if (/^[=+\-@]/.test(text)) text = `'${text}`;
+        return `"${text.replaceAll('"', '""')}"`;
+      };
+      const exportCsv = () => {
+        if (!filteredRecords.length) return;
+        const headers = [
+          "source_id",
+          "source_record_id",
+          "named_entity",
+          "source_role",
+          "jurisdiction",
+          "regulator",
+          "reporting_scheme",
+          "source_dates",
+          "publication_level",
+          "affected_population",
+          "information_categories",
+          "breach_cause",
+          "source_url",
+        ];
+        const rows = filteredRecords.map((record) => [
+          record.source_id,
+          record.source_record_id,
+          record.named_entity.source_name,
+          record.named_entity.role,
+          record.jurisdiction,
+          record.regulator,
+          record.reporting_scheme,
+          record.dates
+            .map((item) => item.normalized_date)
+            .filter((value): value is string => Boolean(value))
+            .join("; "),
+          record.publication_level,
+          record.affected_population?.count,
+          record.information_categories.map((item) => item.normalized_label).join("; "),
+          record.breach_cause?.normalized_label,
+          record.source_url,
+        ]);
+        const csv = [
+          headers.map(csvCell).join(","),
+          ...rows.map((row) => row.map(csvCell).join(",")),
+        ].join("\r\n");
+        const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "breach-gazette-notifications.csv";
+        link.click();
+        URL.revokeObjectURL(url);
+        exportStatus.textContent = `Exported ${filteredRecords.length.toLocaleString()} matching source records.`;
+      };
+      exportButton.addEventListener("click", exportCsv);
+
       let renderVersion = 0;
       let debounce: number | undefined;
       const render = async () => {
@@ -165,6 +272,9 @@ const publication = getPublication();
         const hasFilters = [...controls.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")]
           .some((control) => control.value.trim() !== "");
         if (!hasFilters) {
+          filteredRecords = [];
+          exportButton.disabled = true;
+          exportStatus.textContent = "Apply a filter to enable export.";
           results.replaceChildren(...[...initialResults.childNodes].map((node) => node.cloneNode(true)));
           results.removeAttribute("aria-busy");
           count.textContent = `${manifest.record_count.toLocaleString()} matching source records. Showing the latest ${initialCount}; no search partitions loaded.`;
@@ -183,9 +293,9 @@ const publication = getPublication();
             count.textContent = `Searching ${Math.min(offset + batch.length, candidatePartitions.length).toLocaleString()} of ${candidatePartitions.length.toLocaleString()} relevant data partitions locally…`;
           }
           if (version !== renderVersion) return;
-          const term = query.value.trim().toLocaleLowerCase();
+          const term = normalizeSearch(query.value);
           const filtered = records.filter((record) =>
-            (!term || record.named_entity.source_name.toLocaleLowerCase().includes(term)) &&
+            (!term || searchText(record).includes(term)) &&
             (!jurisdiction.value || record.jurisdiction === jurisdiction.value) &&
             (!regulator.value || record.regulator === regulator.value) &&
             (!source.value || record.source_id === source.value) &&
@@ -196,6 +306,11 @@ const publication = getPublication();
             (!role.value || record.named_entity.role === role.value) &&
             (!publication.value || record.publication_level === publication.value)
           );
+          filteredRecords = filtered;
+          exportButton.disabled = filtered.length === 0;
+          exportStatus.textContent = filtered.length
+            ? `Ready to export all ${filtered.length.toLocaleString()} matches.`
+            : "No matching records to export.";
           const visible = filtered.slice(0, 50);
           count.textContent = `${filtered.length.toLocaleString()} matching source records. Showing ${visible.length}; loaded ${candidatePartitions.length.toLocaleString()} of ${manifest.partitions.length.toLocaleString()} partitions.`;
           renderTable(visible);
@@ -204,6 +319,9 @@ const publication = getPublication();
           if (version !== renderVersion) return;
           results.replaceChildren(...[...initialResults.childNodes].map((node) => node.cloneNode(true)));
           results.removeAttribute("aria-busy");
+          filteredRecords = [];
+          exportButton.disabled = true;
+          exportStatus.textContent = "Export is unavailable while search data is unavailable.";
           count.textContent = "Search partitions could not be loaded. The latest static records remain available.";
         }
       };

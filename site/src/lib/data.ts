@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import type {
-  Notification,
   Publication,
   SearchManifest,
   SearchPartition,
@@ -33,20 +32,17 @@ export function getPublication(): Publication {
   return publication;
 }
 
-export function getNotifications(): Notification[] {
-  const notifications = readJson<Notification[]>("notifications.json");
-  if (!Array.isArray(notifications)) {
-    throw new Error("notifications.json is not an array");
-  }
-  return notifications;
-}
-
 export function getSearchManifest(): SearchManifest {
   const manifest = readJson<SearchManifest>("search-manifest.json");
   if (
     !manifest ||
     !Array.isArray(manifest.partitions) ||
-    !Number.isInteger(manifest.record_count)
+    !Number.isInteger(manifest.record_count) ||
+    manifest.query_routing?.algorithm !== "normalized_trigram_bloom" ||
+    manifest.query_routing?.encoding !== "hex" ||
+    !Number.isInteger(manifest.query_routing.bits) ||
+    !Number.isInteger(manifest.query_routing.hashes) ||
+    manifest.partitions.some((partition) => !partition.query_bloom)
   ) {
     throw new Error("search-manifest.json is invalid");
   }
