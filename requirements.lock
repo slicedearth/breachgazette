@@ -1,6 +1,8 @@
+annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.14.2
-beautifulsoup4==4.14.3
+ast_serialize==0.6.0
+beautifulsoup4==4.15.0
 boolean.py==5.0
 CacheControl==0.14.4
 certifi==2026.7.22
@@ -15,7 +17,7 @@ editables==0.6
 et_xmlfile==2.0.0
 filelock==3.32.0
 h11==0.16.0
-hatchling==1.28.0
+hatchling==1.31.0
 httpcore==1.0.9
 httpx==0.28.1
 hypothesis==6.151.9
@@ -26,7 +28,7 @@ license-expression==30.4.4
 markdown-it-py==4.2.0
 mdurl==0.1.2
 msgpack==1.2.1
-mypy==1.19.1
+mypy==2.3.0
 mypy_extensions==1.1.0
 openpyxl==3.1.5
 packageurl-python==0.17.6
@@ -53,14 +55,14 @@ PyYAML==6.0.3
 requests==2.34.2
 respx==0.23.1
 rich==15.0.0
-ruff==0.15.4
+ruff==0.15.22
 shellingham==1.5.4
 sortedcontainers==2.4.0
 soupsieve==2.9.1
 tomli==2.4.1
 tomli_w==1.2.0
 trove-classifiers==2026.6.1.19
-typer==0.21.0
+typer==0.27.0
 types-PyYAML==6.0.12.20250915
 typing-inspection==0.4.2
 typing_extensions==4.16.0

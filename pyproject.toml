@@ -1,5 +1,5 @@
 [build-system]
-requires = ["editables==0.6", "hatchling==1.28.0"]
+requires = ["editables==0.6", "hatchling==1.31.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -11,24 +11,24 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "slicedearth" }]
 dependencies = [
-  "beautifulsoup4==4.14.3",
+  "beautifulsoup4==4.15.0",
   "httpx==0.28.1",
   "openpyxl==3.1.5",
   "pdfplumber==0.11.10",
   "pydantic==2.13.4",
   "PyYAML==6.0.3",
-  "typer==0.21.0",
+  "typer==0.27.0",
 ]
 
 [project.optional-dependencies]
 dev = [
   "hypothesis==6.151.9",
-  "mypy==1.19.1",
+  "mypy==2.3.0",
   "pip-audit==2.10.1",
   "pytest==9.1.1",
   "pytest-cov==7.1.0",
   "respx==0.23.1",
-  "ruff==0.15.4",
+  "ruff==0.15.22",
   "types-PyYAML==6.0.12.20250915",
 ]
 

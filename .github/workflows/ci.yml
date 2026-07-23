@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -29,6 +31,7 @@ jobs:
         run: |
           python -m pip install -r requirements.lock
           python -m pip install --no-deps --no-build-isolation -e .
+          python -m pip check
       - name: Verify Python
         run: |
           ruff check .
@@ -49,7 +52,9 @@ jobs:
           cache-dependency-path: site/package-lock.json
       - name: Install locked site dependencies
         working-directory: site
-        run: npm ci --ignore-scripts
+        run: |
+          npm ci --ignore-scripts
+          npm ls --depth=0
       - name: Verify test-only static site
         working-directory: site
         run: |
