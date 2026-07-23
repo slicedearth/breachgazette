@@ -13,8 +13,8 @@ information-category labels, source revision, observation times, source link,
 and limitations.
 
 Organization names are public source labels. Exact normalization and reviewed
-aliases may connect those labels, but fuzzy similarity does not merge
-identities.
+aliases may connect those labels, but similarity creates private review
+proposals only and does not merge identities.
 
 ## Excluded fields
 
@@ -26,8 +26,8 @@ cookies. A complete public source page is not republished.
 
 There are no accounts, visitor profiles, analytics, cookies, remote fonts,
 search telemetry, or notification promises. Search and filters run locally in
-the browser against the bounded static dataset. No browser-local watchlist is
-included in this release.
+the browser against same-origin bounded static partitions. No browser-local
+watchlist is included in this release.
 
 ## Private and public data
 

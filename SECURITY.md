@@ -32,8 +32,11 @@ Production publication refuses fixture state.
 
 Workflows use least privilege, immutable action SHAs, explicit timeouts, locked
 dependencies, and no live sources in CI. Pages deployment is manual-only and
-requires configured real source-derived data. Update workflows make no commit,
-push, issue, or deployment.
+requires configured real source-derived data. Dry-run update workflows make no
+commit, push, issue, or deployment. The separate scheduled workflow is disabled
+unless explicitly enabled and can push only its verified candidate to the
+configured private state repository through that repository's scoped deploy
+key. It cannot write the public source repository.
 
 Python and npm dependencies are fully pinned in committed lockfiles. CI runs
 `pip-audit` and `npm audit --audit-level=high`. See
