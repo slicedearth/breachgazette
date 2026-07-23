@@ -10,7 +10,6 @@ import yaml
 
 from breachgazette.contracts import IncidentGroupCandidate, RelationshipReviewDecision
 from breachgazette.contracts.enums import RelationshipClass
-from breachgazette.policies import repository_root
 from breachgazette.utils import stable_id
 
 
@@ -27,9 +26,8 @@ class RelationshipCatalogue:
         return {decision.candidate_id: decision for decision in self.decisions}
 
 
-def load_relationship_catalogue(path: Path | None = None) -> RelationshipCatalogue:
-    catalogue_path = path or repository_root() / "sources" / "relationship-decisions.yml"
-    payload = yaml.safe_load(catalogue_path.read_text(encoding="utf-8"))
+def load_relationship_catalogue(path: Path) -> RelationshipCatalogue:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or payload.get("schema_version") != "1.0":
         raise ValueError("relationship catalogue must use schema_version 1.0")
     raw_decisions = payload.get("decisions")

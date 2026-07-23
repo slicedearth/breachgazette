@@ -19,6 +19,10 @@ Review per-source counts, rejections, revision, checksum, completeness, latest
 attempt, and last complete update. A source failure preserves prior state and
 writes a failed checkpoint with a non-sensitive message.
 
+`validate-source-policies` also rejects a rights review dated in the future or
+more than 366 days ago. Re-check official terms and attribution before updating
+that date; advancing it is not a clerical version bump.
+
 The candidate is copied beside the configured root without `.git`, updated,
 health-checked, published into a temporary directory, privacy-audited,
 compacted, and size-checked. Promotion moves the original root aside, preserves
@@ -40,13 +44,15 @@ requires review rather than silently replacing complete state.
   --json
 .venv/bin/breachgazette alias-decision-id \
   "Source-reported alias" "Reviewed canonical name" --json
-.venv/bin/breachgazette validate-aliases --json
+.venv/bin/breachgazette validate-aliases \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" --json
 ```
 
 The proposal report is private operational state. Never bulk-approve it.
 Verify legal identity or explicit cross-reference evidence at official
-sources, then record either an approved or rejected decision. A catalogue
-change is code-reviewed and tested before it can affect a publication.
+sources, then record either an approved or rejected decision in
+`$BREACHGAZETTE_DATA_ROOT/reviews/organization-aliases.yml`. The private
+catalogue must be reviewed and validated before it can affect a publication.
 
 ## Relationship review
 
@@ -57,19 +63,23 @@ IDs, then validate the separate catalogue:
 .venv/bin/breachgazette relationship-decision-id \
   rel_000000000000000000000000 \
   --record-id source:one --record-id source:two --json
-.venv/bin/breachgazette validate-relationships --json
+.venv/bin/breachgazette validate-relationships \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" --json
 ```
 
 `confirmed_related`, `rejected`, and `unresolved` are explicit review outcomes.
 A rejection suppresses the candidate. A confirmation changes only the
-displayed relationship status and never merges source records.
+displayed relationship status and never merges source records. Decisions live
+at `$BREACHGAZETTE_DATA_ROOT/reviews/relationship-decisions.yml`; they are
+private operational state and must not be committed to the public repository.
 
 ## Retention, backup, and restore
 
 The committed policy bounds managed private-state directories to 1 GiB,
 retains the latest 53 weekly health-history reports, and allows archives up to
 1.25 GiB. Immutable events, source state, manifests, checkpoints, and the
-latest health report are never compaction candidates.
+latest health report are never compaction candidates. Review catalogues are
+included in managed backup, restore, and size accounting.
 
 ```bash
 .venv/bin/breachgazette state-inventory \
@@ -118,7 +128,7 @@ publication_dir="$(mktemp -d /tmp/breachgazette-publication.XXXXXX)"
 .venv/bin/breachgazette build-site-data \
   --data-root "$BREACHGAZETTE_DATA_ROOT" --output "$publication_dir"
 cd site
-BREACHGAZETTE_SITE_DATA_DIR="$publication_dir" npm run build
+BREACHGAZETTE_SITE_DATA_DIR="$publication_dir" npm run build:budget
 ../.venv/bin/breachgazette audit-public-tree dist
 ```
 

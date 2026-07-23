@@ -14,7 +14,9 @@ and limitations.
 
 Organization names are public source labels. Exact normalization and reviewed
 aliases may connect those labels, but similarity creates private review
-proposals only and does not merge identities.
+proposals only and does not merge identities. Alias and relationship review
+catalogues remain under the private data root; only the minimised effect of an
+approved decision can enter generated public output.
 
 ## Excluded fields
 
@@ -27,14 +29,18 @@ cookies. A complete public source page is not republished.
 There are no accounts, visitor profiles, analytics, cookies, remote fonts,
 search telemetry, or notification promises. Search, Bloom routing, filters,
 and formula-safe CSV export run locally in the browser against same-origin
-bounded static partitions.
+bounded static partitions. Copied search links encode bounded filter values in
+the URL fragment, which is not included in HTTP requests. The Atom feed
+contains only the same privacy-minimised public notification fields.
 
 ## Private and public data
 
 Raw retrievals and durable production state live at the operator-configured
 `BREACHGAZETTE_DATA_ROOT`, outside the repository. The public build receives only
 a temporary, validated, derived publication directory. The repository contains
-synthetic fixtures labelled `test_fixture`; production commands reject them.
+synthetic fixtures labelled `test_fixture` and empty review-catalogue schemas;
+production commands reject fixture state. Generated publication output is not
+committed.
 
 To delete local operational data, stop update and build processes, verify the
 exact configured private root, and remove that root through the operator's

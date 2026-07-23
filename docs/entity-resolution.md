@@ -18,6 +18,9 @@ another without collapsing those meanings.
 `breachgazette propose-aliases` produces a bounded private report from
 token-spacing and contained-token blocks. Proposals never enter the resolver.
 An operator verifies official evidence, records an approved or rejected
-decision in `sources/organization-aliases.yml`, generates its stable ID with
-`breachgazette alias-decision-id`, and runs `breachgazette validate-aliases`.
-Rejected decisions remain in the catalogue to suppress repeat proposals.
+decision in
+`$BREACHGAZETTE_DATA_ROOT/reviews/organization-aliases.yml`, generates its
+stable ID with `breachgazette alias-decision-id`, and runs
+`breachgazette validate-aliases --data-root "$BREACHGAZETTE_DATA_ROOT"`.
+Rejected decisions remain in the private catalogue to suppress repeat
+proposals.

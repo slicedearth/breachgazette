@@ -22,6 +22,10 @@ Bloom manifest plus source/year JSON partitions capped at 250 records. The
 browser fetches false-positive-safe candidate partitions only after filtering;
 there is no runtime API.
 
+Alias and relationship review catalogues are private operational inputs under
+`BREACHGAZETTE_DATA_ROOT/reviews`. They are validated before publication and
+are never committed with the public source tree.
+
 ```text
 official sources -> fixed clients -> source contracts -> private state
                                              |

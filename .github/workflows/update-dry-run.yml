@@ -31,7 +31,10 @@ jobs:
         run: |
           breachgazette validate-source-policies --json
           breachgazette validate-monitoring --json
-          breachgazette validate-aliases --json
+          breachgazette validate-aliases \
+            --catalogue tests/fixtures/reviews/organization-aliases.yml --json
+          breachgazette validate-relationships \
+            --catalogue tests/fixtures/reviews/relationship-decisions.yml --json
           breachgazette update --data-root "$RUNNER_TEMP/breachgazette-dry-run" --json
           breachgazette source-health \
             --data-root "$RUNNER_TEMP/breachgazette-dry-run" \

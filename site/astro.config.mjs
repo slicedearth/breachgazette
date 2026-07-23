@@ -1,7 +1,7 @@
 import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
 
-const inPages = process.env.GITHUB_ACTIONS === "true";
+const inPages = process.env.BREACHGAZETTE_PAGES_BUILD === "1";
 
 export default defineConfig({
   output: "static",
