@@ -88,7 +88,8 @@ decisions:
     reviewed = next(
         alias for alias in identities[0].aliases if alias.confidence_class == "reviewed"
     )
-    assert decision_id in reviewed.supporting_evidence[0]
+    assert reviewed.supporting_evidence == ["Reviewed alias decision applied"]
+    assert reviewed.review_note is None
 
 
 def test_alias_catalogue_rejects_chains(tmp_path: Path) -> None:
@@ -187,6 +188,8 @@ decisions:
     assert published[0].reviewed is True
     assert published[0].review_status == "confirmed_related"
     assert published[0].relationship_class == "likely_same_publicly_reported_event"
+    assert published[0].review_note is None
+    assert published[0].review_evidence == []
     assert decisions[0].decision_id == decision_id
 
     path.write_text(
