@@ -34,16 +34,24 @@ fixture state.
 ## Workflows and dependencies
 
 Workflows use least privilege, immutable action SHAs, explicit timeouts, locked
-dependencies, and no live sources in CI. Netlify deployment is manual-only and
-requires configured real source-derived data. It checks out private state with
-a read-only deploy key and uploads only the audited static tree. Dry-run update
-workflows make no commit, push, issue, or deployment. The separate scheduled
-workflow is disabled unless explicitly enabled and can push only its verified
-candidate to the configured private state repository through a distinct
-write-scoped deploy key. It cannot write the public source repository.
+dependencies, and no live sources in CI. Netlify publication runs only after
+successful `main` CI, after a verified persisted private-state update, or by
+manual dispatch. It checks out private state with a read-only deploy key and
+uploads only the audited static tree. Dry-run update workflows make no commit,
+push, issue, or deployment. The separate scheduled workflow is disabled unless
+explicitly enabled and can push only its verified candidate to the configured
+private state repository through a distinct write-scoped deploy key. Its
+follow-on publication job receives only the read key and Netlify token. Neither
+job can write the public source repository.
 
 Python and npm dependencies are fully pinned in committed lockfiles. CI runs
-`pip-audit` and `npm audit --audit-level=high`. See
+security-focused Ruff checks, `pip-audit`, `npm audit --audit-level=high`, and
+CodeQL for Python and JavaScript/TypeScript. The public-tree gate rejects
+hidden files, sensitive filenames, unknown file types, symbolic links, remote
+analytics markers, fixture data, and output that exceeds its file, byte, or
+page budgets. The publication workflow validates Netlify's returned HTTPS URL
+and verifies the live CSP, HSTS, framing, referrer, permissions, content-type,
+and opener policies after each deploy. See
 [the dependency policy](docs/dependency-policy.md).
 
 Netlify applies committed response headers for transport security, framing

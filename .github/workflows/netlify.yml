@@ -1,6 +1,24 @@
 name: Publish Netlify
 
 on:
+  workflow_call:
+    inputs:
+      data_ref:
+        description: Private production-data branch, tag, or commit to publish
+        required: false
+        type: string
+    secrets:
+      BREACHGAZETTE_DATA_READ_KEY:
+        required: true
+      NETLIFY_AUTH_TOKEN:
+        required: true
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       data_ref:
@@ -17,6 +35,14 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
     environment:
       name: netlify-production
       url: ${{ steps.deploy.outputs.deploy_url }}
@@ -25,14 +51,42 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      - name: Resolve private production-data revision
+        id: data-ref
+        env:
+          CONFIGURED_DATA_REF: ${{ vars.BREACHGAZETTE_DATA_REF }}
+          REQUESTED_DATA_REF: ${{ inputs.data_ref }}
+        run: |
+          data_ref="$REQUESTED_DATA_REF"
+          if test -z "$data_ref"; then
+            data_ref="$CONFIGURED_DATA_REF"
+          fi
+          if test -z "$data_ref"; then
+            echo "Configure BREACHGAZETTE_DATA_REF for automatic publication."
+            exit 1
+          fi
+          if ! git check-ref-format --allow-onelevel "$data_ref" > /dev/null 2>&1; then
+            echo "The private production-data revision is not a safe Git ref."
+            exit 1
+          fi
+          echo "data_ref=$data_ref" >> "$GITHUB_OUTPUT"
       - name: Check out configured private real-data state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ vars.BREACHGAZETTE_DATA_REPOSITORY }}
-          ref: ${{ inputs.data_ref }}
+          ref: ${{ steps.data-ref.outputs.data_ref }}
           ssh-key: ${{ secrets.BREACHGAZETTE_DATA_READ_KEY }}
           path: .private-production-data
           persist-credentials: false
+      - name: Record resolved revisions
+        run: |
+          source_revision="$(git rev-parse HEAD)"
+          data_revision="$(git -C .private-production-data rev-parse HEAD)"
+          echo "## Breach Gazette production inputs" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Source revision: \`$source_revision\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Private data revision: \`$data_revision\`" >> "$GITHUB_STEP_SUMMARY"
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
@@ -114,5 +168,36 @@ jobs:
           done
           deploy_url="$(jq -r '.ssl_url // .url // empty' \
             "$RUNNER_TEMP/netlify-deploy.json")"
-          test -n "$deploy_url"
+          if [[ ! "$deploy_url" =~ ^https://[A-Za-z0-9.-]+/?$ ]]; then
+            echo "Netlify returned an invalid HTTPS deployment URL."
+            exit 1
+          fi
+          deploy_url="${deploy_url%/}"
           echo "deploy_url=$deploy_url" >> "$GITHUB_OUTPUT"
+      - name: Verify live security headers
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.deploy_url }}
+        run: |
+          curl --fail --silent --show-error \
+            --output /dev/null \
+            --dump-header "$RUNNER_TEMP/netlify-response-headers.txt" \
+            "$DEPLOY_URL/"
+          tr -d '\r' < "$RUNNER_TEMP/netlify-response-headers.txt" \
+            | tr '[:upper:]' '[:lower:]' \
+            > "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
+          grep -F "content-security-policy:" \
+            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
+          grep -F "frame-ancestors 'none'" \
+            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
+          grep -F "strict-transport-security: max-age=31536000" \
+            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
+          grep -F "x-content-type-options: nosniff" \
+            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
+          grep -F "x-frame-options: deny" \
+            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
+          grep -F "referrer-policy: no-referrer" \
+            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
+          grep -F "permissions-policy:" \
+            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
+          grep -F "cross-origin-opener-policy: same-origin" \
+            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"

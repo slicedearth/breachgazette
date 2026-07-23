@@ -221,8 +221,9 @@ documented in [docs/methodology.md](docs/methodology.md).
 - No generic Australia-versus-US comparison is calculated.
 - Search routing uses a false-positive-only Bloom index; candidate partitions
   can be loaded unnecessarily, but matching partitions must never be omitted.
-- Scheduled updates remain inert until the private repository, scoped deploy
-  keys, and explicit enablement variable are configured.
+- Scheduled updates and their automatic publication remain inert until the
+  private repository, production branch, scoped deploy keys, hosting settings,
+  and explicit enablement variable are configured.
 - Washington's dataset has no dataset-specific licence identifier; its
   publication boundary requires ongoing review.
 - HHS remains deferred rather than using brittle browser automation.

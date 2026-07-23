@@ -38,6 +38,33 @@ PUBLIC_TREE_MAX_FILES = 3_200
 PUBLIC_TREE_MAX_BYTES = 40_000_000
 PUBLIC_TREE_MAX_HTML_FILES = 3_050
 PUBLIC_TREE_MAX_HTML_BYTES = 300_000
+PUBLIC_TREE_ALLOWED_SUFFIXES = frozenset(
+    {
+        ".css",
+        ".csv",
+        ".html",
+        ".ico",
+        ".js",
+        ".json",
+        ".png",
+        ".svg",
+        ".txt",
+        ".webmanifest",
+        ".xml",
+    }
+)
+PUBLIC_TREE_ALLOWED_EXTENSIONLESS = frozenset({"_headers"})
+PUBLIC_TREE_FORBIDDEN_NAMES = frozenset(
+    {
+        ".env",
+        ".git",
+        ".gitignore",
+        ".npmrc",
+        ".netrc",
+        "id_ed25519",
+        "id_rsa",
+    }
+)
 
 
 def _latest_date(record: SourceNotificationRecord) -> str:
@@ -412,6 +439,8 @@ def audit_public_tree(
 ) -> dict[str, Any]:
     if not path.exists() or not path.is_dir():
         raise ValueError("public tree does not exist")
+    if path.is_symlink():
+        raise DataQualityError("public tree audit failed: public tree root must not be a symlink")
     forbidden = (
         "tests/fixtures",
         'dataset_class":"test_fixture',
@@ -423,27 +452,34 @@ def audit_public_tree(
     scanned_bytes = 0
     html_files = 0
     violations: list[str] = []
-    for file in sorted(candidate for candidate in path.rglob("*") if candidate.is_file()):
+    for file in sorted(path.rglob("*")):
+        relative = file.relative_to(path)
+        if file.is_symlink():
+            violations.append(f"{relative}: symbolic links are not allowed in the public tree")
+            continue
+        if not file.is_file():
+            continue
+        if any(part.startswith(".") for part in relative.parts):
+            violations.append(f"{relative}: hidden paths are not allowed in the public tree")
+        if file.name.casefold() in PUBLIC_TREE_FORBIDDEN_NAMES:
+            violations.append(f"{relative}: sensitive filename is not allowed in the public tree")
+        suffix = file.suffix.casefold()
+        if (
+            suffix not in PUBLIC_TREE_ALLOWED_SUFFIXES
+            and file.name not in PUBLIC_TREE_ALLOWED_EXTENSIONLESS
+        ):
+            violations.append(f"{relative}: file type is not allowed in the public tree")
         size = file.stat().st_size
         scanned_files += 1
         scanned_bytes += size
-        if file.suffix.lower() == ".html":
+        if suffix == ".html":
             html_files += 1
             if size > max_html_bytes:
                 violations.append(f"{file}: HTML page exceeds {max_html_bytes} bytes")
         if size > 15_000_000:
             violations.append(f"{file}: file exceeds 15 MB")
             continue
-        if file.suffix.lower() not in {
-            ".html",
-            ".css",
-            ".js",
-            ".json",
-            ".xml",
-            ".txt",
-            ".csv",
-            ".svg",
-        }:
+        if suffix not in {".html", ".css", ".js", ".json", ".xml", ".txt", ".csv", ".svg"}:
             continue
         text = file.read_text(encoding="utf-8", errors="replace").casefold()
         for marker in forbidden:

@@ -24,12 +24,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Resolve private production-data branch
+        id: data-ref
+        env:
+          CONFIGURED_DATA_REF: ${{ vars.BREACHGAZETTE_DATA_REF }}
+        run: |
+          if test -z "$CONFIGURED_DATA_REF"; then
+            echo "Configure BREACHGAZETTE_DATA_REF before enabling updates."
+            exit 1
+          fi
+          if ! git check-ref-format --branch "$CONFIGURED_DATA_REF" > /dev/null 2>&1; then
+            echo "BREACHGAZETTE_DATA_REF must name a writable branch."
+            exit 1
+          fi
+          echo "data_ref=$CONFIGURED_DATA_REF" >> "$GITHUB_OUTPUT"
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Check out private production state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ vars.BREACHGAZETTE_DATA_REPOSITORY }}
+          ref: ${{ steps.data-ref.outputs.data_ref }}
           ssh-key: ${{ secrets.BREACHGAZETTE_DATA_WRITE_KEY }}
           path: .private-production-data
           persist-credentials: true
@@ -94,3 +109,16 @@ jobs:
       - name: Fail incomplete update after preserving health report
         if: steps.update_cycle.outcome != 'success'
         run: exit 1
+
+  publish:
+    name: Publish verified private state
+    needs: update
+    if: >-
+      needs.update.result == 'success' &&
+      (github.event_name == 'schedule' || inputs.persist_private_state)
+    uses: ./.github/workflows/netlify.yml
+    with:
+      data_ref: ${{ vars.BREACHGAZETTE_DATA_REF }}
+    secrets:
+      BREACHGAZETTE_DATA_READ_KEY: ${{ secrets.BREACHGAZETTE_DATA_READ_KEY }}
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
