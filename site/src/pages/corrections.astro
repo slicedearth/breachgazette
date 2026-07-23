@@ -1,0 +1,24 @@
+---
+import Hero from "../components/Hero.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getPublication } from "../lib/data";
+
+const publication = getPublication();
+---
+
+<BaseLayout title="Recent record corrections" description="Deterministic changes observed in official source records.">
+  <Hero
+    eyebrow="Temporal audit trail"
+    title="Recent record corrections"
+    intro="These events describe changes first observed between complete official-source snapshots. They do not independently establish why a source changed."
+  />
+  <section class="section shell">
+    {publication.corrections.length ? (
+      <ol class="grid">
+        {publication.corrections.map((event) => (
+          <li class="card"><pre>{JSON.stringify(event, null, 2)}</pre></li>
+        ))}
+      </ol>
+    ) : <p class="notice">No correction events have been observed in the retained complete snapshot history.</p>}
+  </section>
+</BaseLayout>

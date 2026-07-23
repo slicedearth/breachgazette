@@ -1,0 +1,16 @@
+---
+interface Props {
+  eyebrow: string;
+  title: string;
+  intro: string;
+  warning?: string | undefined;
+}
+const { eyebrow, title, intro, warning } = Astro.props;
+---
+
+<header class="hero shell">
+  <p class="eyebrow">{eyebrow}</p>
+  <h1>{title}</h1>
+  <p class="lede">{intro}</p>
+  {warning && <p class="notice">{warning}</p>}
+</header>

@@ -1,0 +1,63 @@
+---
+import Hero from "../../components/Hero.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+import { date, label } from "../../lib/format";
+
+const publication = getPublication();
+const records = [...publication.regulatory_actions].sort((a, b) => b.source_reported_event_date.localeCompare(a.source_reported_event_date));
+const policy = publication.policies.oaic_regulatory!;
+---
+
+<BaseLayout title="OAIC regulatory actions" description="Status-aware OAIC regulatory action timeline." section="Australia / Regulation">
+  <Hero
+    eyebrow="Status-aware timeline"
+    title="OAIC regulatory actions"
+    intro="Each matter event retains the source-backed distinction between a preliminary inquiry, investigation, enforceable undertaking, proceeding, judgment, and penalty order."
+    warning="An allegation is not a finding. A closed preliminary inquiry without an adverse finding is not an endorsement or compliance assurance."
+  />
+  <section class="section shell">
+    <div class="filters" data-regulatory-filters>
+      <label>Legal status
+        <select name="legal-status">
+          <option value="">All legal statuses</option>
+          {[...new Set(records.map((record) => record.legal_status))].sort().map((status) => (
+            <option value={status}>{label(status)}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+    <p aria-live="polite" data-regulatory-count>{records.length} source-backed events.</p>
+    <ol class="grid" aria-label="OAIC regulatory timeline">
+      {records.map((record) => (
+        <li class="card" data-regulatory-event data-legal-status={record.legal_status}>
+          <span class="pill">{label(record.legal_status)}</span>
+          <h2><a href={`${import.meta.env.BASE_URL}matters/${record.source_record_id}/`}>{record.entity.source_name}</a></h2>
+          <p><strong>{date(record.source_reported_event_date)}</strong> · {record.status_wording}</p>
+          <p>{record.summary}</p>
+          <p>{record.allegation ? "The Commissioner alleges; no finding is represented." : record.finding ? "This record represents a source-backed court or determination outcome." : "No adverse finding is implied by this status."}</p>
+        </li>
+      ))}
+    </ol>
+    <SourceNote href={policy.source_url} />
+  </section>
+  <script>
+    const controls = document.querySelector<HTMLElement>("[data-regulatory-filters]");
+    const count = document.querySelector<HTMLElement>("[data-regulatory-count]");
+    const events = [...document.querySelectorAll<HTMLElement>("[data-regulatory-event]")];
+    const status = controls?.querySelector<HTMLSelectElement>('[name="legal-status"]');
+    if (controls && count && status) {
+      const filter = () => {
+        let visible = 0;
+        for (const event of events) {
+          event.hidden = Boolean(status.value && event.dataset.legalStatus !== status.value);
+          if (!event.hidden) visible += 1;
+        }
+        count.textContent = `${visible} source-backed events.`;
+      };
+      controls.addEventListener("input", filter);
+      filter();
+    }
+  </script>
+</BaseLayout>

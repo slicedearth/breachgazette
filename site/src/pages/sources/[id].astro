@@ -1,0 +1,45 @@
+---
+import DefinitionGrid from "../../components/DefinitionGrid.astro";
+import Hero from "../../components/Hero.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+import { label } from "../../lib/format";
+
+export function getStaticPaths() {
+  const publication = getPublication();
+  return Object.values(publication.policies).map((policy) => ({ params: { id: policy.source_id }, props: { policy } }));
+}
+const { policy } = Astro.props;
+---
+
+<BaseLayout title={policy.name} description={policy.unit_of_observation} section="Source methodology">
+  <Hero
+    eyebrow={policy.implemented ? "Implemented official source" : "Deferred official source"}
+    title={policy.name}
+    intro={policy.unit_of_observation}
+    warning={policy.public_window}
+  />
+  <section class="section shell">
+    <DefinitionGrid items={[
+      { term: "Regulator", description: policy.regulator },
+      { term: "Jurisdiction", description: policy.jurisdiction },
+      { term: "Reporting scheme", description: policy.reporting_scheme },
+      { term: "Publication level", description: label(policy.publication_level) },
+      { term: "Coverage type", description: label(policy.coverage_type) },
+      { term: "Reporting threshold", description: policy.source_threshold },
+      { term: "Source population", description: policy.source_population },
+      { term: "Licence state", description: policy.source_licence },
+      { term: "Redistribution decision", description: label(policy.redistribution_decision) },
+    ]} />
+    <div class="prose">
+      <h2>Limitations</h2>
+      <ul>{policy.limitations.map((item: string) => <li>{item}</li>)}</ul>
+      <h2>Correction process</h2>
+      <p>{policy.correction_process}</p>
+      <h2>Attribution</h2>
+      <p>{policy.attribution}</p>
+    </div>
+    <SourceNote href={policy.source_url} />
+  </section>
+</BaseLayout>

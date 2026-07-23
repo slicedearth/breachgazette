@@ -1,0 +1,54 @@
+---
+import DefinitionGrid from "../../components/DefinitionGrid.astro";
+import Hero from "../../components/Hero.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+import { date, label } from "../../lib/format";
+
+export function getStaticPaths() {
+  const publication = getPublication();
+  const details = publication.detail_notifications.length ? publication.detail_notifications : publication.latest_notifications;
+  return details.map((record) => ({
+    params: { id: record.source_record_id },
+    props: { record },
+  }));
+}
+const { record } = Astro.props;
+const policy = getPublication().policies[record.source_id]!;
+---
+
+<BaseLayout title={record.named_entity.source_name} description={`Official ${record.jurisdiction} public notification source record.`} section="Public notification record">
+  <Hero
+    eyebrow={`${record.jurisdiction} / ${policy.name}`}
+    title={record.named_entity.source_name}
+    intro={record.named_entity.state === "present"
+      ? "The notifying entity was recorded by the source in the displayed role. The affected entity is not identified unless the source role says so."
+      : "The source does not publish a named entity for this row. Breach Gazette preserves that omission and does not create an organization identity."}
+    warning={record.register_window_state !== "not_applicable" ? "This record comes from a rolling public register. Disappearance is not evidence of remediation." : undefined}
+  />
+  <section class="section shell">
+    <DefinitionGrid items={[
+      { term: "Regulator or source", description: record.regulator },
+      { term: "Jurisdiction", description: record.jurisdiction },
+      { term: "Reporting scheme", description: record.reporting_scheme },
+      { term: "Publication level", description: label(record.publication_level) },
+      { term: "Coverage type", description: label(record.coverage_type) },
+      { term: "Reporting threshold", description: policy.source_threshold },
+      { term: "Named entity role", description: label(record.named_entity.role) },
+      { term: "Affected population", description: record.affected_population?.count ?? label(record.affected_population?.state ?? "not_published") },
+      { term: "Source revision", description: record.source_revision },
+      { term: "First locally observed", description: date(record.local_first_observed_time) },
+      { term: "Last locally observed", description: date(record.local_last_observed_time) },
+    ]} />
+    <div class="prose">
+      <h2>Source dates</h2>
+      <ul>{record.dates.map((item) => <li><strong>{label(item.meaning)}:</strong> {date(item.normalized_date)} <small>({item.raw_value ?? label(item.state)})</small></li>)}</ul>
+      <h2>Limitations</h2>
+      <ul>{[...policy.limitations, ...record.limitations].map((item) => <li>{item}</li>)}</ul>
+      <h2>Correction path</h2>
+      <p>{policy.correction_process}</p>
+    </div>
+    <SourceNote href={record.source_detail_url ?? record.source_url} />
+  </section>
+</BaseLayout>

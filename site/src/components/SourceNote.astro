@@ -1,0 +1,16 @@
+---
+interface Props {
+  href?: string | null;
+  label?: string;
+}
+const { href, label = "Open official source" } = Astro.props;
+---
+
+<aside class="source-note">
+  <strong>Source boundary</strong>
+  <p>
+    The source reports this information. Breach Gazette preserves its threshold, coverage,
+    named-entity role, dates, and limitations without independently verifying the event.
+  </p>
+  {href && <a href={href} rel="external noopener noreferrer">{label}<span aria-hidden="true"> ↗</span></a>}
+</aside>

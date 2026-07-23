@@ -1,0 +1,26 @@
+---
+import Hero from "../components/Hero.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { informationPages } from "../lib/content";
+
+export function getStaticPaths() {
+  return Object.keys(informationPages).map((slug) => ({
+    params: { slug },
+    props: informationPages[slug as keyof typeof informationPages],
+  }));
+}
+
+const page = Astro.props;
+---
+
+<BaseLayout title={page.title} description={page.intro}>
+  <Hero eyebrow="Project method and boundary" title={page.title} intro={page.intro} />
+  <article class="section shell prose">
+    {page.sections.map(([heading, body]: readonly [string, string]) => (
+      <section>
+        <h2>{heading}</h2>
+        <p>{body}</p>
+      </section>
+    ))}
+  </article>
+</BaseLayout>

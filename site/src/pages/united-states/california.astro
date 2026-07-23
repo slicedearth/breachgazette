@@ -1,0 +1,25 @@
+---
+import Hero from "../../components/Hero.astro";
+import NotificationTable from "../../components/NotificationTable.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+
+const publication = getPublication();
+const details = publication.detail_notifications.length ? publication.detail_notifications : publication.latest_notifications;
+const records = details.filter((record) => record.source_id === "california");
+const policy = publication.policies.california!;
+---
+
+<BaseLayout title="California notifications" description="California Attorney General breach list records." section="United States / California">
+  <Hero
+    eyebrow="State breach list"
+    title="California public notifications"
+    intro="The California Attorney General’s official CSV reports organization names, reported dates, and occurrence dates where known. A source-omitted organization remains explicitly unnamed."
+    warning="The notifier may differ from the affected entity. Breach Gazette does not retrieve or reproduce sample notification letters."
+  />
+  <section class="section shell">
+    <NotificationTable records={records} limit={250} />
+    <SourceNote href={policy.source_url} />
+  </section>
+</BaseLayout>

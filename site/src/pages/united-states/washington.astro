@@ -1,0 +1,25 @@
+---
+import Hero from "../../components/Hero.astro";
+import NotificationTable from "../../components/NotificationTable.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+
+const publication = getPublication();
+const details = publication.detail_notifications.length ? publication.detail_notifications : publication.latest_notifications;
+const records = details.filter((record) => record.source_id === "washington");
+const policy = publication.policies.washington!;
+---
+
+<BaseLayout title="Washington notifications" description="Washington Attorney General breach notification records." section="United States / Washington">
+  <Hero
+    eyebrow="State notification data"
+    title="Washington public notifications"
+    intro="The Washington Attorney General publishes source records for breaches reported as affecting more than 500 Washington residents."
+    warning="The named organization is the notifying entity in this dataset and is not necessarily the entity where the breach occurred. Counts do not automatically represent unique incidents."
+  />
+  <section class="section shell">
+    <NotificationTable records={records} limit={250} />
+    <SourceNote href={policy.source_url} />
+  </section>
+</BaseLayout>
