@@ -1,0 +1,25 @@
+---
+import Hero from "../components/Hero.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Page not found" description="The requested Breach Gazette page was not found." section="Not found">
+  <Hero
+    eyebrow="404"
+    title="That record page is not available."
+    intro="The address may be incomplete, or the source record may not have a generated detail page."
+    warning="A missing page does not mean that an official notification was deleted, resolved, or found to be inaccurate."
+  />
+  <section class="section shell">
+    <div class="grid">
+      <article class="card">
+        <h2><a href={`${import.meta.env.BASE_URL}latest/`}>Search notifications</a></h2>
+        <p>Filter the complete bounded published notification dataset locally.</p>
+      </article>
+      <article class="card">
+        <h2><a href={`${import.meta.env.BASE_URL}sources/`}>Review source coverage</a></h2>
+        <p>Check official-source boundaries, thresholds, roles, and limitations.</p>
+      </article>
+    </div>
+  </section>
+</BaseLayout>

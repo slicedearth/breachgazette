@@ -42,9 +42,10 @@ Astro renders a static website from a temporary privacy-minimised publication
 directory. Production builds refuse test fixtures and missing required real
 sources. Browser search uses a compact facet and trigram-Bloom manifest, loads
 only candidate source/year partitions, and can export every filtered match to
-a formula-safe CSV. There is no
-runtime application server, account system, analytics, cookie, or remotely
-collected search query.
+a formula-safe CSV. Filter state can be copied as a URL fragment without
+sending the search to a server. A privacy-minimised Atom feed exposes the
+latest public notifications. There is no runtime application server, account
+system, analytics, cookie, or remotely collected search query.
 
 See [the architecture](docs/architecture.md), [methodology](docs/methodology.md),
 and [data dictionary](docs/data-dictionary.md) for the complete model.
@@ -73,13 +74,19 @@ Run deterministic tests:
 .venv/bin/mypy src
 .venv/bin/pytest --cov=breachgazette --cov-report=term-missing --cov-fail-under=80
 .venv/bin/breachgazette validate-monitoring --json
-.venv/bin/breachgazette validate-aliases --json
-.venv/bin/breachgazette validate-relationships --json
+.venv/bin/breachgazette validate-aliases \
+  --catalogue tests/fixtures/reviews/organization-aliases.yml --json
+.venv/bin/breachgazette validate-relationships \
+  --catalogue tests/fixtures/reviews/relationship-decisions.yml --json
 cd site
 npm run check:test
 npm run build:test
 npm run test:e2e
 ```
+
+The local browser command uses Chromium only. Linux CI runs Chromium, Firefox,
+and WebKit through `npm run test:e2e:ci`; this avoids launching Playwright
+browser bundles that are incompatible with older macOS releases.
 
 Ordinary tests use only test-specific fixtures and injected transports. A
 fixture can be ingested only into a data-root directory whose final name
@@ -107,7 +114,8 @@ export BREACHGAZETTE_DATA_ROOT=/absolute/private/path/breachgazette-data
 The cycle updates an isolated copy, runs health, quality, publication, privacy,
 and public-tree gates, then promotes only the complete candidate. Without
 `--promote`, it is a non-mutating full-cycle rehearsal. Each source also keeps
-its previous complete snapshot when an individual retrieval fails.
+its previous complete snapshot when an individual retrieval fails. Source
+policy validation rejects future-dated or more-than-366-day-old rights reviews.
 
 ## Reviewed organization aliases
 
@@ -120,13 +128,16 @@ public organization identity:
   --output "$BREACHGAZETTE_DATA_ROOT/reports/alias-proposals.json"
 .venv/bin/breachgazette alias-decision-id \
   "Source-reported alias" "Reviewed canonical name" --json
-.venv/bin/breachgazette validate-aliases --json
+.venv/bin/breachgazette validate-aliases \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" --json
 ```
 
 An operator must verify official evidence and add an approved or rejected
-decision to `sources/organization-aliases.yml`. Decisions are deterministic,
-evidence-bearing, non-chained, and auditable. Rejected pairs are retained so
-they are not repeatedly proposed.
+decision to
+`$BREACHGAZETTE_DATA_ROOT/reviews/organization-aliases.yml`. Reviewed
+catalogues are private operational state and are never committed. Decisions
+are deterministic, evidence-bearing, non-chained, and auditable. Rejected
+pairs are retained so they are not repeatedly proposed.
 
 Reviewed incident-link decisions use a separate catalogue:
 
@@ -134,7 +145,8 @@ Reviewed incident-link decisions use a separate catalogue:
 .venv/bin/breachgazette relationship-decision-id \
   rel_000000000000000000000000 \
   --record-id source:one --record-id source:two --json
-.venv/bin/breachgazette validate-relationships --json
+.venv/bin/breachgazette validate-relationships \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" --json
 ```
 
 Confirmed links remain evidence-backed public-record relationships, not merged
@@ -162,13 +174,15 @@ publication_dir="$(mktemp -d /tmp/breachgazette-publication.XXXXXX)"
   --data-root "$BREACHGAZETTE_DATA_ROOT" \
   --output "$publication_dir"
 cd site
-BREACHGAZETTE_SITE_DATA_DIR="$publication_dir" npm run build
+BREACHGAZETTE_SITE_DATA_DIR="$publication_dir" npm run build:budget
 ../.venv/bin/breachgazette audit-public-tree dist
 ```
 
 The production build fails if the real data root is incomplete or if the
-publication data declares itself to be a fixture. Generated production
-records, search indexes, and publication data are not committed.
+publication data declares itself to be a fixture. The build and public-tree
+audits also enforce time, file-count, HTML-size, and total-size budgets.
+Generated production records, search indexes, and publication data are not
+committed.
 
 ## Privacy and safety
 
@@ -179,7 +193,9 @@ static tree for personal contact patterns, unsafe markup, dangerous URLs,
 spreadsheet formulas, control characters, and unapproved fields.
 
 Search and filtering run in the browser against the published bounded dataset.
-No query leaves the visitor's device. See [PRIVACY.md](PRIVACY.md) and
+Shareable filters use a URL fragment, which browsers do not send in HTTP
+requests. No query leaves the visitor's device. Reviewed alias and relationship
+catalogues remain private operational state. See [PRIVACY.md](PRIVACY.md) and
 [SECURITY.md](SECURITY.md).
 
 ## Source freshness and corrections

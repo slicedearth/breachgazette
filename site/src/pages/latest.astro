@@ -16,7 +16,7 @@ const publication = getPublication();
   />
   <section class="section shell">
     <div class="filters" data-notification-filters>
-      <label>Organization or agency<input type="search" name="query" autocomplete="off" /></label>
+      <label>Organization or agency<input type="search" name="query" autocomplete="off" maxlength="120" /></label>
       <label>Jurisdiction<select name="jurisdiction"><option value="">All jurisdictions</option></select></label>
       <label>Regulator<select name="regulator"><option value="">All regulators</option></select></label>
       <label>Source<select name="source"><option value="">All sources</option></select></label>
@@ -29,7 +29,9 @@ const publication = getPublication();
     </div>
     <div class="result-actions">
       <button type="button" data-export-results disabled>Export matching CSV</button>
+      <button type="button" data-copy-search disabled>Copy search link</button>
       <span class="table-note" data-export-status>Apply a filter to enable export.</span>
+      <span class="table-note" data-share-status>Search-link filters stay in the URL fragment and are not sent in HTTP requests.</span>
     </div>
     <p aria-live="polite" data-result-count>Loading bounded dataset…</p>
     <div data-results>
@@ -70,6 +72,8 @@ const publication = getPublication();
       const query = controls.querySelector<HTMLInputElement>('[name="query"]')!;
       const exportButton = document.querySelector<HTMLButtonElement>("[data-export-results]")!;
       const exportStatus = document.querySelector<HTMLElement>("[data-export-status]")!;
+      const copySearchButton = document.querySelector<HTMLButtonElement>("[data-copy-search]")!;
+      const shareStatus = document.querySelector<HTMLElement>("[data-share-status]")!;
       const options = (values: string[]) => [...new Set(values)].sort();
       for (const value of options(manifest.facets.jurisdictions)) jurisdiction.add(new Option(value, value));
       for (const value of options(manifest.facets.regulators)) regulator.add(new Option(value, value));
@@ -78,6 +82,45 @@ const publication = getPublication();
       for (const value of options(manifest.facets.information_categories)) information.add(new Option(label(value), value));
       for (const value of options(manifest.facets.roles)) role.add(new Option(label(value), value));
       for (const value of options(manifest.facets.publication_levels)) publication.add(new Option(label(value), value));
+      const filterControls = [
+        ...controls.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select"),
+      ];
+      const hasFilters = () =>
+        filterControls.some((control) => control.value.trim() !== "");
+      const applyHashState = () => {
+        const parameters = new URLSearchParams(
+          window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "",
+        );
+        for (const control of filterControls) {
+          const value = (parameters.get(control.name) ?? "").slice(0, 120);
+          if (
+            control instanceof HTMLSelectElement &&
+            value &&
+            ![...control.options].some((option) => option.value === value)
+          ) {
+            control.value = "";
+          } else {
+            control.value = value;
+          }
+        }
+      };
+      const syncHashState = () => {
+        const parameters = new URLSearchParams();
+        for (const control of filterControls) {
+          const value = control.value.trim();
+          if (value) parameters.set(control.name, value);
+        }
+        const fragment = parameters.toString();
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}${fragment ? `#${fragment}` : ""}`,
+        );
+        copySearchButton.disabled = !hasFilters();
+        shareStatus.textContent = fragment
+          ? "This search can be bookmarked without sending its filters in HTTP requests."
+          : "Search-link filters stay in the URL fragment and are not sent in HTTP requests.";
+      };
       const populationBand = (record: Notification) => {
         const affected = record.affected_population?.count;
         if (affected === null || affected === undefined) return "not_published";
@@ -264,14 +307,20 @@ const publication = getPublication();
         exportStatus.textContent = `Exported ${filteredRecords.length.toLocaleString()} matching source records.`;
       };
       exportButton.addEventListener("click", exportCsv);
+      copySearchButton.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          shareStatus.textContent = "Search link copied.";
+        } catch {
+          shareStatus.textContent = "Copy the current address to share this local search state.";
+        }
+      });
 
       let renderVersion = 0;
       let debounce: number | undefined;
       const render = async () => {
         const version = ++renderVersion;
-        const hasFilters = [...controls.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")]
-          .some((control) => control.value.trim() !== "");
-        if (!hasFilters) {
+        if (!hasFilters()) {
           filteredRecords = [];
           exportButton.disabled = true;
           exportStatus.textContent = "Apply a filter to enable export.";
@@ -327,9 +376,17 @@ const publication = getPublication();
       };
 
       controls.addEventListener("input", () => {
+        syncHashState();
         window.clearTimeout(debounce);
         debounce = window.setTimeout(() => void render(), query.value ? 180 : 0);
       });
+      window.addEventListener("hashchange", () => {
+        applyHashState();
+        syncHashState();
+        void render();
+      });
+      applyHashState();
+      syncHashState();
       void render();
       }
     }

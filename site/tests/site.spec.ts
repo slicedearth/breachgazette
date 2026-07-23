@@ -160,3 +160,41 @@ test("search includes regulator fields and exports every filtered match", async 
   expect(csv).toContain('"Washington Attorney General"');
   expect(csv.trim().split(/\r?\n/)).toHaveLength(2);
 });
+
+test("search filters can be restored from a server-private URL fragment", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  await page.goto("/latest/#jurisdiction=Washington&query=Example+Services");
+  await expect(page.getByLabel("Jurisdiction")).toHaveValue("Washington");
+  await expect(page.getByLabel("Organization or agency")).toHaveValue("Example Services");
+  await expect(page.getByText(/1 matching source records/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy search link" })).toBeEnabled();
+  expect(requests.every((url) => !url.includes("#"))).toBe(true);
+  await page.reload();
+  await expect(page.getByLabel("Jurisdiction")).toHaveValue("Washington");
+  await expect(page.getByLabel("Organization or agency")).toHaveValue("Example Services");
+});
+
+test("feed, crawler policy, and not-found page preserve publication boundaries", async ({
+  page,
+  request,
+}) => {
+  const feed = await request.get("/feeds/notifications.xml");
+  expect(feed.ok()).toBe(true);
+  expect(feed.headers()["content-type"]).toMatch(
+    /^(?:application\/atom\+xml|text\/xml)/,
+  );
+  const feedText = await feed.text();
+  expect(feedText).toContain("<feed xmlns=");
+  expect(feedText).toContain("Example Regional Agency");
+  expect(feedText).toContain("not an independently verified incident");
+  expect(feedText).not.toContain("Synthetic test fixture");
+
+  const robots = await request.get("/robots.txt");
+  expect(await robots.text()).toContain("Sitemap:");
+
+  await page.goto("/404.html");
+  await expect(page.getByRole("heading", { name: "That record page is not available." }))
+    .toBeVisible();
+  await expect(page.getByText(/missing page does not mean/i)).toBeVisible();
+});
