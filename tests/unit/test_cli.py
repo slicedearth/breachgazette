@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from click import unstyle
 from typer.testing import CliRunner
 
 from breachgazette.cli import app
@@ -77,9 +78,9 @@ def test_source_policy_cli_commands_are_machine_readable() -> None:
 
 
 def test_cli_requires_a_private_data_root() -> None:
-    result = runner.invoke(app, ["compare", "--json"])
+    result = runner.invoke(app, ["compare", "--json"], color=True)
     assert result.exit_code != 0
-    assert "data-root" in result.output
+    assert "--data-root" in unstyle(result.output)
 
 
 def test_fixture_and_inventory_cli(tmp_path: Path, notification_factory) -> None:
