@@ -20,13 +20,19 @@ from breachgazette.monitoring import build_source_health_report
 from breachgazette.policies import load_source_policies
 from breachgazette.privacy.audit import require_public_safe
 from breachgazette.quality import DataQualityError, build_quality_report
-from breachgazette.relationships import generate_candidates
+from breachgazette.relationships import (
+    apply_relationship_decisions,
+    generate_candidates,
+    load_relationship_catalogue,
+)
 from breachgazette.state import PrivateStateStore
 from breachgazette.utils import atomic_write_json, sha256_hex
 
 DETAIL_RECORDS_PER_SOURCE = 250
 LATEST_RECORDS = 100
 SEARCH_PARTITION_SIZE = 250
+SEARCH_BLOOM_BITS = 16_384
+SEARCH_BLOOM_HASHES = 3
 
 
 def _latest_date(record: SourceNotificationRecord) -> str:
@@ -86,6 +92,50 @@ def _search_facets(records: list[NormalizedNotification]) -> dict[str, list[str]
     }
 
 
+def _normalized_search_text(record: NormalizedNotification) -> str:
+    return " ".join(
+        " ".join(value.casefold().split())
+        for value in (
+            record.named_entity.source_name,
+            record.source_record_id,
+            record.jurisdiction,
+            record.regulator,
+            record.reporting_scheme,
+            str(record.named_entity.role),
+        )
+        if value
+    )
+
+
+def _search_trigrams(value: str) -> set[str]:
+    normalized = " ".join(value.casefold().split())
+    return (
+        {normalized[index : index + 3] for index in range(len(normalized) - 2)}
+        if len(normalized) >= 3
+        else set()
+    )
+
+
+def _fnv1a(value: str) -> int:
+    hashed = 2_166_136_261
+    for byte in value.encode():
+        hashed ^= byte
+        hashed = (hashed * 16_777_619) & 0xFFFFFFFF
+    return hashed
+
+
+def _query_bloom(records: list[NormalizedNotification]) -> str:
+    bloom = bytearray(SEARCH_BLOOM_BITS // 8)
+    grams = {
+        gram for record in records for gram in _search_trigrams(_normalized_search_text(record))
+    }
+    for gram in grams:
+        for seed in range(SEARCH_BLOOM_HASHES):
+            bit = _fnv1a(f"{seed}|{gram}") % SEARCH_BLOOM_BITS
+            bloom[bit // 8] |= 1 << (bit % 8)
+    return bloom.hex()
+
+
 def _build_search_assets(
     records: list[NormalizedNotification],
     *,
@@ -123,6 +173,7 @@ def _build_search_assets(
                 {
                     "id": partition_id,
                     "count": len(partition_records),
+                    "query_bloom": _query_bloom(partition_records),
                     **facets,
                 }
             )
@@ -131,6 +182,13 @@ def _build_search_assets(
         "generated_at": generated_at,
         "record_count": len(records),
         "partition_size": SEARCH_PARTITION_SIZE,
+        "query_routing": {
+            "algorithm": "normalized_trigram_bloom",
+            "encoding": "hex",
+            "bits": SEARCH_BLOOM_BITS,
+            "hashes": SEARCH_BLOOM_HASHES,
+            "minimum_query_length": 3,
+        },
         "facets": _search_facets(records),
         "partitions": partition_metadata,
     }
@@ -197,7 +255,10 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         )
     for action in regulatory_actions:
         action.canonical_organization_id = organization_by_alias.get(action.entity.normalized_name)
-    relationships = generate_candidates(notifications)
+    relationships, relationship_decisions = apply_relationship_decisions(
+        generate_candidates(notifications),
+        catalogue=load_relationship_catalogue(),
+    )
     events = [
         event for event in store.load_events() if event.event_type != "notification_first_observed"
     ]
@@ -254,6 +315,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         "regulatory_actions": regulatory_actions,
         "detail_organizations": detail_organizations,
         "relationships": relationships,
+        "relationship_decisions": relationship_decisions,
         "corrections": sorted(
             events,
             key=lambda event: (event.first_observed_time, event.event_id),
@@ -307,6 +369,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     )
     summary_payload["quality"] = final_quality
     output.mkdir(parents=True, exist_ok=True)
+    (output / "notifications.json").unlink(missing_ok=True)
     search_output = output / "search-partitions"
     search_output.mkdir(parents=True, exist_ok=True)
     for existing in search_output.glob("*.json"):
@@ -314,7 +377,6 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     for partition_id, payload in search_partitions:
         atomic_write_json(search_output / f"{partition_id}.json", payload)
     atomic_write_json(output / "publication.json", summary_payload)
-    atomic_write_json(output / "notifications.json", notifications)
     atomic_write_json(output / "search-manifest.json", search_manifest)
     atomic_write_json(output / "source-health.json", source_health)
     atomic_write_json(output / "organizations.json", organizations)

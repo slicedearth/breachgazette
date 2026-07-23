@@ -17,20 +17,28 @@ const { relationship } = Astro.props;
 <BaseLayout title={relationship.candidate_id} description={relationship.limitations[0] ?? "Candidate relationship between source records."} section="Candidate incident group">
   <Hero
     eyebrow={label(relationship.relationship_class)}
-    title="Candidate record relationship"
-    intro="These records may relate based on the displayed evidence."
-    warning="This is not a declaration that the records describe the same breach. It does not merge their provenance, roles, dates, thresholds, or legal meaning."
+    title={relationship.review_status === "confirmed_related" ? "Reviewed record relationship" : "Candidate record relationship"}
+    intro={relationship.review_status === "confirmed_related" ? "A reviewer confirmed that these public records likely report the same public event." : "These records may relate based on the displayed evidence."}
+    warning="This is not a declaration that the records describe one incident. Even a confirmed relationship does not merge source provenance, roles, dates, thresholds, legal meaning, or source-defined entities."
   />
   <section class="section shell">
     <DefinitionGrid items={[
       { term: "Candidate ID", description: relationship.candidate_id },
       { term: "Source records", description: relationship.record_ids.join(" and ") },
       { term: "Relationship class", description: label(relationship.relationship_class) },
-      { term: "Review state", description: relationship.reviewed ? "Reviewed" : "Not reviewed" },
+      { term: "Review state", description: relationship.review_status ? label(relationship.review_status) : "Not reviewed" },
+      ...(relationship.reviewed_on ? [{ term: "Reviewed on", description: relationship.reviewed_on }] : []),
     ]} />
     <div class="prose">
       <h2>Displayed evidence</h2>
       <ul>{relationship.reasons.map((reason) => <li><strong>{label(reason.code)}:</strong> {reason.explanation} Evidence: {reason.evidence.join("; ")}.</li>)}</ul>
+      {relationship.review_note && <p><strong>Review note:</strong> {relationship.review_note}</p>}
+      {(relationship.review_evidence?.length ?? 0) > 0 && (
+        <>
+          <h2>Review evidence</h2>
+          <ul>{relationship.review_evidence?.map((evidence) => <li>{evidence}</li>)}</ul>
+        </>
+      )}
       {relationship.limitations.map((limitation) => <p>{limitation}</p>)}
     </div>
   </section>

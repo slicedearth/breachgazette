@@ -306,7 +306,22 @@ class IncidentGroupCandidate(ContractModel):
     reasons: list[RelationshipReason] = Field(min_length=1, max_length=10)
     origin: Literal[ValueOrigin.DERIVED_CANDIDATE] = ValueOrigin.DERIVED_CANDIDATE
     reviewed: bool = False
+    review_status: Literal["confirmed_related", "rejected", "unresolved"] | None = None
+    reviewed_on: date | None = None
+    review_note: str | None = Field(default=None, max_length=500)
+    review_evidence: list[str] = Field(default_factory=list, max_length=10)
     limitations: list[str] = Field(min_length=1)
+
+
+class RelationshipReviewDecision(ContractModel):
+    decision_id: str = Field(pattern=r"^relationship_[0-9a-f]{16}$")
+    candidate_id: str = Field(pattern=r"^rel_[0-9a-f]{24}$")
+    status: Literal["confirmed_related", "rejected", "unresolved"]
+    record_ids: list[str] = Field(min_length=2, max_length=10)
+    evidence: list[str] = Field(min_length=1, max_length=10)
+    reviewed_on: date
+    review_note: str = Field(min_length=2, max_length=500)
+    decision_version: Literal["1.0"] = "1.0"
 
 
 class IncidentGroup(ContractModel):

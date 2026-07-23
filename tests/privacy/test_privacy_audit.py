@@ -55,6 +55,7 @@ def test_opaque_identifiers_do_not_trigger_phone_detectors() -> None:
             "record_ids": ["ca:077065575516518341c47b1d:1"],
             "source_revision": "293f77604737bf7a",
             "canonical_organization_id": "org_0479028280477635",
+            "query_bloom": "020478026102047802610204780261",
             "organization": "Outcomes One, Inc.",
         },
         record_identity="record",

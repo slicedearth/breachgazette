@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 test("Australian landing separates aggregate records from incidents", async ({ page }) => {
   await page.goto("/australia/");
@@ -47,10 +48,19 @@ test("organization and candidate relationship pages explain evidence", async ({ 
   await expect(page.getByRole("heading", { name: "Displayed evidence" })).toBeVisible();
 });
 
-test("keyboard navigation exposes skip link and table alternatives", async ({ page }) => {
+test("keyboard navigation exposes skip link and table alternatives", async ({ page, browserName }) => {
   await page.goto("/");
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
+  const skipLink = page.getByRole("link", { name: "Skip to content" });
+  if (browserName === "webkit") {
+    // Headless WebKit follows the host's full-keyboard-access preference, so
+    // focus the link directly before checking its keyboard activation.
+    await skipLink.focus();
+  } else {
+    await page.keyboard.press("Tab");
+  }
+  await expect(skipLink).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#main")).toBeFocused();
   await page.goto("/australia/");
   await expect(page.getByRole("table", { name: /OAIC aggregate metrics/i })).toBeVisible();
 });
@@ -132,4 +142,21 @@ test("full notification filters preserve source fields and population bands", as
   await page.locator('[name="publication"]').selectOption("regulator_register_entry");
   await expect(page.locator("[data-result-count]")).toContainText("1 matching source records");
   await expect(page.getByRole("link", { name: "Example Services Cooperative" })).toBeVisible();
+});
+
+test("search includes regulator fields and exports every filtered match", async ({ page }) => {
+  await page.goto("/latest/");
+  await page.locator('[name="query"]').fill("Washington Attorney General");
+  await expect(page.locator("[data-result-count]")).toContainText("1 matching source records");
+  const download = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export matching CSV" }).click(),
+  ]).then(([item]) => item);
+  expect(download.suggestedFilename()).toBe("breach-gazette-notifications.csv");
+  const path = await download.path();
+  expect(path).not.toBeNull();
+  const csv = await readFile(path!, "utf8");
+  expect(csv).toContain('"washington","fixture-wa-1"');
+  expect(csv).toContain('"Washington Attorney General"');
+  expect(csv.trim().split(/\r?\n/)).toHaveLength(2);
 });

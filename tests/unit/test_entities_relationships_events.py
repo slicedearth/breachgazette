@@ -15,7 +15,12 @@ from breachgazette.entities import (
     propose_alias_reviews,
     resolve_organizations,
 )
-from breachgazette.relationships import generate_candidates
+from breachgazette.relationships import (
+    apply_relationship_decisions,
+    generate_candidates,
+    load_relationship_catalogue,
+    relationship_decision_id,
+)
 from breachgazette.utils import canonical_json_bytes
 
 
@@ -148,6 +153,53 @@ def test_candidate_requires_exact_entity_date_and_different_sources(notification
     assert candidates[0].record_ids == ["ca:1", "wa:1"]
     assert "not proof" in candidates[0].limitations[0]
     assert generate_candidates([left, same_source]) == []
+
+
+def test_reviewed_relationships_publish_confirmations_and_suppress_rejections(
+    tmp_path: Path,
+    notification_factory,
+) -> None:
+    left = notification_factory(source_id="washington", record_id="wa:1")
+    right = notification_factory(source_id="california", record_id="ca:1")
+    candidate = generate_candidates([left, right])[0]
+    decision_id = relationship_decision_id(candidate.candidate_id, candidate.record_ids)
+    path = tmp_path / "relationships.yml"
+    path.write_text(
+        f"""
+schema_version: "1.0"
+decisions:
+  - decision_id: "{decision_id}"
+    candidate_id: "{candidate.candidate_id}"
+    status: confirmed_related
+    record_ids: [ca:1, wa:1]
+    evidence: ["Exact synthetic source labels and occurrence date."]
+    reviewed_on: 2026-01-01
+    review_note: "Synthetic confirmation for deterministic testing."
+""".lstrip(),
+        encoding="utf-8",
+    )
+    published, decisions = apply_relationship_decisions(
+        [candidate],
+        catalogue=load_relationship_catalogue(path),
+    )
+    assert published[0].reviewed is True
+    assert published[0].review_status == "confirmed_related"
+    assert published[0].relationship_class == "likely_same_publicly_reported_event"
+    assert decisions[0].decision_id == decision_id
+
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "status: confirmed_related",
+            "status: rejected",
+        ),
+        encoding="utf-8",
+    )
+    suppressed, decisions = apply_relationship_decisions(
+        [generate_candidates([left, right])[0]],
+        catalogue=load_relationship_catalogue(path),
+    )
+    assert suppressed == []
+    assert decisions[0].status == "rejected"
 
 
 @given(st.lists(st.integers(), max_size=30))
