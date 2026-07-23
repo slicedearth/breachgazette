@@ -5,9 +5,10 @@ from pathlib import Path
 
 WORKFLOW_ROOT = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 SHA_PIN = re.compile(r"^\s*uses:\s+[^@\s]+@[0-9a-f]{40}(?:\s+#.*)?$")
+LOCAL_WORKFLOW = re.compile(r"^\s*uses:\s+\./\.github/workflows/[a-z0-9-]+\.yml$")
 
 
-def test_every_action_reference_is_pinned_to_a_full_commit_sha() -> None:
+def test_every_external_action_is_pinned_and_local_workflows_are_repository_relative() -> None:
     action_references = [
         line
         for workflow in WORKFLOW_ROOT.glob("*.yml")
@@ -15,13 +16,15 @@ def test_every_action_reference_is_pinned_to_a_full_commit_sha() -> None:
         if line.lstrip().startswith("uses:")
     ]
     assert action_references
-    assert all(SHA_PIN.match(line) for line in action_references)
+    assert all(SHA_PIN.match(line) or LOCAL_WORKFLOW.match(line) for line in action_references)
 
 
 def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     workflow = (WORKFLOW_ROOT / "scheduled-private-update.yml").read_text(encoding="utf-8")
+    update_job, publish_job = workflow.split("\n  publish:\n", maxsplit=1)
     assert "permissions:\n  contents: read" in workflow
     assert "vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true'" in workflow
+    assert "vars.BREACHGAZETTE_DATA_REF" in update_job
     assert "default: false" in workflow
     assert "breachgazette update-cycle --data-root .private-production-data --promote" in workflow
     assert "steps.update_cycle.outcome == 'success'" in workflow
@@ -34,14 +37,20 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     assert workflow.index("Verify and promote an isolated candidate") < workflow.index(
         "git push origin HEAD"
     )
-    assert "secrets.BREACHGAZETTE_DATA_WRITE_KEY" in workflow
-    assert "secrets.BREACHGAZETTE_DATA_READ_KEY" not in workflow
+    assert "secrets.BREACHGAZETTE_DATA_WRITE_KEY" in update_job
+    assert "secrets.BREACHGAZETTE_DATA_READ_KEY" not in update_job
+    assert "secrets.BREACHGAZETTE_DATA_READ_KEY" in publish_job
+    assert "secrets.BREACHGAZETTE_DATA_WRITE_KEY" not in publish_job
+    assert "needs.update.result == 'success'" in publish_job
+    assert "github.event_name == 'schedule' || inputs.persist_private_state" in publish_job
+    assert "uses: ./.github/workflows/netlify.yml" in publish_job
     assert "reviews" in workflow
     assert "breachgazette-update@users.noreply.github.com" in workflow
 
 
 def test_ci_covers_private_catalogue_contracts_and_all_browser_engines() -> None:
     workflow = (WORKFLOW_ROOT / "ci.yml").read_text(encoding="utf-8")
+    assert "ruff check --select S src" in workflow
     assert "tests/fixtures/reviews/organization-aliases.yml" in workflow
     assert "tests/fixtures/reviews/relationship-decisions.yml" in workflow
     assert "playwright install --with-deps chromium firefox webkit" in workflow
@@ -51,6 +60,19 @@ def test_ci_covers_private_catalogue_contracts_and_all_browser_engines() -> None
 
 def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() -> None:
     workflow = (WORKFLOW_ROOT / "netlify.yml").read_text(encoding="utf-8")
+    assert "workflow_call:" in workflow
+    assert "workflow_run:" in workflow
+    assert "workflows:\n      - CI" in workflow
+    assert "github.event.workflow_run.conclusion == 'success'" in workflow
+    assert "github.event.workflow_run.event == 'push'" in workflow
+    assert "github.event.workflow_run.head_branch == 'main'" in workflow
+    assert (
+        "github.event.workflow_run.head_repository.full_name == github.repository"
+        in workflow
+    )
+    assert "github.event.workflow_run.head_sha" in workflow
+    assert "vars.BREACHGAZETTE_DATA_REF" in workflow
+    assert "steps.data-ref.outputs.data_ref" in workflow
     assert "secrets.BREACHGAZETTE_DATA_READ_KEY" in workflow
     assert "secrets.BREACHGAZETTE_DATA_WRITE_KEY" not in workflow
     assert "persist-credentials: false" in workflow
@@ -62,8 +84,16 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert "Content-Type: application/zip" in workflow
     assert '--data-binary "@$RUNNER_TEMP/breachgazette-site.zip"' in workflow
     assert "/deploys?production=true" in workflow
+    assert "Netlify returned an invalid HTTPS deployment URL." in workflow
+    assert "Verify live security headers" in workflow
+    assert "strict-transport-security: max-age=31536000" in workflow
+    assert "x-content-type-options: nosniff" in workflow
+    assert "cross-origin-opener-policy: same-origin" in workflow
     assert workflow.index("breachgazette audit-public-tree dist --json") < workflow.index(
         "breachgazette-site.zip"
+    )
+    assert workflow.index("breachgazette-site.zip") < workflow.index(
+        "Verify live security headers"
     )
 
 

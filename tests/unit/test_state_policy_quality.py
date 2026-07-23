@@ -427,8 +427,10 @@ def test_public_tree_audit_passes_safe_tree_and_rejects_remote_assets(tmp_path: 
     safe = tmp_path / "safe"
     safe.mkdir()
     (safe / "index.html").write_text("<p>Safe static page</p>", encoding="utf-8")
+    (safe / "_headers").write_text("/*\n  X-Frame-Options: DENY\n", encoding="utf-8")
     report = audit_public_tree(safe)
     assert report["passed"] is True
+    assert report["files"] == 2
     assert report["html_files"] == 1
     with pytest.raises(DataQualityError, match="budget"):
         audit_public_tree(safe, max_files=0)
@@ -439,3 +441,35 @@ def test_public_tree_audit_passes_safe_tree_and_rejects_remote_assets(tmp_path: 
         audit_public_tree(safe)
     with pytest.raises(ValueError, match="does not exist"):
         audit_public_tree(tmp_path / "missing")
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        ".env",
+        "archive.zip",
+        "bundle.js.map",
+        "private.pem",
+        "state.sqlite",
+    ],
+)
+def test_public_tree_audit_rejects_sensitive_or_unknown_file_types(
+    tmp_path: Path,
+    filename: str,
+) -> None:
+    public = tmp_path / "public"
+    public.mkdir()
+    (public / "index.html").write_text("<p>Safe static page</p>", encoding="utf-8")
+    (public / filename).write_text("not public", encoding="utf-8")
+    with pytest.raises(DataQualityError, match="not allowed"):
+        audit_public_tree(public)
+
+
+def test_public_tree_audit_rejects_symbolic_links(tmp_path: Path) -> None:
+    public = tmp_path / "public"
+    public.mkdir()
+    target = tmp_path / "private.txt"
+    target.write_text("private state", encoding="utf-8")
+    (public / "linked.txt").symlink_to(target)
+    with pytest.raises(DataQualityError, match="symbolic links"):
+        audit_public_tree(public)

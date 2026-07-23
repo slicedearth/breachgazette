@@ -109,7 +109,7 @@ state store and receives only the audited `site/dist` output.
 Use separate deploy keys:
 
 - `BREACHGAZETTE_DATA_READ_KEY` is read-only and is available only to the
-  manual publication workflow;
+  automatic or manually dispatched publication job;
 - `BREACHGAZETTE_DATA_WRITE_KEY` is write-scoped to the private data repository
   and is available only to the explicitly enabled update workflow.
 
@@ -129,20 +129,24 @@ but the scheduled job is inert until all of these are deliberately configured:
 - `BREACHGAZETTE_SCHEDULE_ENABLED=true` repository variable;
 - `BREACHGAZETTE_DATA_REPOSITORY` pointing to the separate private state
   repository;
+- `BREACHGAZETTE_DATA_REF` naming the writable private-state branch used for
+  automatic updates and publication;
 - `BREACHGAZETTE_DATA_WRITE_KEY` containing a write-scoped deploy key for only
-  that private repository.
+  that private repository;
+- the read-only publication key and Netlify settings listed below.
 
 Manual dispatch defaults `persist_private_state` to false. The workflow runs
 `update-cycle --promote` against the private checkout; that command verifies an
 isolated candidate before replacing the checkout contents. It commits and
 pushes private state only on an enabled schedule or an explicitly persistent
-manual run. A failed candidate never replaces the checkout.
+manual run. A successful persisted update then calls the read-only publication
+workflow for the configured private branch. A rehearsal does not publish, and a
+failed candidate never replaces the checkout or reaches Netlify.
 
 The health artifact is retained for 14 days and contains counts, checksums,
 timestamps, states, and bounded reasons, not source records. The job summary
 contains only source ID, status, count, and overall result. GitHub’s normal
-failed-run notification is the default operator alert. Netlify publication
-remains a separate manual workflow with read-only access to private state.
+failed-run notification is the default operator alert.
 
 ## Publication
 
@@ -162,15 +166,37 @@ workflow artifact, or publish a test fixture. Schedules require a separate
 review of source load, rights, private-repository retention, failure reporting,
 and operator ownership before enablement.
 
-The manual Netlify workflow additionally requires:
+The Netlify publication workflow requires:
 
+- `BREACHGAZETTE_DATA_REPOSITORY`, the separate private state repository;
+- `BREACHGAZETTE_DATA_REF`, its configured writable production branch;
 - `BREACHGAZETTE_SITE_URL`, the final HTTPS origin;
 - `NETLIFY_SITE_ID`, the target site identifier;
 - `NETLIFY_AUTH_TOKEN`, a dedicated token stored only as a repository secret;
 - `BREACHGAZETTE_DATA_READ_KEY`, scoped read-only to the private state
   repository.
 
-The workflow builds from an exact private-state commit or tag, audits the
-result, and then performs an atomic manual deploy of only `site/dist`. Do not
-enable Netlify's connected repository build because it has no reason to receive
-the private state repository or its credentials.
+Publication runs automatically after successful `main` CI and after a
+successful scheduled or explicitly persisted private-state update. A manual
+dispatch remains available for an exact private-state commit or tag. The
+workflow records the resolved source and private-state commit IDs, audits the
+result, and atomically deploys only `site/dist`. Do not enable Netlify's
+connected repository build because it has no reason to receive the private
+state repository or its credentials.
+
+Before enabling unattended publication:
+
+- protect the public repository's `main` branch and require CI and CodeQL for
+  pull requests;
+- restrict the GitHub `netlify-production` environment to the `main` branch,
+  without a required reviewer if publication must remain unattended;
+- use a dedicated, revocable Netlify token rather than a personal general-use
+  credential;
+- keep Netlify connected builds disabled so GitHub Actions is the only
+  production publisher;
+- manually publish one exact private-state commit, verify the live response
+  headers and site content, then enable the schedule.
+
+These are provider settings and are not established by the repository. Review
+them after changes to repository ownership, branch protection, environments,
+tokens, or the Netlify site.
