@@ -34,17 +34,27 @@ the URL fragment, which is not included in HTTP requests. The Atom feed
 contains only the same privacy-minimised public notification fields. No
 browser-local watchlist is included in this release.
 
+Breach Gazette does not add application analytics or request logging. As the
+static hosting and CDN provider, Netlify may process ordinary request metadata
+such as IP address, requested path, user agent, and timestamp under its own
+service terms. Search filters in URL fragments are not sent with those
+requests. Optional Netlify analytics or log-export features should remain
+disabled unless this policy is reviewed first.
+
 ## Private and public data
 
 Raw retrievals and durable production state live at the operator-configured
-`BREACHGAZETTE_DATA_ROOT`, outside the repository. The public build receives only
-a temporary, validated, derived publication directory. The repository contains
-synthetic fixtures labelled `test_fixture` and empty review-catalogue schemas;
-production commands reject fixture state. Generated publication output is not
-committed.
+`BREACHGAZETTE_DATA_ROOT`, outside the public source repository. The public
+build receives only a temporary, validated, derived publication directory. The
+public repository contains synthetic fixtures labelled `test_fixture` and
+empty review-catalogue schemas; production commands reject fixture state.
+Generated publication output is not committed, and Netlify receives only the
+audited static tree.
 
 To delete local operational data, stop update and build processes, verify the
 exact configured private root, and remove that root through the operator's
-normal recoverable deletion procedure. Deleting private state also deletes
-local observation history. Public correction requests should identify the
-official source and field without supplying personal data.
+normal recoverable deletion procedure. If that root is synchronized through a
+private Git repository or backup, the same deletion review must cover repository
+history and retained backup copies. Deleting private state also deletes local
+observation history. Public correction requests should identify the official
+source and field without supplying personal data.

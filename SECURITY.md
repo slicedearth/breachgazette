@@ -25,29 +25,28 @@ text. Breach Gazette does not retrieve breach-notification letters or complete
 regulator decisions.
 
 Production state, raw retrieval caches, manifests, checkpoints, and immutable
-events remain in a private data root outside Git and the static site. Reviewed
-alias and relationship catalogues also remain private. The public repository
-contains only deterministic synthetic fixtures and empty review-catalogue
-schemas. Production publication refuses fixture state.
+events remain in a separate private data root outside the public source
+repository and static site. Reviewed alias and relationship catalogues also
+remain private. The public repository contains only deterministic synthetic
+fixtures and empty review-catalogue schemas. Production publication refuses
+fixture state.
 
 ## Workflows and dependencies
 
 Workflows use least privilege, immutable action SHAs, explicit timeouts, locked
-dependencies, and no live sources in CI. Pages deployment is manual-only and
-requires configured real source-derived data. Dry-run update workflows make no
-commit, push, issue, or deployment. The separate scheduled workflow is disabled
-unless explicitly enabled and can push only its verified candidate to the
-configured private state repository through that repository's scoped deploy
-key. It cannot write the public source repository.
+dependencies, and no live sources in CI. Netlify deployment is manual-only and
+requires configured real source-derived data. It checks out private state with
+a read-only deploy key and uploads only the audited static tree. Dry-run update
+workflows make no commit, push, issue, or deployment. The separate scheduled
+workflow is disabled unless explicitly enabled and can push only its verified
+candidate to the configured private state repository through a distinct
+write-scoped deploy key. It cannot write the public source repository.
 
 Python and npm dependencies are fully pinned in committed lockfiles. CI runs
 `pip-audit` and `npm audit --audit-level=high`. See
 [the dependency policy](docs/dependency-policy.md).
 
-Where supported, static hosts should apply response headers for transport
-security, framing protection, content-type sniffing protection, referrer
-policy, and a restrictive content security policy. HTML metadata is defense in
-depth and cannot enforce `Strict-Transport-Security` or CSP
-`frame-ancestors`. The included GitHub Pages workflow cannot configure
-arbitrary response headers, so a host with header controls is required when
-those protections are mandatory.
+Netlify applies committed response headers for transport security, framing
+protection, content-type sniffing protection, referrer policy, permissions, and
+a restrictive content security policy. HTML metadata remains defense in depth;
+it cannot enforce `Strict-Transport-Security` or CSP `frame-ancestors`.

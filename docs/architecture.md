@@ -16,25 +16,27 @@ state.
 
 The publication builder reads real state, applies quality gates, resolves exact
 and reviewed organization identities, applies reviewed relationship decisions,
-and writes a temporary minimised publication. Astro statically renders summary
-and bounded detail pages. It publishes a compact facet and hex-encoded trigram
-Bloom manifest plus source/year JSON partitions capped at 250 records. The
-browser fetches false-positive-safe candidate partitions only after filtering;
-there is no runtime API.
+and writes a temporary minimised publication. Astro statically renders summary,
+paginated relationship-directory, and bounded detail pages. It publishes a
+compact facet and hex-encoded trigram Bloom manifest plus source/year JSON
+partitions capped at 250 records. The browser fetches false-positive-safe
+candidate partitions only after filtering; there is no runtime API.
 
 Alias and relationship review catalogues are private operational inputs under
 `BREACHGAZETTE_DATA_ROOT/reviews`. They are validated before publication and
 are never committed with the public source tree.
 
 ```text
-official sources -> fixed clients -> source contracts -> private state
+official sources -> fixed clients -> source contracts -> private state repository
                                              |
                                              v
-health + quality + privacy -> minimised publication -> Astro static site
+health + quality + privacy -> minimised publication -> audited static tree -> Netlify
 ```
 
 Production and fixture paths are explicit and incompatible. Repository
-fixtures cannot be promoted into production output.
+fixtures cannot be promoted into production output. Netlify is a publication
+target, not a durable store; it receives neither the private data root nor
+review catalogues.
 
 The same candidate transaction serves the local CLI and scheduled workflow. It
 promotes only after update, health report, quality report, publication build,
