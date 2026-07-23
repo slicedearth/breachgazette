@@ -19,3 +19,7 @@ Alias proposals remain private operational reports and cannot change public
 identities. Source-health artifacts contain source IDs, counts, checksums,
 timestamps, statuses, and bounded reasons, not source records. Public search
 uses static same-origin partitions and sends no query to an application server.
+The query-routing Bloom values are irreversible derived bitsets and are exempt
+from text-pattern detectors only by exact field name; the underlying public
+records still pass the full privacy audit. CSV export is user-initiated,
+browser-local, field-allowlisted, and formula-neutralized.

@@ -17,6 +17,10 @@ publications, names, logos, or third-party material.
 - **California:** California DOJ describes government site material as public
   domain subject to third-party exclusions. Only the official CSV fields are
   normalized; sample letters are excluded.
+- **Massachusetts:** publication is limited to attributed factual fields in the
+  reviewed 2025 and 2026 official annual reports, subject to Mass.gov terms.
+  Placeholder and duplicate-marker rows contain no independent notification
+  facts and are counted but excluded. Consumer letters are not retrieved.
 - **HHS:** the portal is linked and assessed but no source records are
   redistributed in this release.
 

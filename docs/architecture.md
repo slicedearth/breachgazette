@@ -15,11 +15,12 @@ thresholds stop suspicious source results before they can replace complete
 state.
 
 The publication builder reads real state, applies quality gates, resolves exact
-organization identities, derives conservative relationship candidates, and
-writes a temporary minimised publication. Astro statically renders summary and
-bounded detail pages. It publishes a compact search manifest plus source/year
-JSON partitions capped at 250 records. The browser fetches candidate partitions
-only after filtering; there is no runtime API.
+and reviewed organization identities, applies reviewed relationship decisions,
+and writes a temporary minimised publication. Astro statically renders summary
+and bounded detail pages. It publishes a compact facet and hex-encoded trigram
+Bloom manifest plus source/year JSON partitions capped at 250 records. The
+browser fetches false-positive-safe candidate partitions only after filtering;
+there is no runtime API.
 
 ```text
 official sources -> fixed clients -> source contracts -> private state
@@ -31,7 +32,8 @@ health + quality + privacy -> minimised publication -> Astro static site
 Production and fixture paths are explicit and incompatible. Repository
 fixtures cannot be promoted into production output.
 
-The scheduled workflow uses a candidate copy of the separate private state
-repository. It promotes that candidate only after the update, health report,
-quality report, publication build, and public-tree audit all pass. Schedule
-execution is additionally gated by an explicit repository variable.
+The same candidate transaction serves the local CLI and scheduled workflow. It
+promotes only after update, health report, quality report, publication build,
+public-tree audit, compaction, and size checks pass. The candidate swap
+preserves private repository metadata and rolls back a failed promotion.
+Schedule execution is additionally gated by an explicit repository variable.
