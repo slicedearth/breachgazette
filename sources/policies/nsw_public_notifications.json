@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "source_id": "nsw_public_notifications",
+  "name": "NSW IPC Public Notifications Register",
+  "country": "Australia",
+  "jurisdiction": "New South Wales",
+  "regulator": "Information and Privacy Commission NSW",
+  "reporting_scheme": "Mandatory Notification of Data Breach Scheme",
+  "publication_level": "regulator_register_entry",
+  "unit_of_observation": "One public notification register entry published by a NSW public sector agency",
+  "source_threshold": "Public notification is used where direct notification is not reasonably practicable; exemptions and direct notifications affect publication.",
+  "source_population": "NSW public sector agency public notifications under Part 6A of the PPIP Act.",
+  "public_window": "Links are published for at least 12 months; the page also lists expired entries without their former links.",
+  "coverage_type": "rolling_public_window",
+  "aggregate": false,
+  "organizations_named": true,
+  "records_may_be_amended": true,
+  "records_may_disappear": true,
+  "counts_may_be_estimates": false,
+  "duplicate_notifications_may_be_consolidated": false,
+  "notifier_may_differ_from_affected_entity": true,
+  "source_licence": "Creative Commons Attribution 4.0 International, subject to the IPC copyright notice",
+  "attribution": "Information and Privacy Commission NSW",
+  "redistribution_decision": "approved_with_conditions",
+  "correction_process": "Verify the current IPC register and linked agency notification; do not reproduce the notification prose.",
+  "source_url": "https://www.ipc.nsw.gov.au/privacy/MNDB-scheme/public-notifications",
+  "limitations": [
+    "The register is not a complete list of NSW public-sector data breaches.",
+    "Absence is not evidence that an agency had no eligible breach.",
+    "Expired records reflect source windowing, not remediation."
+  ]
+}

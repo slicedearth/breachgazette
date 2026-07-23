@@ -1,0 +1,110 @@
+schema_version: "1.0"
+reviewed_at: "2026-07-23"
+entries:
+  - matter_id: medibank-2022
+    event_id: medibank-investigation-commenced-2022-12-01
+    official_url: https://www.oaic.gov.au/news/media-centre/oaic-opens-investigation-into-medibank-over-data-breach
+    entity: Medibank Private Limited
+    entity_role: regulator_named_entity
+    event_date: "2022-12-01"
+    publication_date: "2022-12-01"
+    legal_status: investigation_commenced
+    source_title: OAIC opens investigation into Medibank over data breach
+    status_wording: The OAIC commenced an investigation into Medibank's personal information handling practices.
+    summary: The OAIC source reports that an investigation commenced. It was not a determination or finding.
+    source_type: media_release
+    expected_parser: reviewed_title_marker
+    expected_marker: OAIC opens investigation into Medibank over data breach
+    why_included: Official commencement of a Commissioner-initiated investigation following a public data breach.
+  - matter_id: medibank-2022
+    event_id: medibank-proceeding-filed-2024-06-05
+    official_url: https://www.oaic.gov.au/news/media-centre/oaic-takes-civil-penalty-action-against-medibank
+    entity: Medibank Private Limited
+    entity_role: alleged_respondent
+    event_date: "2024-06-05"
+    publication_date: "2024-06-05"
+    legal_status: civil_proceeding_allegation
+    source_title: OAIC takes civil penalty action against Medibank
+    status_wording: The Commissioner filed civil penalty proceedings and alleges serious interference with privacy.
+    summary: The filed proceeding contains allegations. Whether liability or a civil penalty is established is a matter for the court.
+    source_type: media_release
+    expected_parser: reviewed_title_marker
+    expected_marker: OAIC takes civil penalty action against Medibank
+    why_included: Official filing and allegation connected to the earlier investigation.
+    previous_related_event: medibank-investigation-commenced-2022-12-01
+  - matter_id: oxfam-2021
+    event_id: oxfam-investigation-commenced-2021-09-10
+    official_url: https://www.oaic.gov.au/news/media-centre/oaic-accepts-oxfam-australia-enforceable-undertaking
+    entity: Oxfam Australia
+    entity_role: regulator_named_entity
+    event_date: "2021-09-10"
+    publication_date: "2025-02-20"
+    legal_status: investigation_commenced
+    source_title: OAIC accepts Oxfam Australia enforceable undertaking
+    status_wording: The source timeline says the Commissioner commenced an investigation on 10 September 2021.
+    summary: The later OAIC release records when the investigation commenced.
+    source_type: media_release
+    expected_parser: reviewed_title_marker
+    expected_marker: OAIC accepts Oxfam Australia enforceable undertaking
+    why_included: Official retrospective timeline for a breach-related investigation.
+  - matter_id: oxfam-2021
+    event_id: oxfam-enforceable-undertaking-2024-12-20
+    official_url: https://www.oaic.gov.au/news/media-centre/oaic-accepts-oxfam-australia-enforceable-undertaking
+    entity: Oxfam Australia
+    entity_role: regulator_named_entity
+    event_date: "2024-12-20"
+    publication_date: "2025-02-20"
+    legal_status: enforceable_undertaking
+    source_title: OAIC accepts Oxfam Australia enforceable undertaking
+    status_wording: The Privacy Commissioner accepted an enforceable undertaking on 20 December 2024.
+    summary: The OAIC expressly states that acceptance was not a finding that Oxfam breached the Privacy Act or Australian Privacy Principles.
+    source_type: media_release
+    expected_parser: reviewed_title_marker
+    expected_marker: acceptance of the EU is not a finding
+    why_included: Official outcome that must remain distinct from an adverse finding.
+    previous_related_event: oxfam-investigation-commenced-2021-09-10
+  - matter_id: optus-2022
+    event_id: optus-proceeding-filed-2025-08-08
+    official_url: https://www.oaic.gov.au/news/media-centre/australian-information-commissioner-takes-civil-penalty-action-against-optus
+    entity: Singtel Optus Pty Limited and Optus Systems Pty Limited
+    entity_role: alleged_respondent
+    event_date: "2025-08-08"
+    publication_date: "2025-08-08"
+    legal_status: civil_proceeding_allegation
+    source_title: Australian Information Commissioner takes civil penalty action against Optus
+    status_wording: The Commissioner filed civil penalty proceedings and alleges serious interference with privacy.
+    summary: The filed proceeding contains allegations. Whether a civil penalty order is made is a matter for the court.
+    source_type: media_release
+    expected_parser: reviewed_title_marker
+    expected_marker: Australian Information Commissioner takes civil penalty action against Optus
+    why_included: Official court filing following an OAIC investigation.
+  - matter_id: acl-medlab-2022
+    event_id: acl-civil-penalty-order-2025-10-08
+    official_url: https://www.oaic.gov.au/news/media-centre/australian-clinical-labs-ordered-to-pay-penalties-in-relation-to-medlab-pathology-data-breach-in-first-for-privacy-act
+    entity: Australian Clinical Labs Limited
+    entity_role: determined_respondent
+    event_date: "2025-10-08"
+    publication_date: "2025-10-09"
+    legal_status: civil_penalty_order
+    source_title: Australian Clinical Labs ordered to pay penalties in relation to Medlab Pathology data breach in first for Privacy Act
+    status_wording: The Federal Court ordered Australian Clinical Labs to pay $5.8 million in civil penalties.
+    summary: The OAIC source reports Federal Court orders and admitted contraventions, distinct from an allegation or investigation.
+    source_type: media_release
+    expected_parser: reviewed_title_marker
+    expected_marker: Australian Clinical Labs ordered to pay penalties in relation to Medlab Pathology data breach in first for Privacy Act
+    why_included: Official report of a court outcome and civil penalty orders.
+  - matter_id: qantas-2025
+    event_id: qantas-inquiry-completed-2026-06-01
+    official_url: https://www.oaic.gov.au/privacy/privacy-assessments-and-decisions/privacy-decisions/Investigation-inquiry-reports/report-into-preliminary-inquiries-of-qantas
+    entity: Qantas Airways Limited
+    entity_role: regulator_named_entity
+    event_date: "2026-06-01"
+    publication_date: "2026-07-16"
+    legal_status: outcome_no_adverse_finding
+    source_title: Report into preliminary inquiries of Qantas
+    status_wording: The Commissioner closed preliminary inquiries without commencing a CII or taking other regulatory action at that time.
+    summary: The OAIC did not consider the evidence supported the likelihood of a breach. The report says this is not an endorsement or broader compliance assurance.
+    source_type: investigation_report
+    expected_parser: reviewed_title_marker
+    expected_marker: closing the preliminary inquiries
+    why_included: Official completion outcome that must not be grouped with adverse findings.

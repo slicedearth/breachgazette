@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "source_id": "oaic_ndb",
+  "name": "OAIC Notifiable Data Breaches statistics",
+  "country": "Australia",
+  "jurisdiction": "Australia",
+  "regulator": "Office of the Australian Information Commissioner",
+  "reporting_scheme": "Notifiable Data Breaches scheme",
+  "publication_level": "national_aggregate",
+  "unit_of_observation": "One published aggregate metric cell for a reporting period and source-defined dimension",
+  "source_threshold": "Notifications concern eligible data breaches under Part IIIC of the Privacy Act 1988; the workbook contains aggregate statistics, not a register of named notifications.",
+  "source_population": "Notifications received under the NDB scheme; affected-person figures use the source-labelled Australian or worldwide population.",
+  "public_window": "Historical reporting-period workbook published through Data.gov.au and subject to revision.",
+  "coverage_type": "aggregate_reporting_periods",
+  "aggregate": true,
+  "organizations_named": false,
+  "records_may_be_amended": true,
+  "records_may_disappear": false,
+  "counts_may_be_estimates": true,
+  "duplicate_notifications_may_be_consolidated": true,
+  "notifier_may_differ_from_affected_entity": true,
+  "source_licence": "Creative Commons Attribution 4.0 International",
+  "attribution": "Office of the Australian Information Commissioner",
+  "redistribution_decision": "approved_with_conditions",
+  "correction_process": "Check the current Data.gov.au resource and OAIC dashboard notes before publishing a correction.",
+  "source_url": "https://data.gov.au/data/dataset/5781dc17-2ad0-4dd1-bced-01c544943ce3",
+  "limitations": [
+    "The figures are based on information self-reported by notifying entities.",
+    "Aggregate records do not identify reporting entities.",
+    "Notification counts are not automatically unique real-world incidents.",
+    "Statistics can be revised."
+  ]
+}

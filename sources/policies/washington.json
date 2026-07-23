@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "source_id": "washington",
+  "name": "Washington Attorney General Data Breach Notifications",
+  "country": "United States",
+  "jurisdiction": "Washington",
+  "regulator": "Washington State Attorney General's Office",
+  "reporting_scheme": "Washington data breach notification laws",
+  "publication_level": "named_notification",
+  "unit_of_observation": "One notice submitted to the Attorney General, joined to zero or more source information-type rows",
+  "source_threshold": "The source states that notice to the Attorney General is required when more than 500 Washington residents are affected.",
+  "source_population": "Notifications affecting Washington residents since July 24, 2015.",
+  "public_window": "Historical public datasets from August 2015 to present.",
+  "coverage_type": "complete_published_dataset",
+  "aggregate": false,
+  "organizations_named": true,
+  "records_may_be_amended": true,
+  "records_may_disappear": false,
+  "counts_may_be_estimates": true,
+  "duplicate_notifications_may_be_consolidated": false,
+  "notifier_may_differ_from_affected_entity": true,
+  "source_licence": "The dataset has no dataset-specific licence identifier. Data.wa.gov states its content may generally be used free for most purposes unless restrictions are documented.",
+  "attribution": "Washington State Attorney General's Office Consumer Protection Division",
+  "redistribution_decision": "approved_with_conditions",
+  "correction_process": "Check the current Socrata row and dataset metadata; preserve the notifying-entity role.",
+  "source_url": "https://data.wa.gov/Consumer-Protection/Data-Breach-Notifications-Affecting-Washington-Res/sb4j-ca4h",
+  "limitations": [
+    "The named entity is the notifier and is nearly always the data owner, not necessarily the entity where the event occurred.",
+    "Affected counts may be estimated.",
+    "Dataset-specific licence metadata is absent and requires ongoing review."
+  ]
+}

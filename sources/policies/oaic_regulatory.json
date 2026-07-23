@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "source_id": "oaic_regulatory",
+  "name": "Curated OAIC data-breach regulatory actions",
+  "country": "Australia",
+  "jurisdiction": "Australia",
+  "regulator": "Office of the Australian Information Commissioner",
+  "reporting_scheme": "Privacy Act regulatory action",
+  "publication_level": "regulatory_action",
+  "unit_of_observation": "One manually reviewed legal-status event supported by a fixed official OAIC page",
+  "source_threshold": "Selective official regulatory publications relevant to public data-breach activity.",
+  "source_population": "Reviewed preliminary inquiries, investigations, enforceable undertakings, determinations and court actions.",
+  "public_window": "Versioned curated manifest; not a complete index of every OAIC action.",
+  "coverage_type": "regulatory_actions_only",
+  "aggregate": false,
+  "organizations_named": true,
+  "records_may_be_amended": true,
+  "records_may_disappear": false,
+  "counts_may_be_estimates": false,
+  "duplicate_notifications_may_be_consolidated": false,
+  "notifier_may_differ_from_affected_entity": true,
+  "source_licence": "OAIC website material is generally Creative Commons Attribution 3.0 Australia unless an exclusion applies; each source must retain attribution and source wording.",
+  "attribution": "Office of the Australian Information Commissioner",
+  "redistribution_decision": "approved_with_conditions",
+  "correction_process": "Review the official OAIC page and update the curated manifest only after legal-status review.",
+  "source_url": "https://www.oaic.gov.au/privacy/privacy-assessments-and-decisions/privacy-decisions",
+  "limitations": [
+    "The timeline is selective rather than exhaustive.",
+    "Proceedings and allegations are not findings.",
+    "An enforceable undertaking is not automatically a finding of breach."
+  ]
+}

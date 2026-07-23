@@ -1,0 +1,28 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.mypy_cache/
+.hypothesis/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+htmlcov/
+.coverage
+
+# Production state and generated publication data are private build inputs.
+/data/
+/site-data/
+site/dist/
+site/.astro/
+site/node_modules/
+site/playwright-report/
+site/test-results/
+
+# Temporary fixture builds never belong in public history.
+.fixture-data/
