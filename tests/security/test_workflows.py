@@ -37,10 +37,16 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     assert workflow.index("Verify and promote an isolated candidate") < workflow.index(
         "git push origin HEAD"
     )
-    assert "secrets.BREACHGAZETTE_DATA_WRITE_KEY" in update_job
-    assert "secrets.BREACHGAZETTE_DATA_READ_KEY" not in update_job
-    assert "secrets.BREACHGAZETTE_DATA_READ_KEY" in publish_job
-    assert "secrets.BREACHGAZETTE_DATA_WRITE_KEY" not in publish_job
+    assert "actions/create-github-app-token@" in update_job
+    assert "vars.BREACHGAZETTE_STATE_APP_CLIENT_ID" in update_job
+    assert "secrets.BREACHGAZETTE_STATE_APP_PRIVATE_KEY" in update_job
+    assert "owner: ${{ github.repository_owner }}" in update_job
+    assert "repositories: ${{ vars.BREACHGAZETTE_DATA_REPOSITORY }}" in update_job
+    assert "permission-contents: write" in update_job
+    assert "permission-contents: read" not in update_job
+    assert "token: ${{ steps.state-token.outputs.token }}" in update_job
+    assert "ssh-key:" not in update_job
+    assert "secrets.BREACHGAZETTE_STATE_APP_PRIVATE_KEY" in publish_job
     assert "needs.update.result == 'success'" in publish_job
     assert "github.event_name == 'schedule' || inputs.persist_private_state" in publish_job
     assert "uses: ./.github/workflows/netlify.yml" in publish_job
@@ -73,8 +79,15 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert "github.event.workflow_run.head_sha" in workflow
     assert "vars.BREACHGAZETTE_DATA_REF" in workflow
     assert "steps.data-ref.outputs.data_ref" in workflow
-    assert "secrets.BREACHGAZETTE_DATA_READ_KEY" in workflow
-    assert "secrets.BREACHGAZETTE_DATA_WRITE_KEY" not in workflow
+    assert "actions/create-github-app-token@" in workflow
+    assert "vars.BREACHGAZETTE_STATE_APP_CLIENT_ID" in workflow
+    assert "secrets.BREACHGAZETTE_STATE_APP_PRIVATE_KEY" in workflow
+    assert "owner: ${{ github.repository_owner }}" in workflow
+    assert "repositories: ${{ vars.BREACHGAZETTE_DATA_REPOSITORY }}" in workflow
+    assert "permission-contents: read" in workflow
+    assert "permission-contents: write" not in workflow
+    assert "token: ${{ steps.state-token.outputs.token }}" in workflow
+    assert "ssh-key:" not in workflow
     assert "persist-credentials: false" in workflow
     assert "vars.BREACHGAZETTE_SITE_URL" in workflow
     assert "npm run build:budget" in workflow

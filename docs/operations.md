@@ -106,12 +106,21 @@ directories and its own repository metadata; it must never be nested in,
 submoduled into, or copied to the public source repository. Netlify is not a
 state store and receives only the audited `site/dist` output.
 
-Use separate deploy keys:
+Use the private `Breach Gazette State` GitHub App for cross-repository access.
+The App must be installed only on the private state repository, with Contents
+read and write as its sole configurable repository permission and webhooks
+disabled. Store its Client ID as the
+`BREACHGAZETTE_STATE_APP_CLIENT_ID` repository variable and its private key as
+the `BREACHGAZETTE_STATE_APP_PRIVATE_KEY` repository secret in the public source
+repository.
 
-- `BREACHGAZETTE_DATA_READ_KEY` is read-only and is available only to the
-  automatic or manually dispatched publication job;
-- `BREACHGAZETTE_DATA_WRITE_KEY` is write-scoped to the private data repository
-  and is available only to the explicitly enabled update workflow.
+Each job mints a repository-specific installation token immediately before
+checking out private state. Publication explicitly requests Contents read
+access; the enabled updater explicitly requests Contents write access. Tokens
+expire after one hour and are revoked when their jobs finish. The App private
+key is the remaining long-lived credential: keep it only in Actions secrets,
+rotate it after suspected exposure, and protect `main` from unreviewed workflow
+changes.
 
 A private Git repository is not an independent backup and Git history does not
 enforce deletion or retention. Keep a separately verified backup on encrypted
@@ -131,9 +140,9 @@ but the scheduled job is inert until all of these are deliberately configured:
   repository;
 - `BREACHGAZETTE_DATA_REF` naming the writable private-state branch used for
   automatic updates and publication;
-- `BREACHGAZETTE_DATA_WRITE_KEY` containing a write-scoped deploy key for only
-  that private repository;
-- the read-only publication key and Netlify settings listed below.
+- `BREACHGAZETTE_STATE_APP_CLIENT_ID` and
+  `BREACHGAZETTE_STATE_APP_PRIVATE_KEY` for the repository-scoped App;
+- the Netlify settings listed below.
 
 Manual dispatch defaults `persist_private_state` to false. The workflow runs
 `update-cycle --promote` against the private checkout; that command verifies an
@@ -173,8 +182,8 @@ The Netlify publication workflow requires:
 - `BREACHGAZETTE_SITE_URL`, the final HTTPS origin;
 - `NETLIFY_SITE_ID`, the target site identifier;
 - `NETLIFY_AUTH_TOKEN`, a dedicated token stored only as a repository secret;
-- `BREACHGAZETTE_DATA_READ_KEY`, scoped read-only to the private state
-  repository.
+- `BREACHGAZETTE_STATE_APP_CLIENT_ID`, the private state App's Client ID;
+- `BREACHGAZETTE_STATE_APP_PRIVATE_KEY`, the private state App's private key.
 
 Publication runs automatically after successful `main` CI and after a
 successful scheduled or explicitly persisted private-state update. A manual
