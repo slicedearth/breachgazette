@@ -21,6 +21,21 @@ name. That row remains a notification with an explicit `source_omitted` state
 and is excluded from entity resolution. Sample letters are not retrieved or
 published.
 
+## Massachusetts
+
+The adapter retrieves only the fixed official 2025 and 2026 annual-report PDF
+URLs, requires the exact ten-column table on every page, and caps each response
+at 5 MB and the combined row set at 10,000. Rows preserve the reporting
+organization role, regulator-submission date, Massachusetts resident count,
+organization type, and five source information-category flags.
+
+The official reports can include all-dash placeholders and explicit
+`DUPLICATE OF` markers without independent notification facts. The adapter
+counts and excludes those rows rather than inventing names, counts, or merged
+records. Consumer notification letters are neither retrieved nor reproduced.
+Coverage is deliberately bounded to two complete annual reports rather than
+the full series beginning in 2007.
+
 ## HHS OCR
 
 The official portal separates a current 24-month list from an archive for

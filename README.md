@@ -22,6 +22,7 @@ an allegation into a finding.
 | OAIC regulatory actions | Selective legal-status timeline | Reviewed fixed official OAIC URLs |
 | Washington Attorney General | Named notifications | Fixed Socrata datasets and exact fields |
 | California Attorney General | Named notifications | Official full CSV, without notice letters |
+| Massachusetts OCABR | Named notifications | Reviewed 2025 and 2026 annual reports, without notice letters |
 | HHS OCR | Deferred | No stable bounded machine-readable public-list contract verified |
 
 Aggregate rows never become named incident records. A named notifier is not
@@ -32,14 +33,16 @@ relationships remain explainable candidates until reviewed.
 
 The Python 3.12 pipeline uses source-specific HTTPS clients, Pydantic v2
 contracts, deterministic normalization, immutable comparison events, reviewed
-organization-alias decisions, source-freshness monitoring, record-count drift
-guards, and fail-closed privacy checks. Durable source state lives outside this
-repository under `BREACHGAZETTE_DATA_ROOT`.
+organization-alias and relationship decisions, source-freshness monitoring,
+record-count drift guards, transactional update cycles, bounded retention and
+restore tools, and fail-closed privacy checks. Durable source state lives
+outside this repository under `BREACHGAZETTE_DATA_ROOT`.
 
 Astro renders a static website from a temporary privacy-minimised publication
 directory. Production builds refuse test fixtures and missing required real
-sources. Browser search starts with a compact manifest and loads only relevant
-bounded source/year partitions after a visitor applies a filter. There is no
+sources. Browser search uses a compact facet and trigram-Bloom manifest, loads
+only candidate source/year partitions, and can export every filtered match to
+a formula-safe CSV. There is no
 runtime application server, account system, analytics, cookie, or remotely
 collected search query.
 
@@ -71,6 +74,7 @@ Run deterministic tests:
 .venv/bin/pytest --cov=breachgazette --cov-report=term-missing --cov-fail-under=80
 .venv/bin/breachgazette validate-monitoring --json
 .venv/bin/breachgazette validate-aliases --json
+.venv/bin/breachgazette validate-relationships --json
 cd site
 npm run check:test
 npm run build:test
@@ -95,15 +99,15 @@ The live update is deliberate, bounded, and separate from ordinary tests:
 export BREACHGAZETTE_DATA_ROOT=/absolute/private/path/breachgazette-data
 .venv/bin/breachgazette validate-source-policies
 .venv/bin/breachgazette validate-monitoring
-.venv/bin/breachgazette update --data-root "$BREACHGAZETTE_DATA_ROOT"
-.venv/bin/breachgazette source-health \
+.venv/bin/breachgazette update-cycle \
   --data-root "$BREACHGAZETTE_DATA_ROOT" \
-  --output "$BREACHGAZETTE_DATA_ROOT/reports/source-health.json"
+  --promote
 ```
 
-Each source keeps its previous complete snapshot when a new retrieval fails.
-The update reports retrieval time, source revision, accepted and rejected
-counts, bounded limits, and completeness state.
+The cycle updates an isolated copy, runs health, quality, publication, privacy,
+and public-tree gates, then promotes only the complete candidate. Without
+`--promote`, it is a non-mutating full-cycle rehearsal. Each source also keeps
+its previous complete snapshot when an individual retrieval fails.
 
 ## Reviewed organization aliases
 
@@ -124,6 +128,18 @@ decision to `sources/organization-aliases.yml`. Decisions are deterministic,
 evidence-bearing, non-chained, and auditable. Rejected pairs are retained so
 they are not repeatedly proposed.
 
+Reviewed incident-link decisions use a separate catalogue:
+
+```bash
+.venv/bin/breachgazette relationship-decision-id \
+  rel_000000000000000000000000 \
+  --record-id source:one --record-id source:two --json
+.venv/bin/breachgazette validate-relationships --json
+```
+
+Confirmed links remain evidence-backed public-record relationships, not merged
+incidents or legal findings.
+
 ## Scheduled private updates
 
 The scheduled workflow is implemented but disabled by default. It runs only
@@ -131,9 +147,9 @@ after the repository variable `BREACHGAZETTE_SCHEDULE_ENABLED` is explicitly set
 to `true`. Manual runs default to dry-run behavior unless
 `persist_private_state` is selected.
 
-Every run copies private state into an isolated candidate directory, updates
-and audits the candidate, uploads only the non-sensitive health report, and
-promotes or pushes private state only if all source, freshness, quality,
+Every run invokes the same tested candidate transaction used locally, writes a
+sanitized source-ID/status/count job summary, uploads only the non-sensitive
+health report, and pushes private state only if all source, freshness, quality,
 privacy, and publication gates pass. See [operations](docs/operations.md).
 
 ## Production static build
@@ -183,8 +199,8 @@ documented in [docs/methodology.md](docs/methodology.md).
 - Organization names are source-reported and can be corrected.
 - Relationship candidates are not proof of a shared event.
 - No generic Australia-versus-US comparison is calculated.
-- An unqualified name search may still load many small partitions; source,
-  jurisdiction, date, and categorical filters reduce that work.
+- Search routing uses a false-positive-only Bloom index; candidate partitions
+  can be loaded unnecessarily, but matching partitions must never be omitted.
 - Scheduled updates remain inert until the private repository, scoped deploy
   key, and explicit enablement variable are configured.
 - Washington's dataset has no dataset-specific licence identifier; its
@@ -195,6 +211,6 @@ documented in [docs/methodology.md](docs/methodology.md).
 
 Original source code and project-authored documentation are licensed under the
 [MIT Licence](LICENSE). That licence does not relicense official source data.
-OAIC, NSW IPC, Washington, California, and other source-derived material keeps
-its own attribution, terms, and limitations. See
+OAIC, NSW IPC, Washington, California, Massachusetts, and other source-derived
+material keeps its own attribution, terms, and limitations. See
 [docs/legal-and-licensing.md](docs/legal-and-licensing.md) and [NOTICE](NOTICE).

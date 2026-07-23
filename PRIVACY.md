@@ -25,8 +25,9 @@ complete regulator decisions, attachments, portal form state, and source
 cookies. A complete public source page is not republished.
 
 There are no accounts, visitor profiles, analytics, cookies, remote fonts,
-search telemetry, or notification promises. Search and filters run locally in
-the browser against same-origin bounded static partitions.
+search telemetry, or notification promises. Search, Bloom routing, filters,
+and formula-safe CSV export run locally in the browser against same-origin
+bounded static partitions.
 
 ## Private and public data
 
