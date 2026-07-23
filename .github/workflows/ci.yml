@@ -62,10 +62,10 @@ jobs:
       - name: Run browser tests
         working-directory: site
         run: npm run test:e2e:ci
-      - name: Verify GitHub Pages subpath build
+      - name: Verify configured root deployment build
         working-directory: site
         env:
-          BREACHGAZETTE_PAGES_BUILD: "1"
+          BREACHGAZETTE_SITE_URL: "https://breachgazette.example"
         run: |
           npm run build:test
           breachgazette audit-public-tree dist --json

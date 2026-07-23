@@ -23,6 +23,7 @@ site/.astro/
 site/node_modules/
 site/playwright-report/
 site/test-results/
+.netlify/
 
 # Temporary fixture builds never belong in public history.
 .fixture-data/

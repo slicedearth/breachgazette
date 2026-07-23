@@ -174,15 +174,19 @@ publication_dir="$(mktemp -d /tmp/breachgazette-publication.XXXXXX)"
   --data-root "$BREACHGAZETTE_DATA_ROOT" \
   --output "$publication_dir"
 cd site
-BREACHGAZETTE_SITE_DATA_DIR="$publication_dir" npm run build:budget
+BREACHGAZETTE_SITE_DATA_DIR="$publication_dir" \
+  BREACHGAZETTE_SITE_URL="https://breachgazette.example" \
+  npm run build:budget
 ../.venv/bin/breachgazette audit-public-tree dist
 ```
 
 The production build fails if the real data root is incomplete or if the
-publication data declares itself to be a fixture. The build and public-tree
-audits also enforce time, file-count, HTML-size, and total-size budgets.
+publication data declares itself to be a fixture. It also requires the exact
+production HTTPS origin so canonical links, feeds, social metadata, robots
+guidance, and sitemaps cannot ship with a placeholder URL. The build and
+public-tree audits enforce time, file-count, HTML-size, and total-size budgets.
 Generated production records, search indexes, and publication data are not
-committed.
+committed. Netlify receives only the audited `site/dist` tree.
 
 ## Privacy and safety
 
@@ -218,7 +222,7 @@ documented in [docs/methodology.md](docs/methodology.md).
 - Search routing uses a false-positive-only Bloom index; candidate partitions
   can be loaded unnecessarily, but matching partitions must never be omitted.
 - Scheduled updates remain inert until the private repository, scoped deploy
-  key, and explicit enablement variable are configured.
+  keys, and explicit enablement variable are configured.
 - Washington's dataset has no dataset-specific licence identifier; its
   publication boundary requires ongoing review.
 - HHS remains deferred rather than using brittle browser automation.

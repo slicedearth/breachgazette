@@ -14,7 +14,10 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run preview -- --host 127.0.0.1 --port 41733",
+    command:
+      "BREACHGAZETTE_TEST_BUILD=1 " +
+      "BREACHGAZETTE_SITE_DATA_DIR=../tests/fixtures/site " +
+      "npm run preview -- --host 127.0.0.1 --port 41733",
     port: 41733,
     reuseExistingServer: false,
     timeout: 30_000,

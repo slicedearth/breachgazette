@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ vars.BREACHGAZETTE_DATA_REPOSITORY }}
-          ssh-key: ${{ secrets.BREACHGAZETTE_DATA_DEPLOY_KEY }}
+          ssh-key: ${{ secrets.BREACHGAZETTE_DATA_WRITE_KEY }}
           path: .private-production-data
           persist-credentials: true
       - name: Set up Python

@@ -98,6 +98,29 @@ Compaction is a dry run unless `--apply` is supplied. Restore accepts only
 managed regular files, rejects traversal and symbolic links, enforces byte
 bounds, and requires an absent or empty destination.
 
+### Durable-store boundary
+
+For the current bounded state, use a dedicated private Git repository as the
+authoritative operational store. It contains only managed private-state
+directories and its own repository metadata; it must never be nested in,
+submoduled into, or copied to the public source repository. Netlify is not a
+state store and receives only the audited `site/dist` output.
+
+Use separate deploy keys:
+
+- `BREACHGAZETTE_DATA_READ_KEY` is read-only and is available only to the
+  manual publication workflow;
+- `BREACHGAZETTE_DATA_WRITE_KEY` is write-scoped to the private data repository
+  and is available only to the explicitly enabled update workflow.
+
+A private Git repository is not an independent backup and Git history does not
+enforce deletion or retention. Keep a separately verified backup on encrypted
+local or off-site storage. `backup-state` produces a bounded ZIP archive but
+does not encrypt it; protect the destination filesystem or encrypt the archive
+before it leaves the trusted operator environment. If source terms or a valid
+privacy request require historical removal, review and purge private Git
+history as well as the current tree.
+
 ## Opt-in scheduled update
 
 `.github/workflows/scheduled-private-update.yml` runs at `23 17 * * 1` UTC,
@@ -106,7 +129,7 @@ but the scheduled job is inert until all of these are deliberately configured:
 - `BREACHGAZETTE_SCHEDULE_ENABLED=true` repository variable;
 - `BREACHGAZETTE_DATA_REPOSITORY` pointing to the separate private state
   repository;
-- `BREACHGAZETTE_DATA_DEPLOY_KEY` containing a write-scoped deploy key for only
+- `BREACHGAZETTE_DATA_WRITE_KEY` containing a write-scoped deploy key for only
   that private repository.
 
 Manual dispatch defaults `persist_private_state` to false. The workflow runs
@@ -118,8 +141,8 @@ manual run. A failed candidate never replaces the checkout.
 The health artifact is retained for 14 days and contains counts, checksums,
 timestamps, states, and bounded reasons, not source records. The job summary
 contains only source ID, status, count, and overall result. GitHub’s normal
-failed-run notification is the default operator alert. GitHub Pages publication
-remains a separate manual workflow.
+failed-run notification is the default operator alert. Netlify publication
+remains a separate manual workflow with read-only access to private state.
 
 ## Publication
 
@@ -128,7 +151,9 @@ publication_dir="$(mktemp -d /tmp/breachgazette-publication.XXXXXX)"
 .venv/bin/breachgazette build-site-data \
   --data-root "$BREACHGAZETTE_DATA_ROOT" --output "$publication_dir"
 cd site
-BREACHGAZETTE_SITE_DATA_DIR="$publication_dir" npm run build:budget
+BREACHGAZETTE_SITE_DATA_DIR="$publication_dir" \
+  BREACHGAZETTE_SITE_URL="https://breachgazette.example" \
+  npm run build:budget
 ../.venv/bin/breachgazette audit-public-tree dist
 ```
 
@@ -136,3 +161,16 @@ Never place the real data root inside the repository, upload raw records as a
 workflow artifact, or publish a test fixture. Schedules require a separate
 review of source load, rights, private-repository retention, failure reporting,
 and operator ownership before enablement.
+
+The manual Netlify workflow additionally requires:
+
+- `BREACHGAZETTE_SITE_URL`, the final HTTPS origin;
+- `NETLIFY_SITE_ID`, the target site identifier;
+- `NETLIFY_AUTH_TOKEN`, a dedicated token stored only as a repository secret;
+- `BREACHGAZETTE_DATA_READ_KEY`, scoped read-only to the private state
+  repository.
+
+The workflow builds from an exact private-state commit or tag, audits the
+result, and then performs an atomic manual deploy of only `site/dist`. Do not
+enable Netlify's connected repository build because it has no reason to receive
+the private state repository or its credentials.
