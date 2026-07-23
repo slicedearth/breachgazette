@@ -1,0 +1,25 @@
+---
+import Hero from "../../components/Hero.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+
+const publication = getPublication();
+---
+
+<BaseLayout title="Organization directory" description="Conservatively resolved organization identities and source roles.">
+  <Hero
+    eyebrow="Exact and reviewed identities"
+    title="Organization directory"
+    intro="Profiles are created through exact deterministic names or reviewed aliases. Similar-looking names are not fuzzy-merged."
+  />
+  <section class="section shell">
+    <div class="grid">
+      {publication.detail_organizations.map((organization) => (
+        <article class="card">
+          <h2 class="record-title"><a href={`${import.meta.env.BASE_URL}organizations/${organization.organization_id}/`}>{organization.canonical_name}</a></h2>
+          <p>{organization.aliases.length} source name{organization.aliases.length === 1 ? "" : "s"} across {[...new Set(organization.aliases.map((alias) => alias.source_id))].length} source{new Set(organization.aliases.map((alias) => alias.source_id)).size === 1 ? "" : "s"}.</p>
+        </article>
+      ))}
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,23 @@
+---
+import Hero from "../../components/Hero.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+
+const publication = getPublication();
+const policy = publication.policies.hhs!;
+---
+
+<BaseLayout title="HHS OCR source status" description="HHS OCR source assessment and deferral." section="United States / HHS OCR">
+  <Hero
+    eyebrow="Deferred source"
+    title="HHS OCR is assessed, not ingested"
+    intro="The HHS OCR breach portal presents a current 24-month list and an archive for breaches affecting 500 or more individuals."
+    warning="No stable, bounded, machine-readable public export contract was verified for this release. Breach Gazette will not use brittle browser automation or retain portal state."
+  />
+  <section class="section shell prose">
+    <h2>Implementation boundary</h2>
+    <p>{policy.limitations.join(" ")}</p>
+    <p>A future adapter requires a reviewed fixed schema, explicit current-versus-archive handling, partial-result detection, bounded retrieval, and a confirmed publication-rights decision.</p>
+    <a href={policy.source_url} rel="external noopener noreferrer">Open the official HHS OCR source <span aria-hidden="true">↗</span></a>
+  </section>
+</BaseLayout>

@@ -1,0 +1,64 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  description: string;
+  section?: string;
+}
+
+const { title, description, section = "Observatory" } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    />
+    <link rel="canonical" href={canonical} />
+    <title>{title} | Breach Gazette</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="shell masthead">
+        <a class="brand" href={import.meta.env.BASE_URL}>
+          <span aria-hidden="true" class="brand-mark">B</span>
+          <span>Breach Gazette<small>Public-data observatory</small></span>
+        </a>
+        <nav aria-label="Primary">
+          <a href={`${import.meta.env.BASE_URL}australia/`}>Australia</a>
+          <a href={`${import.meta.env.BASE_URL}united-states/washington/`}>United States</a>
+          <a href={`${import.meta.env.BASE_URL}latest/`}>Notifications</a>
+          <a href={`${import.meta.env.BASE_URL}sources/`}>Sources</a>
+          <a href={`${import.meta.env.BASE_URL}methodology/`}>Methodology</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <div class="shell page-kicker"><span>{section}</span></div>
+      <slot />
+    </main>
+    <footer>
+      <div class="shell footer-grid">
+        <p>
+          Breach Gazette reproduces or derives information from official public sources and
+          does not independently verify underlying events.
+        </p>
+        <nav aria-label="Footer">
+          <a href={`${import.meta.env.BASE_URL}privacy/`}>Privacy</a>
+          <a href={`${import.meta.env.BASE_URL}security/`}>Security</a>
+          <a href={`${import.meta.env.BASE_URL}legal-and-licensing/`}>Legal and licensing</a>
+          <a href={`${import.meta.env.BASE_URL}limitations/`}>Limitations</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

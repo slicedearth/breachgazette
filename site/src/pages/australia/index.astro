@@ -1,0 +1,49 @@
+---
+import Hero from "../../components/Hero.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+import { date, label } from "../../lib/format";
+
+const publication = getPublication();
+const records = publication.aggregates.filter((record) => record.source_id === "oaic_ndb");
+const policy = publication.policies.oaic_ndb!;
+const dimensions = [...new Set(records.map((record) => record.dimension))];
+---
+
+<BaseLayout title="Australia" description="OAIC national NDB aggregate statistics and explicit reporting semantics." section="Australia">
+  <Hero
+    eyebrow="National aggregate reporting"
+    title="Australia’s NDB reporting patterns"
+    intro="The OAIC received these notifications under the Notifiable Data Breaches scheme. Values are aggregate reporting measures, not named incidents."
+  />
+  <section class="section shell">
+    <div class="section-head"><h2>Reporting-period measures</h2><p>{records.length} source cells across {dimensions.length} reviewed dimensions.</p></div>
+    <div class="table-wrap" tabindex="0" aria-label="Scrollable OAIC aggregate metrics table">
+      <table aria-label="OAIC aggregate metrics">
+        <thead><tr><th>Dimension</th><th>Category</th><th>Value</th><th>Period</th><th>Population scope</th></tr></thead>
+        <tbody>
+          {records.slice(0, 250).map((record) => (
+            <tr>
+              <td>{label(record.dimension)}</td>
+              <th scope="row">{record.parent_category ? `${record.parent_category}: ` : ""}{record.category}</th>
+              <td>{record.value.value ?? label(record.value.state)}{record.unit === "percent" ? "%" : ""}</td>
+              <td>{date(record.reporting_period_start)} to {date(record.reporting_period_end)}</td>
+              <td>{record.population_scope}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="section shell" aria-labelledby="interpretation">
+    <div class="section-head"><h2 id="interpretation">How to read this view</h2></div>
+    <div class="grid">
+      <article class="card"><h3>Source of breach</h3><p>Source categories reflect OAIC-published classifications. Rounded values retain an estimated state.</p></article>
+      <article class="card"><h3>Affected population</h3><p>Worldwide and Australian scopes remain distinct. Neither is silently substituted for the other.</p></article>
+      <article class="card"><h3>Timing</h3><p>Identification and notification timing retain the source’s dimension and reporting period.</p></article>
+      <article class="card"><h3>Revisions</h3><p>Source revisions are recorded over time. A historical value may change without creating a named incident.</p></article>
+    </div>
+    <SourceNote href={policy.source_url} />
+  </section>
+</BaseLayout>

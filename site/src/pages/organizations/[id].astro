@@ -1,0 +1,36 @@
+---
+import Hero from "../../components/Hero.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+import { label } from "../../lib/format";
+
+export function getStaticPaths() {
+  return getPublication().detail_organizations.map((organization) => ({
+    params: { id: organization.organization_id },
+    props: { organization },
+  }));
+}
+const { organization } = Astro.props;
+const publication = getPublication();
+const notifications = publication.detail_notifications.filter((record) => record.canonical_organization_id === organization.organization_id);
+const actions = publication.regulatory_actions.filter((record) => record.canonical_organization_id === organization.organization_id);
+---
+
+<BaseLayout title={organization.canonical_name} description="Conservatively resolved organization profile." section="Organization profile">
+  <Hero
+    eyebrow="Exact or reviewed identity"
+    title={organization.canonical_name}
+    intro="This profile groups source-reported organization names through exact deterministic normalization or a reviewed alias. It does not infer ownership or culpability."
+  />
+  <section class="section shell">
+    <h2>Source names and roles</h2>
+    <div class="table-wrap" tabindex="0"><table><thead><tr><th>Source name</th><th>Source</th><th>Role</th><th>Resolution evidence</th></tr></thead><tbody>
+      {organization.aliases.map((alias) => <tr><th scope="row">{alias.source_name}</th><td>{label(alias.source_id)}</td><td>{label(alias.role)}</td><td>{alias.supporting_evidence.join("; ")}</td></tr>)}
+    </tbody></table></div>
+    <h2>Bounded source records</h2>
+    <div class="grid">
+      {notifications.map((record) => <article class="card"><span class="pill">{label(record.named_entity.role)}</span><h3><a href={`${import.meta.env.BASE_URL}notifications/${record.source_record_id}/`}>{record.jurisdiction} notification</a></h3></article>)}
+      {actions.map((record) => <article class="card"><span class="pill">{label(record.legal_status)}</span><h3><a href={`${import.meta.env.BASE_URL}matters/${record.source_record_id}/`}>{record.source_title}</a></h3></article>)}
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,44 @@
+---
+import { date, label } from "../lib/format";
+import type { Notification } from "../lib/types";
+
+interface Props {
+  records: Notification[];
+  limit?: number;
+}
+const { records, limit = 50 } = Astro.props;
+const visible = records.slice(0, limit);
+function observation(record: Notification): string | null {
+  return record.dates.find((item) => item.normalized_date)?.normalized_date ?? null;
+}
+---
+
+<div class="table-wrap" tabindex="0" aria-label="Scrollable public notification table">
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Named entity</th>
+        <th scope="col">Source role</th>
+        <th scope="col">Jurisdiction</th>
+        <th scope="col">Source date</th>
+        <th scope="col">Publication level</th>
+      </tr>
+    </thead>
+    <tbody>
+      {visible.map((record) => (
+        <tr>
+          <th scope="row">
+            <a href={`${import.meta.env.BASE_URL}notifications/${record.source_record_id}/`}>
+              {record.named_entity.source_name}
+            </a>
+          </th>
+          <td>{label(record.named_entity.role)}</td>
+          <td>{record.jurisdiction}</td>
+          <td>{date(observation(record))}</td>
+          <td>{label(record.publication_level)}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+{records.length > limit && <p class="table-note">Showing the first {limit} records on this static view.</p>}

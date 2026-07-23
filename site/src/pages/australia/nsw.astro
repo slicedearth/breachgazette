@@ -1,0 +1,38 @@
+---
+import Hero from "../../components/Hero.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+import { date } from "../../lib/format";
+
+const publication = getPublication();
+const records = publication.aggregates.filter((record) => record.source_id === "nsw_mndb_aggregate");
+const policy = publication.policies.nsw_mndb_aggregate!;
+---
+
+<BaseLayout title="NSW MNDB statistics" description="NSW mandatory-notification aggregate sector snapshot." section="Australia / New South Wales">
+  <Hero
+    eyebrow="State aggregate snapshot"
+    title="NSW MNDB sector statistics"
+    intro="The IPC’s reviewed sector table reports aggregate notifications, source categories, and affected-individual measures for the displayed six-month period."
+    warning="These aggregate measures are not the NSW Public Notifications Register and do not name all agencies that notified the IPC."
+  />
+  <section class="section shell">
+    <div class="table-wrap" tabindex="0" aria-label="Scrollable NSW aggregate sector table">
+      <table>
+        <thead><tr><th>Measure</th><th>Sector</th><th>Value</th><th>Period</th></tr></thead>
+        <tbody>
+          {records.map((record) => (
+            <tr>
+              <th scope="row">{record.category}</th>
+              <td>{record.parent_category}</td>
+              <td>{record.value.value ?? "Not applicable"}{record.unit === "percent" ? "%" : ""}</td>
+              <td>{date(record.reporting_period_start)} to {date(record.reporting_period_end)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <SourceNote href={policy.source_url} />
+  </section>
+</BaseLayout>

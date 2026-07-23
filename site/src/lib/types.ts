@@ -1,0 +1,156 @@
+export type DateObservation = {
+  meaning: string;
+  raw_value: string | null;
+  normalized_date: string | null;
+  origin: string;
+  state: string;
+};
+
+export type Notification = {
+  source_id: string;
+  source_record_id: string;
+  source_url: string;
+  source_revision: string;
+  source_completeness: string;
+  source_retrieval_time: string;
+  local_first_observed_time: string;
+  local_last_observed_time: string;
+  regulator: string;
+  jurisdiction: string;
+  reporting_scheme: string;
+  publication_level: string;
+  coverage_type: string;
+  named_entity: {
+    source_name: string;
+    normalized_name: string;
+    role: string;
+    state: string;
+  };
+  dates: DateObservation[];
+  affected_population?: {
+    count: number | null;
+    scope: string;
+    estimated: boolean;
+    state: string;
+  } | null;
+  information_categories: Array<{ source_label: string; normalized_label: string }>;
+  breach_cause?: { source_label: string | null; normalized_label: string | null } | null;
+  register_window_state: string;
+  source_detail_url?: string | null;
+  canonical_organization_id?: string | null;
+  has_detail_page?: boolean;
+  limitations: string[];
+};
+
+export type Aggregate = {
+  source_id: string;
+  source_record_id: string;
+  regulator: string;
+  reporting_scheme: string;
+  reporting_period_start: string;
+  reporting_period_end: string;
+  dimension: string;
+  category: string;
+  parent_category: string | null;
+  value: { value: string | number | null; state: string; source_label: string | null };
+  unit: string;
+  population_scope: string;
+  source_url: string;
+  source_revision: string;
+  source_notes: string[];
+};
+
+export type RegulatoryAction = {
+  source_id: string;
+  source_record_id: string;
+  source_url: string;
+  source_revision: string;
+  regulator: string;
+  matter_id: string;
+  entity: { source_name: string; normalized_name: string; role: string };
+  legal_status: string;
+  source_title: string;
+  source_publication_date: string;
+  source_reported_event_date: string;
+  status_wording: string;
+  summary: string;
+  allegation: boolean;
+  finding: boolean;
+  canonical_organization_id?: string | null;
+  limitations: string[];
+};
+
+export type Organization = {
+  organization_id: string;
+  canonical_name: string;
+  aliases: Array<{
+    source_id: string;
+    source_name: string;
+    role: string;
+    match_method: string;
+    supporting_evidence: string[];
+  }>;
+};
+
+export type Relationship = {
+  candidate_id: string;
+  relationship_class: string;
+  record_ids: string[];
+  reasons: Array<{ code: string; explanation: string; evidence: string[] }>;
+  reviewed: boolean;
+  limitations: string[];
+};
+
+export type SourcePolicy = {
+  source_id: string;
+  name: string;
+  country: string;
+  jurisdiction: string;
+  regulator: string;
+  reporting_scheme: string;
+  publication_level: string;
+  unit_of_observation: string;
+  source_threshold: string;
+  source_population: string;
+  public_window: string;
+  coverage_type: string;
+  source_licence: string;
+  attribution: string;
+  redistribution_decision: string;
+  correction_process: string;
+  source_url: string;
+  implemented: boolean;
+  limitations: string[];
+};
+
+export type Publication = {
+  schema_version: string;
+  generated_at: string;
+  tagline: string;
+  disclaimer: string;
+  stats: Record<string, number>;
+  latest_notifications: Notification[];
+  detail_notifications: Notification[];
+  aggregates: Aggregate[];
+  regulatory_actions: RegulatoryAction[];
+  detail_organizations: Organization[];
+  relationships: Relationship[];
+  corrections: Array<Record<string, unknown>>;
+  policies: Record<string, SourcePolicy>;
+  snapshots: Array<Record<string, unknown>>;
+  quality: {
+    passed: boolean;
+    dataset_class: string;
+    checks: Record<string, boolean>;
+    source_health: Record<string, string>;
+    findings: string[];
+    limitations: string[];
+  };
+  manifest: {
+    dataset_class: string;
+    generated_at: string;
+    record_counts: Record<string, number>;
+    limitations: string[];
+  };
+  deferred_sources: SourcePolicy[];
+};

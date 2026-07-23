@@ -1,0 +1,19 @@
+---
+interface Item {
+  term: string;
+  description: string | number | null | undefined;
+}
+interface Props {
+  items: Item[];
+}
+const { items } = Astro.props;
+---
+
+<dl class="definition-grid">
+  {items.map((item) => (
+    <div>
+      <dt>{item.term}</dt>
+      <dd>{item.description ?? "Not published"}</dd>
+    </div>
+  ))}
+</dl>

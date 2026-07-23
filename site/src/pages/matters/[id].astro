@@ -1,0 +1,47 @@
+---
+import DefinitionGrid from "../../components/DefinitionGrid.astro";
+import Hero from "../../components/Hero.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+import { date, label } from "../../lib/format";
+
+export function getStaticPaths() {
+  return getPublication().regulatory_actions.map((record) => ({
+    params: { id: record.source_record_id },
+    props: { record },
+  }));
+}
+const { record } = Astro.props;
+const policy = getPublication().policies[record.source_id]!;
+---
+
+<BaseLayout title={record.source_title} description={record.summary} section="Regulatory matter">
+  <Hero
+    eyebrow={label(record.legal_status)}
+    title={record.entity.source_name}
+    intro={record.summary}
+    warning={record.allegation ? "The Commissioner alleges. This proceeding record is not a finding." : record.finding ? "This page records a source-backed outcome with its exact status." : "This status does not imply an adverse finding, endorsement, or compliance assurance."}
+  />
+  <section class="section shell">
+    <DefinitionGrid items={[
+      { term: "Regulator", description: record.regulator },
+      { term: "Matter ID", description: record.matter_id },
+      { term: "Legal status", description: label(record.legal_status) },
+      { term: "Source role", description: label(record.entity.role) },
+      { term: "Reported event date", description: date(record.source_reported_event_date) },
+      { term: "Publication date", description: date(record.source_publication_date) },
+      { term: "Status wording", description: record.status_wording },
+      { term: "Source revision", description: record.source_revision },
+      { term: "Reporting threshold", description: policy.source_threshold },
+    ]} />
+    <div class="prose">
+      <h2>Legal interpretation boundary</h2>
+      <p>{record.allegation ? "This is an allegation in a civil proceeding. Breach Gazette does not render it as a finding." : record.finding ? "The official source reports an order, judgment, or determination outcome." : "The official source reports a procedural or supervisory event without an adverse finding represented here."}</p>
+      <h2>Limitations and correction path</h2>
+      <ul>{[...policy.limitations, ...record.limitations].map((item) => <li>{item}</li>)}</ul>
+      <p>{policy.correction_process}</p>
+    </div>
+    <SourceNote href={record.source_url} />
+  </section>
+</BaseLayout>

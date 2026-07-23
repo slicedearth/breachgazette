@@ -1,0 +1,25 @@
+---
+import Hero from "../../components/Hero.astro";
+import NotificationTable from "../../components/NotificationTable.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+
+const publication = getPublication();
+const details = publication.detail_notifications.length ? publication.detail_notifications : publication.latest_notifications;
+const records = details.filter((record) => record.source_id === "nsw_public_notifications");
+const policy = publication.policies.nsw_public_notifications!;
+---
+
+<BaseLayout title="NSW public notifications" description="NSW agency public notifications with rolling-window semantics." section="Australia / New South Wales">
+  <Hero
+    eyebrow="Rolling public register"
+    title="NSW agency public notifications"
+    intro="The agency published a public notification under the NSW MNDB scheme. Incident and publication dates retain their exact source meanings."
+    warning="The register is not a complete list of all breaches notified to the IPC. Links are generally published for at least 12 months; disappearance is not evidence of remediation."
+  />
+  <section class="section shell">
+    <NotificationTable records={records} limit={250} />
+    <SourceNote href={policy.source_url} />
+  </section>
+</BaseLayout>
