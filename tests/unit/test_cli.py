@@ -16,16 +16,16 @@ def test_source_policy_cli_commands_are_machine_readable() -> None:
     assert "oaic_ndb" in json.loads(inspected.stdout)
     validated = runner.invoke(app, ["validate-source-policies", "--json"])
     assert validated.exit_code == 0
-    assert json.loads(validated.stdout) == {"policies": 7, "valid": True}
+    assert json.loads(validated.stdout) == {"policies": 8, "valid": True}
     monitoring = runner.invoke(app, ["validate-monitoring", "--json"])
     assert monitoring.exit_code == 0
-    assert json.loads(monitoring.stdout)["sources"] == 6
+    assert json.loads(monitoring.stdout)["sources"] == 7
     aliases = runner.invoke(app, ["validate-aliases", "--json"])
     assert aliases.exit_code == 0
     assert json.loads(aliases.stdout) == {
-        "approved": 0,
-        "decisions": 0,
-        "rejected": 0,
+        "approved": 18,
+        "decisions": 25,
+        "rejected": 7,
         "valid": True,
     }
     decision = runner.invoke(
@@ -34,6 +34,29 @@ def test_source_policy_cli_commands_are_machine_readable() -> None:
     )
     assert decision.exit_code == 0
     assert json.loads(decision.stdout)["decision_id"].startswith("alias_")
+    relationships = runner.invoke(app, ["validate-relationships", "--json"])
+    assert relationships.exit_code == 0
+    assert json.loads(relationships.stdout) == {
+        "confirmed_related": 3,
+        "decisions": 4,
+        "rejected": 0,
+        "unresolved": 1,
+        "valid": True,
+    }
+    relationship_id = runner.invoke(
+        app,
+        [
+            "relationship-decision-id",
+            "rel_111111111111111111111111",
+            "--record-id",
+            "one",
+            "--record-id",
+            "two",
+            "--json",
+        ],
+    )
+    assert relationship_id.exit_code == 0
+    assert json.loads(relationship_id.stdout)["decision_id"].startswith("relationship_")
 
 
 def test_cli_requires_a_private_data_root() -> None:

@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "managed_directories": [
+    "checkpoints",
+    "events",
+    "manifests",
+    "metadata",
+    "reports",
+    "state"
+  ],
+  "maximum_history_reports": 53,
+  "maximum_state_bytes": 1073741824,
+  "maximum_archive_bytes": 1342177280
+}

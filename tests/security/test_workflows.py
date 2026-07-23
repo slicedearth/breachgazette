@@ -23,8 +23,14 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     assert "permissions:\n  contents: read" in workflow
     assert "vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true'" in workflow
     assert "default: false" in workflow
-    assert "Create isolated candidate state" in workflow
-    assert "rsync -a --exclude .git .private-production-data/" in workflow
-    assert "steps.candidate_quality.outcome == 'success'" in workflow
+    assert "breachgazette update-cycle --data-root .private-production-data --promote" in workflow
+    assert "steps.update_cycle.outcome == 'success'" in workflow
+    assert "source-health-summary" in workflow
+    assert "GITHUB_STEP_SUMMARY" in workflow
+    assert workflow.index("source-health-summary") < workflow.index(
+        "Fail incomplete update after preserving health report"
+    )
     assert "git push origin HEAD" in workflow
-    assert workflow.index("Promote complete candidate") < workflow.index("git push origin HEAD")
+    assert workflow.index("Verify and promote an isolated candidate") < workflow.index(
+        "git push origin HEAD"
+    )
