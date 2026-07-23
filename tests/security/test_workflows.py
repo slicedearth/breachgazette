@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -56,11 +57,24 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
 
 def test_ci_covers_private_catalogue_contracts_and_all_browser_engines() -> None:
     workflow = (WORKFLOW_ROOT / "ci.yml").read_text(encoding="utf-8")
+    package = json.loads(
+        (WORKFLOW_ROOT.parents[1] / "site" / "package.json").read_text(encoding="utf-8")
+    )
+    verify_job, browser_job = workflow.split("\n  browser:\n", maxsplit=1)
+    image = re.search(
+        r"image: mcr\.microsoft\.com/playwright:"
+        r"v(?P<version>\d+\.\d+\.\d+)-noble@sha256:[0-9a-f]{64}",
+        browser_job,
+    )
     assert "ruff check --select S src" in workflow
     assert "tests/fixtures/reviews/organization-aliases.yml" in workflow
     assert "tests/fixtures/reviews/relationship-decisions.yml" in workflow
-    assert "playwright install --with-deps chromium firefox webkit" in workflow
-    assert "npm run test:e2e:ci" in workflow
+    assert "playwright install" not in workflow
+    assert image is not None
+    assert image.group("version") == package["devDependencies"]["@playwright/test"]
+    assert "options: --user 1001" in browser_job
+    assert "npm run test:e2e:ci" not in verify_job
+    assert "npm run test:e2e:ci" in browser_job
     assert 'BREACHGAZETTE_SITE_URL: "https://breachgazette.example"' in workflow
 
 

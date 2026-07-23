@@ -14,3 +14,7 @@ CI runs `pip-audit -r requirements.lock` and
 removed, upgraded, or documented with reachability and compensating controls.
 Lock updates require the full deterministic test, static build, browser, and
 public-output audit suite.
+
+Cross-browser CI uses the official Playwright container pinned by immutable
+digest. Its image tag must match the exact `@playwright/test` version; a
+security test enforces that pairing whenever the dependency changes.

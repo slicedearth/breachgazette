@@ -103,8 +103,11 @@ npm run test:e2e
 ```
 
 The local browser command uses Chromium only. Linux CI runs Chromium, Firefox,
-and WebKit through `npm run test:e2e:ci`; this avoids launching Playwright
-browser bundles that are incompatible with older macOS releases.
+and WebKit through `npm run test:e2e:ci` in a digest-pinned, version-matched
+official Playwright container. The browser job runs in parallel with the
+deterministic verification job, avoids reinstalling browser system packages on
+the GitHub runner, and does not launch incompatible bundles on older macOS
+releases.
 
 Ordinary tests use only test-specific fixtures and injected transports. A
 fixture can be ingested only into a data-root directory whose final name
