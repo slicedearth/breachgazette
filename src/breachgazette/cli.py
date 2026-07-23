@@ -20,6 +20,7 @@ from breachgazette.monitoring import (
     load_monitoring_catalogue,
     write_source_health_report,
 )
+from breachgazette.operations import run_update_cycle, source_health_summary
 from breachgazette.pipeline import (
     ADAPTERS,
     compare_summary,
@@ -30,7 +31,17 @@ from breachgazette.pipeline import (
 from breachgazette.policies import load_source_policies
 from breachgazette.publish.builder import audit_public_tree, build_site_data
 from breachgazette.quality import build_quality_report
-from breachgazette.relationships import generate_candidates
+from breachgazette.relationships import (
+    generate_candidates,
+    load_relationship_catalogue,
+    relationship_decision_id,
+)
+from breachgazette.retention import (
+    compact_state,
+    create_state_backup,
+    restore_state_backup,
+    state_inventory,
+)
 from breachgazette.state import PrivateStateStore
 from breachgazette.utils import atomic_write_json, normalize_organization_name
 
@@ -122,6 +133,41 @@ def validate_aliases(
     )
 
 
+@app.command("validate-relationships")
+def validate_relationships(
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    catalogue = load_relationship_catalogue()
+    _emit(
+        {
+            "valid": True,
+            "decisions": len(catalogue.decisions),
+            "confirmed_related": sum(
+                decision.status == "confirmed_related" for decision in catalogue.decisions
+            ),
+            "rejected": sum(
+                decision.status == "rejected" for decision in catalogue.decisions
+            ),
+            "unresolved": sum(
+                decision.status == "unresolved" for decision in catalogue.decisions
+            ),
+        },
+        json_output=json_output,
+    )
+
+
+@app.command("relationship-decision-id")
+def relationship_decision_id_command(
+    candidate_id: Annotated[str, typer.Argument()],
+    record_id: Annotated[list[str], typer.Option("--record-id")],
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    _emit(
+        {"decision_id": relationship_decision_id(candidate_id, record_id)},
+        json_output=json_output,
+    )
+
+
 @app.command("alias-decision-id")
 def alias_decision_id_command(
     alias_name: Annotated[str, typer.Argument()],
@@ -195,6 +241,23 @@ def update_one_source(
 ) -> None:
     _emit(
         update_source(source, data_root=_data_root(data_root)),
+        json_output=json_output,
+    )
+
+
+@app.command("update-cycle")
+def update_cycle_command(
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    source: Annotated[list[str] | None, typer.Option("--source")] = None,
+    promote: Annotated[bool, typer.Option("--promote")] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    _emit(
+        run_update_cycle(
+            data_root=_data_root(data_root),
+            sources=source,
+            promote=promote,
+        ),
         json_output=json_output,
     )
 
@@ -303,6 +366,62 @@ def source_health_command(
     _emit(report.model_dump(mode="json"), json_output=json_output)
     if not report.passed:
         raise typer.Exit(code=2)
+
+
+@app.command("source-health-summary")
+def source_health_summary_command(
+    report: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path | None, typer.Option("--output")] = None,
+) -> None:
+    summary = source_health_summary(report)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(summary, encoding="utf-8")
+    typer.echo(summary, nl=False)
+
+
+@app.command("state-inventory")
+def state_inventory_command(
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    _emit(state_inventory(_data_root(data_root)), json_output=json_output)
+
+
+@app.command("compact-state")
+def compact_state_command(
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    apply: Annotated[bool, typer.Option("--apply")] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    _emit(
+        compact_state(_data_root(data_root), apply=apply),
+        json_output=json_output,
+    )
+
+
+@app.command("backup-state")
+def backup_state_command(
+    output: Annotated[Path, typer.Argument()],
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    _emit(
+        create_state_backup(_data_root(data_root), output),
+        json_output=json_output,
+    )
+
+
+@app.command("restore-state")
+def restore_state_command(
+    archive: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    destination: Annotated[Path, typer.Argument()],
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    _emit(
+        restore_state_backup(archive, destination),
+        json_output=json_output,
+    )
 
 
 if __name__ == "__main__":

@@ -43,61 +43,42 @@ jobs:
         run: |
           python -m pip install -r requirements.lock
           python -m pip install --no-deps --no-build-isolation -e .
-      - name: Create isolated candidate state
-        run: |
-          mkdir -p "$RUNNER_TEMP/breachgazette-candidate"
-          rsync -a --exclude .git .private-production-data/ "$RUNNER_TEMP/breachgazette-candidate/"
       - name: Validate source and monitoring policy
         run: |
           breachgazette validate-source-policies --json
           breachgazette validate-monitoring --json
-      - name: Update bounded official sources in candidate state
-        id: source_update
+          breachgazette validate-aliases --json
+          breachgazette validate-relationships --json
+      - name: Verify and promote an isolated candidate
+        id: update_cycle
         continue-on-error: true
-        run: breachgazette update --data-root "$RUNNER_TEMP/breachgazette-candidate" --json
-      - name: Generate non-sensitive source-health report
-        id: source_health
+        run: breachgazette update-cycle --data-root .private-production-data --promote --json
+      - name: Write sanitized operator summary
         if: always()
         continue-on-error: true
         run: |
-          breachgazette source-health \
-            --data-root "$RUNNER_TEMP/breachgazette-candidate" \
-            --output "$RUNNER_TEMP/breachgazette-candidate/reports/source-health.json" \
-            --json
-      - name: Verify candidate publication boundary
-        id: candidate_quality
-        if: steps.source_update.outcome == 'success' && steps.source_health.outcome == 'success'
-        continue-on-error: true
-        run: |
-          breachgazette quality-report \
-            --data-root "$RUNNER_TEMP/breachgazette-candidate" \
-            --json
-          breachgazette build-site-data \
-            --data-root "$RUNNER_TEMP/breachgazette-candidate" \
-            --output "$RUNNER_TEMP/breachgazette-publication" \
-            --json
-          breachgazette audit-public-tree "$RUNNER_TEMP/breachgazette-publication" --json
+          if test "${{ steps.update_cycle.outcome }}" != "success"; then
+            echo "## Breach Gazette source health" >> "$GITHUB_STEP_SUMMARY"
+            echo "The bounded update failed and no candidate state was promoted." >> "$GITHUB_STEP_SUMMARY"
+          elif test -f .private-production-data/reports/source-health.json; then
+            breachgazette source-health-summary \
+              .private-production-data/reports/source-health.json \
+              >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Breach Gazette source health" >> "$GITHUB_STEP_SUMMARY"
+            echo "No candidate health report was promoted." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload source-health report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: breachgazette-source-health
-          path: ${{ runner.temp }}/breachgazette-candidate/reports/source-health.json
+          path: .private-production-data/reports/source-health.json
           if-no-files-found: warn
           retention-days: 14
-      - name: Promote complete candidate into private checkout
-        id: promote
-        if: >-
-          steps.source_update.outcome == 'success' &&
-          steps.source_health.outcome == 'success' &&
-          steps.candidate_quality.outcome == 'success'
-        run: |
-          rsync -a --delete --exclude .git \
-            "$RUNNER_TEMP/breachgazette-candidate/" \
-            .private-production-data/
       - name: Commit verified private state
         if: >-
-          steps.promote.outcome == 'success' &&
+          steps.update_cycle.outcome == 'success' &&
           (github.event_name == 'schedule' || inputs.persist_private_state)
         working-directory: .private-production-data
         run: |
@@ -111,8 +92,5 @@ jobs:
             git push origin HEAD
           fi
       - name: Fail incomplete update after preserving health report
-        if: >-
-          steps.source_update.outcome != 'success' ||
-          steps.source_health.outcome != 'success' ||
-          steps.candidate_quality.outcome != 'success'
+        if: steps.update_cycle.outcome != 'success'
         run: exit 1
