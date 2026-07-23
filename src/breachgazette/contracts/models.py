@@ -262,6 +262,28 @@ class OrganizationIdentity(ContractModel):
     aliases: list[OrganizationAlias]
 
 
+class AliasReviewDecision(ContractModel):
+    decision_id: str = Field(pattern=r"^alias_[0-9a-f]{16}$")
+    alias_name: str = Field(min_length=2, max_length=500)
+    canonical_name: str = Field(min_length=2, max_length=500)
+    status: Literal["approved", "rejected"]
+    source_ids: list[str] = Field(min_length=1, max_length=10)
+    evidence: list[str] = Field(min_length=1, max_length=10)
+    reviewed_on: date
+    review_note: str = Field(min_length=2, max_length=500)
+
+
+class AliasProposal(ContractModel):
+    proposal_id: str = Field(pattern=r"^alias_proposal_[0-9a-f]{16}$")
+    left_name: str = Field(min_length=2, max_length=500)
+    right_name: str = Field(min_length=2, max_length=500)
+    left_normalized_name: str = Field(min_length=2, max_length=500)
+    right_normalized_name: str = Field(min_length=2, max_length=500)
+    source_ids: list[str] = Field(min_length=2, max_length=10)
+    similarity_score: float = Field(ge=0, le=1)
+    reasons: list[str] = Field(min_length=1, max_length=10)
+
+
 class RelationshipReason(ContractModel):
     code: Literal[
         "exact_canonical_entity",
@@ -361,6 +383,52 @@ class QualityReport(ContractModel):
     findings: list[QualityFinding] = Field(default_factory=list)
     record_counts: dict[str, int]
     limitations: list[str]
+
+
+class SourceMonitoringPolicy(ContractModel):
+    source_id: str = Field(pattern=r"^[a-z0-9_]+$")
+    stale_after_hours: int = Field(ge=1, le=8_760)
+    minimum_records: int = Field(ge=1)
+    minimum_retained_fraction: float = Field(gt=0, le=1)
+    maximum_growth_factor: float = Field(ge=1, le=10)
+
+
+class MonitoringCatalogue(ContractModel):
+    schema_version: Literal["1.0"] = "1.0"
+    schedule_utc: str = Field(min_length=9, max_length=100)
+    sources: dict[str, SourceMonitoringPolicy]
+
+
+class SourceHealthEntry(ContractModel):
+    source_id: str
+    status: Literal[
+        "healthy",
+        "missing",
+        "stale",
+        "failed_update",
+        "incomplete_update",
+        "record_count_below_floor",
+    ]
+    record_count: int = Field(ge=0)
+    minimum_records: int = Field(ge=1)
+    completeness: Completeness | None = None
+    snapshot_checksum: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    snapshot_age_hours: float | None = Field(default=None, ge=0)
+    stale_after_hours: int = Field(ge=1)
+    latest_attempted_update: datetime | None = None
+    last_successful_update: datetime | None = None
+    checkpoint_status: Literal["missing", "in_progress", "complete", "failed"]
+    reasons: list[str] = Field(default_factory=list, max_length=10)
+
+
+class SourceHealthReport(ContractModel):
+    schema_version: Literal["1.0"] = "1.0"
+    generated_at: datetime
+    dataset_class: Literal["real_source_data", "test_fixture", "unknown"]
+    passed: bool
+    schedule_utc: str
+    sources: list[SourceHealthEntry]
+    limitations: list[str] = Field(min_length=1, max_length=10)
 
 
 class UpdateCheckpoint(ContractModel):

@@ -4,13 +4,15 @@ import Hero from "../../components/Hero.astro";
 import SourceNote from "../../components/SourceNote.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getPublication } from "../../lib/data";
-import { label } from "../../lib/format";
+import { date, label } from "../../lib/format";
 
 export function getStaticPaths() {
   const publication = getPublication();
   return Object.values(publication.policies).map((policy) => ({ params: { id: policy.source_id }, props: { policy } }));
 }
 const { policy } = Astro.props;
+const pagePublication = getPublication();
+const health = pagePublication.source_health.sources.find((source) => source.source_id === policy.source_id);
 ---
 
 <BaseLayout title={policy.name} description={policy.unit_of_observation} section="Source methodology">
@@ -31,6 +33,8 @@ const { policy } = Astro.props;
       { term: "Source population", description: policy.source_population },
       { term: "Licence state", description: policy.source_licence },
       { term: "Redistribution decision", description: label(policy.redistribution_decision) },
+      { term: "Automated health", description: policy.implemented ? label(health?.status ?? "not monitored") : "Deferred" },
+      { term: "Last successful update", description: date(health?.last_successful_update) },
     ]} />
     <div class="prose">
       <h2>Limitations</h2>

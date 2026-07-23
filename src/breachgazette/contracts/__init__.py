@@ -1,11 +1,14 @@
 """Versioned source, normalization, event, and publication contracts."""
 
 from breachgazette.contracts.models import (
+    AliasProposal,
+    AliasReviewDecision,
     BreachCause,
     DateObservation,
     IncidentGroup,
     IncidentGroupCandidate,
     InformationCategory,
+    MonitoringCatalogue,
     NormalizedAggregateMetric,
     NormalizedNotification,
     NotificationChange,
@@ -21,7 +24,10 @@ from breachgazette.contracts.models import (
     RegulatoryStatusChange,
     RelationshipReason,
     SourceAggregateRecord,
+    SourceHealthEntry,
+    SourceHealthReport,
     SourceManifest,
+    SourceMonitoringPolicy,
     SourceNotificationRecord,
     SourcePolicy,
     SourceRegulatoryRecord,
@@ -30,11 +36,14 @@ from breachgazette.contracts.models import (
 )
 
 __all__ = [
+    "AliasProposal",
+    "AliasReviewDecision",
     "BreachCause",
     "DateObservation",
     "IncidentGroup",
     "IncidentGroupCandidate",
     "InformationCategory",
+    "MonitoringCatalogue",
     "NormalizedAggregateMetric",
     "NormalizedNotification",
     "NotificationChange",
@@ -50,7 +59,10 @@ __all__ = [
     "RegulatoryStatusChange",
     "RelationshipReason",
     "SourceAggregateRecord",
+    "SourceHealthEntry",
+    "SourceHealthReport",
     "SourceManifest",
+    "SourceMonitoringPolicy",
     "SourceNotificationRecord",
     "SourcePolicy",
     "SourceRegulatoryRecord",

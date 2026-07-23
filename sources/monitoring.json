@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0",
+  "schedule_utc": "23 17 * * 1",
+  "sources": {
+    "california": {
+      "source_id": "california",
+      "stale_after_hours": 240,
+      "minimum_records": 1000,
+      "minimum_retained_fraction": 0.9,
+      "maximum_growth_factor": 1.5
+    },
+    "nsw_mndb_aggregate": {
+      "source_id": "nsw_mndb_aggregate",
+      "stale_after_hours": 240,
+      "minimum_records": 10,
+      "minimum_retained_fraction": 0.5,
+      "maximum_growth_factor": 2.0
+    },
+    "nsw_public_notifications": {
+      "source_id": "nsw_public_notifications",
+      "stale_after_hours": 240,
+      "minimum_records": 1,
+      "minimum_retained_fraction": 0.2,
+      "maximum_growth_factor": 4.0
+    },
+    "oaic_ndb": {
+      "source_id": "oaic_ndb",
+      "stale_after_hours": 240,
+      "minimum_records": 100,
+      "minimum_retained_fraction": 0.75,
+      "maximum_growth_factor": 1.5
+    },
+    "oaic_regulatory": {
+      "source_id": "oaic_regulatory",
+      "stale_after_hours": 240,
+      "minimum_records": 7,
+      "minimum_retained_fraction": 1.0,
+      "maximum_growth_factor": 1.25
+    },
+    "washington": {
+      "source_id": "washington",
+      "stale_after_hours": 240,
+      "minimum_records": 500,
+      "minimum_retained_fraction": 0.9,
+      "maximum_growth_factor": 1.5
+    }
+  }
+}

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
-import yaml
 
 from breachgazette.contracts import (
     NormalizedNotification,
@@ -16,8 +15,9 @@ from breachgazette.contracts import (
     SourceAggregateRecord,
     SourceNotificationRecord,
 )
-from breachgazette.entities import resolve_organizations
-from breachgazette.policies import load_source_policies, repository_root
+from breachgazette.entities import load_alias_catalogue, resolve_organizations
+from breachgazette.monitoring import build_source_health_report
+from breachgazette.policies import load_source_policies
 from breachgazette.privacy.audit import require_public_safe
 from breachgazette.quality import DataQualityError, build_quality_report
 from breachgazette.relationships import generate_candidates
@@ -26,6 +26,7 @@ from breachgazette.utils import atomic_write_json, sha256_hex
 
 DETAIL_RECORDS_PER_SOURCE = 250
 LATEST_RECORDS = 100
+SEARCH_PARTITION_SIZE = 250
 
 
 def _latest_date(record: SourceNotificationRecord) -> str:
@@ -37,16 +38,121 @@ def _latest_date(record: SourceNotificationRecord) -> str:
     return max(dates, default="0001-01-01")
 
 
-def _load_curated_aliases() -> dict[str, str]:
-    path = repository_root() / "sources" / "organization-aliases.yml"
-    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return dict(payload.get("aliases", {}))
+def _search_year(record: NormalizedNotification) -> str:
+    normalized_dates = sorted(
+        observation.normalized_date
+        for observation in record.dates
+        if observation.normalized_date is not None
+    )
+    return str(normalized_dates[-1].year) if normalized_dates else "unknown"
+
+
+def _population_band(record: NormalizedNotification) -> str:
+    count = record.affected_population.count if record.affected_population else None
+    if count is None:
+        return "not_published"
+    if count < 1_000:
+        return "500_999"
+    if count < 10_000:
+        return "1000_9999"
+    if count < 100_000:
+        return "10000_99999"
+    return "100000_plus"
+
+
+def _search_facets(records: list[NormalizedNotification]) -> dict[str, list[str]]:
+    return {
+        "jurisdictions": sorted({record.jurisdiction for record in records}),
+        "regulators": sorted({record.regulator for record in records}),
+        "sources": sorted({record.source_id for record in records}),
+        "years": sorted({_search_year(record) for record in records}, reverse=True),
+        "causes": sorted(
+            {
+                record.breach_cause.normalized_label
+                for record in records
+                if record.breach_cause and record.breach_cause.normalized_label
+            }
+        ),
+        "information_categories": sorted(
+            {
+                category.normalized_label
+                for record in records
+                for category in record.information_categories
+            }
+        ),
+        "population_bands": sorted({_population_band(record) for record in records}),
+        "roles": sorted({record.named_entity.role for record in records}),
+        "publication_levels": sorted({record.publication_level for record in records}),
+    }
+
+
+def _build_search_assets(
+    records: list[NormalizedNotification],
+    *,
+    detail_ids: set[str],
+    generated_at: datetime,
+) -> tuple[dict[str, Any], list[tuple[str, dict[str, Any]]]]:
+    grouped: dict[tuple[str, str], list[NormalizedNotification]] = defaultdict(list)
+    for record in records:
+        grouped[(record.source_id, _search_year(record))].append(record)
+    partitions: list[tuple[str, dict[str, Any]]] = []
+    partition_metadata: list[dict[str, Any]] = []
+    for (source_id, year), group in sorted(grouped.items()):
+        ordered = sorted(
+            group,
+            key=lambda record: (_latest_date(record), record.source_record_id),
+            reverse=True,
+        )
+        for offset in range(0, len(ordered), SEARCH_PARTITION_SIZE):
+            page = offset // SEARCH_PARTITION_SIZE + 1
+            partition_id = f"{source_id}-{year}-{page:03d}"
+            partition_records = ordered[offset : offset + SEARCH_PARTITION_SIZE]
+            facets = _search_facets(partition_records)
+            payload_records = []
+            for record in partition_records:
+                payload = record.model_dump(mode="json")
+                payload["has_detail_page"] = record.source_record_id in detail_ids
+                payload_records.append(payload)
+            payload = {
+                "schema_version": "1.0",
+                "partition_id": partition_id,
+                "records": payload_records,
+            }
+            partitions.append((partition_id, payload))
+            partition_metadata.append(
+                {
+                    "id": partition_id,
+                    "count": len(partition_records),
+                    **facets,
+                }
+            )
+    manifest = {
+        "schema_version": "1.0",
+        "generated_at": generated_at,
+        "record_count": len(records),
+        "partition_size": SEARCH_PARTITION_SIZE,
+        "facets": _search_facets(records),
+        "partitions": partition_metadata,
+    }
+    return manifest, partitions
 
 
 def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     store = PrivateStateStore(data_root)
     if store.dataset_class() != "real_source_data":
         raise DataQualityError("production site data requires real source-derived state")
+    generated_at = datetime.now(UTC)
+    source_health = build_source_health_report(data_root=data_root, generated_at=generated_at)
+    if not source_health.passed:
+        failed = ", ".join(
+            f"{entry.source_id}:{entry.status}"
+            for entry in source_health.sources
+            if entry.status != "healthy"
+        )
+        raise DataQualityError(f"production source health gates failed: {failed}")
+    health_states: dict[str, str] = {
+        entry.source_id: entry.status for entry in source_health.sources
+    }
     records_by_source = {
         source_id: store.load_records(source_id) for source_id in store.source_ids()
     }
@@ -55,6 +161,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         dataset_class="real_source_data",
         records_by_source=records_by_source,
         snapshots=snapshots,
+        source_health=health_states,
     )
     aggregates = [
         SourceAggregateRecord.model_validate(record.model_dump(mode="json"))
@@ -77,7 +184,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     organizations = resolve_organizations(
         notifications,
         regulatory_actions,
-        curated_aliases=_load_curated_aliases(),
+        alias_catalogue=load_alias_catalogue(),
     )
     organization_by_alias = {
         alias.normalized_name: identity.organization_id
@@ -125,7 +232,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     ]
     summary_payload = {
         "schema_version": "1.0",
-        "generated_at": datetime.now(UTC),
+        "generated_at": generated_at,
         "tagline": "Public breach notifications, connected and explained.",
         "disclaimer": (
             "Breach Gazette reproduces or derives information from official public sources "
@@ -153,12 +260,19 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
             reverse=True,
         )[:250],
         "quality": initial_quality,
+        "source_health": source_health,
         "deferred_sources": [policy for policy in policies.values() if not policy.implemented],
     }
     require_public_safe(summary_payload, record_identity="publication-summary")
+    search_manifest, search_partitions = _build_search_assets(
+        ordered_notifications,
+        detail_ids=detail_ids,
+        generated_at=generated_at,
+    )
+    require_public_safe(search_manifest, record_identity="notification-search-manifest")
     publication_checksum = sha256_hex(summary_payload)
     manifest = PublicationManifest(
-        generated_at=datetime.now(UTC),
+        generated_at=generated_at,
         dataset_class="real_source_data",
         record_counts={
             "aggregate_metrics": len(aggregates),
@@ -182,12 +296,27 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         dataset_class="real_source_data",
         records_by_source=records_by_source,
         snapshots=snapshots,
-        public_payloads=[summary_payload, notifications, organizations, relationships],
+        public_payloads=[
+            summary_payload,
+            notifications,
+            organizations,
+            relationships,
+            search_manifest,
+        ],
+        source_health=health_states,
     )
     summary_payload["quality"] = final_quality
     output.mkdir(parents=True, exist_ok=True)
+    search_output = output / "search-partitions"
+    search_output.mkdir(parents=True, exist_ok=True)
+    for existing in search_output.glob("*.json"):
+        existing.unlink()
+    for partition_id, payload in search_partitions:
+        atomic_write_json(search_output / f"{partition_id}.json", payload)
     atomic_write_json(output / "publication.json", summary_payload)
     atomic_write_json(output / "notifications.json", notifications)
+    atomic_write_json(output / "search-manifest.json", search_manifest)
+    atomic_write_json(output / "source-health.json", source_health)
     atomic_write_json(output / "organizations.json", organizations)
     atomic_write_json(output / "relationships.json", relationships)
     atomic_write_json(output / "quality-report.json", final_quality)
@@ -196,6 +325,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         "output": str(output),
         "publication_checksum": publication_checksum,
         "records": manifest.record_counts,
+        "search_partitions": len(search_partitions),
         "quality_passed": final_quality.passed,
     }
 

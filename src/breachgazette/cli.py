@@ -9,7 +9,17 @@ from typing import Annotated, Any
 
 import typer
 
-from breachgazette.contracts import NormalizedNotification
+from breachgazette.contracts import NormalizedNotification, RegulatoryAction
+from breachgazette.entities import (
+    alias_decision_id,
+    build_alias_proposal_report,
+    load_alias_catalogue,
+)
+from breachgazette.monitoring import (
+    build_source_health_report,
+    load_monitoring_catalogue,
+    write_source_health_report,
+)
 from breachgazette.pipeline import (
     ADAPTERS,
     compare_summary,
@@ -22,6 +32,7 @@ from breachgazette.publish.builder import audit_public_tree, build_site_data
 from breachgazette.quality import build_quality_report
 from breachgazette.relationships import generate_candidates
 from breachgazette.state import PrivateStateStore
+from breachgazette.utils import atomic_write_json, normalize_organization_name
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -78,6 +89,92 @@ def validate_source_policies(
     if missing:
         raise typer.Exit(code=2)
     _emit({"valid": True, "policies": len(policies)}, json_output=json_output)
+
+
+@app.command("validate-monitoring")
+def validate_monitoring(
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    catalogue = load_monitoring_catalogue()
+    _emit(
+        {
+            "valid": True,
+            "sources": len(catalogue.sources),
+            "schedule_utc": catalogue.schedule_utc,
+        },
+        json_output=json_output,
+    )
+
+
+@app.command("validate-aliases")
+def validate_aliases(
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    catalogue = load_alias_catalogue()
+    _emit(
+        {
+            "valid": True,
+            "decisions": len(catalogue.decisions),
+            "approved": sum(decision.status == "approved" for decision in catalogue.decisions),
+            "rejected": sum(decision.status == "rejected" for decision in catalogue.decisions),
+        },
+        json_output=json_output,
+    )
+
+
+@app.command("alias-decision-id")
+def alias_decision_id_command(
+    alias_name: Annotated[str, typer.Argument()],
+    canonical_name: Annotated[str, typer.Argument()],
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    _emit(
+        {
+            "decision_id": alias_decision_id(alias_name, canonical_name),
+            "alias_normalized": normalize_organization_name(alias_name),
+            "canonical_normalized": normalize_organization_name(canonical_name),
+        },
+        json_output=json_output,
+    )
+
+
+@app.command("propose-aliases")
+def propose_aliases_command(
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    output: Annotated[Path | None, typer.Option("--output")] = None,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=2_000)] = 500,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    root = _data_root(data_root)
+    store = PrivateStateStore(root)
+    notifications = [
+        NormalizedNotification.model_validate(record.model_dump(mode="json"))
+        for source_id in store.source_ids()
+        for record in store.load_records(source_id)
+        if getattr(record, "record_type", None) == "notification"
+    ]
+    regulatory_actions = [
+        RegulatoryAction.model_validate(record.model_dump(mode="json"))
+        for source_id in store.source_ids()
+        for record in store.load_records(source_id)
+        if getattr(record, "record_type", None) == "regulatory"
+    ]
+    report = build_alias_proposal_report(
+        notifications,
+        regulatory_actions,
+        catalogue=load_alias_catalogue(),
+        limit=limit,
+    )
+    report_path = output or root / "reports" / "alias-proposals.json"
+    atomic_write_json(report_path, report)
+    _emit(
+        {
+            "output": str(report_path),
+            "proposal_count": report["proposal_count"],
+            "limitations": report["limitations"],
+        },
+        json_output=json_output,
+    )
 
 
 @app.command()
@@ -192,6 +289,20 @@ def quality_report_command(
         snapshots=store.all_snapshots(),
     )
     _emit(report.model_dump(mode="json"), json_output=json_output)
+
+
+@app.command("source-health")
+def source_health_command(
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    output: Annotated[Path | None, typer.Option("--output")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    report = build_source_health_report(data_root=_data_root(data_root))
+    if output is not None:
+        write_source_health_report(report, output)
+    _emit(report.model_dump(mode="json"), json_output=json_output)
+    if not report.passed:
+        raise typer.Exit(code=2)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from breachgazette.contracts import (
     RegulatoryAction,
 )
 from breachgazette.contracts.enums import EntityRole, ValueState
+from breachgazette.entities.catalogue import AliasCatalogue
 from breachgazette.utils import normalize_organization_name, stable_id
 
 RESOLVER_VERSION = "1.0"
@@ -20,18 +21,25 @@ def resolve_organizations(
     notifications: list[NormalizedNotification],
     regulatory_actions: list[RegulatoryAction],
     *,
-    curated_aliases: dict[str, str] | None = None,
+    alias_catalogue: AliasCatalogue | None = None,
 ) -> list[OrganizationIdentity]:
-    curated_aliases = curated_aliases or {}
+    approved_aliases = alias_catalogue.approved_by_alias if alias_catalogue else {}
     grouped: dict[str, list[OrganizationAlias]] = defaultdict(list)
     canonical_names: dict[str, str] = {}
 
     def add_alias(*, source_id: str, source_name: str, role: EntityRole) -> None:
         normalized = normalize_organization_name(source_name)
-        reviewed_target = curated_aliases.get(normalized)
-        key = reviewed_target or normalized
-        method = "curated_alias" if reviewed_target else "exact_normalized"
-        canonical_names.setdefault(key, source_name)
+        reviewed_decision = approved_aliases.get(normalized)
+        key = (
+            normalize_organization_name(reviewed_decision.canonical_name)
+            if reviewed_decision
+            else normalized
+        )
+        method = "curated_alias" if reviewed_decision else "exact_normalized"
+        if reviewed_decision:
+            canonical_names[key] = reviewed_decision.canonical_name
+        else:
+            canonical_names.setdefault(key, source_name)
         grouped[key].append(
             OrganizationAlias(
                 source_id=source_id,
@@ -39,14 +47,17 @@ def resolve_organizations(
                 normalized_name=normalized,
                 role=role,
                 match_method=method,
-                confidence_class="reviewed" if reviewed_target else "exact",
-                supporting_evidence=[
-                    "Reviewed curated alias" if reviewed_target else "Exact normalized source name"
-                ],
+                confidence_class="reviewed" if reviewed_decision else "exact",
+                supporting_evidence=(
+                    [
+                        f"Reviewed alias decision {reviewed_decision.decision_id}",
+                        *reviewed_decision.evidence,
+                    ]
+                    if reviewed_decision
+                    else ["Exact normalized source name"]
+                ),
                 resolver_version=RESOLVER_VERSION,
-                review_note="Configured in the reviewed alias catalogue."
-                if reviewed_target
-                else None,
+                review_note=reviewed_decision.review_note if reviewed_decision else None,
             )
         )
 

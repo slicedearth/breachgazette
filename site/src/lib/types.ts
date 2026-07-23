@@ -42,6 +42,38 @@ export type Notification = {
   limitations: string[];
 };
 
+export type SearchFacets = {
+  jurisdictions: string[];
+  regulators: string[];
+  sources: string[];
+  years: string[];
+  causes: string[];
+  information_categories: string[];
+  population_bands: string[];
+  roles: string[];
+  publication_levels: string[];
+};
+
+export type SearchPartitionMetadata = SearchFacets & {
+  id: string;
+  count: number;
+};
+
+export type SearchManifest = {
+  schema_version: string;
+  generated_at: string;
+  record_count: number;
+  partition_size: number;
+  facets: SearchFacets;
+  partitions: SearchPartitionMetadata[];
+};
+
+export type SearchPartition = {
+  schema_version: string;
+  partition_id: string;
+  records: Notification[];
+};
+
 export type Aggregate = {
   source_id: string;
   source_record_id: string;
@@ -88,7 +120,10 @@ export type Organization = {
     source_name: string;
     role: string;
     match_method: string;
+    confidence_class?: string;
     supporting_evidence: string[];
+    resolver_version?: string;
+    review_note?: string | null;
   }>;
 };
 
@@ -145,6 +180,21 @@ export type Publication = {
     source_health: Record<string, string>;
     findings: string[];
     limitations: string[];
+  };
+  source_health: {
+    passed: boolean;
+    schedule_utc: string;
+    generated_at: string;
+    sources: Array<{
+      source_id: string;
+      status: string;
+      record_count: number;
+      snapshot_age_hours: number | null;
+      stale_after_hours: number;
+      latest_attempted_update: string | null;
+      last_successful_update: string | null;
+      reasons: string[];
+    }>;
   };
   manifest: {
     dataset_class: string;

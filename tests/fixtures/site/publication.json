@@ -66,6 +66,19 @@
   ],
   "corrections": [],
   "quality": {"passed": true, "dataset_class": "test_fixture", "checks": {"fixture_isolation": true}, "source_health": {"oaic_ndb": "complete", "nsw_public_notifications": "complete", "nsw_mndb_aggregate": "complete", "oaic_regulatory": "complete", "washington": "complete", "california": "complete"}, "findings": [], "limitations": ["Synthetic test-only publication."]},
+  "source_health": {
+    "passed": true,
+    "schedule_utc": "23 17 * * 1",
+    "generated_at": "2026-01-01T00:00:00Z",
+    "sources": [
+      {"source_id": "california", "status": "healthy", "record_count": 1, "snapshot_age_hours": 1, "stale_after_hours": 240, "latest_attempted_update": "2026-01-01T00:00:00Z", "last_successful_update": "2026-01-01T00:00:00Z", "reasons": []},
+      {"source_id": "nsw_mndb_aggregate", "status": "healthy", "record_count": 1, "snapshot_age_hours": 1, "stale_after_hours": 240, "latest_attempted_update": "2026-01-01T00:00:00Z", "last_successful_update": "2026-01-01T00:00:00Z", "reasons": []},
+      {"source_id": "nsw_public_notifications", "status": "healthy", "record_count": 1, "snapshot_age_hours": 1, "stale_after_hours": 240, "latest_attempted_update": "2026-01-01T00:00:00Z", "last_successful_update": "2026-01-01T00:00:00Z", "reasons": []},
+      {"source_id": "oaic_ndb", "status": "healthy", "record_count": 1, "snapshot_age_hours": 1, "stale_after_hours": 240, "latest_attempted_update": "2026-01-01T00:00:00Z", "last_successful_update": "2026-01-01T00:00:00Z", "reasons": []},
+      {"source_id": "oaic_regulatory", "status": "healthy", "record_count": 2, "snapshot_age_hours": 1, "stale_after_hours": 240, "latest_attempted_update": "2026-01-01T00:00:00Z", "last_successful_update": "2026-01-01T00:00:00Z", "reasons": []},
+      {"source_id": "washington", "status": "healthy", "record_count": 1, "snapshot_age_hours": 1, "stale_after_hours": 240, "latest_attempted_update": "2026-01-01T00:00:00Z", "last_successful_update": "2026-01-01T00:00:00Z", "reasons": []}
+    ]
+  },
   "manifest": {"dataset_class": "test_fixture", "generated_at": "2026-01-01T00:00:00Z", "record_counts": {"aggregate_metrics": 2, "notifications": 3, "regulatory_actions": 2, "organizations": 4, "relationships": 1, "corrections": 0}, "limitations": ["Synthetic test-only publication."]},
   "deferred_sources": []
 }

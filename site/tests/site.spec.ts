@@ -13,6 +13,13 @@ test("NSW register displays its rolling-window warning", async ({ page }) => {
   await expect(page.getByText(/Disappearance is not evidence of remediation/i)).toBeVisible();
 });
 
+test("source health exposes freshness without claiming factual completeness", async ({ page }) => {
+  await page.goto("/source-health/");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Source health");
+  await expect(page.getByText(/does not establish that an official source is factually complete/i)).toBeVisible();
+  await expect(page.getByRole("table")).toContainText("Healthy");
+});
+
 test("OAIC allegations and orders retain distinct labels", async ({ page }) => {
   await page.goto("/australia/regulatory-actions/");
   const timeline = page.getByLabel("OAIC regulatory timeline");
@@ -50,7 +57,7 @@ test("keyboard navigation exposes skip link and table alternatives", async ({ pa
 
 test("320 pixel layout has no document-level horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
-  for (const path of ["/", "/latest/", "/australia/public-notifications/", "/sources/oaic_ndb/"]) {
+  for (const path of ["/", "/latest/", "/source-health/", "/australia/public-notifications/", "/sources/oaic_ndb/"]) {
     await page.goto(path);
     const sizes = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
@@ -62,19 +69,56 @@ test("320 pixel layout has no document-level horizontal overflow", async ({ page
 
 test("runtime requests remain same-origin and no remote font or analytics is present", async ({ page }) => {
   const origins = new Set<string>();
+  const paths: string[] = [];
   page.on("request", (request) => origins.add(new URL(request.url()).origin));
+  page.on("request", (request) => paths.push(new URL(request.url()).pathname));
   await page.goto("/latest/");
   await expect(page.locator("[data-result-count]")).toContainText("matching source records");
   const data = await page.evaluate(async () => {
-    const response = await fetch("/data/notifications.json");
-    return await response.json() as Array<{ has_detail_page?: boolean }>;
+    const manifestResponse = await fetch("/data/notifications/manifest.json");
+    const manifest = await manifestResponse.json() as {
+      record_count: number;
+      partitions: Array<{ id: string }>;
+    };
+    const partitionResponse = await fetch(
+      `/data/notifications/${encodeURIComponent(manifest.partitions[0]!.id)}.json`,
+    );
+    const partition = await partitionResponse.json() as {
+      records: Array<{ has_detail_page?: boolean }>;
+    };
+    return { manifest, partition };
   });
-  expect(data.every((record) => typeof record.has_detail_page === "boolean")).toBe(true);
+  expect(data.manifest.record_count).toBeGreaterThan(0);
+  expect(data.partition.records.every((record) => typeof record.has_detail_page === "boolean")).toBe(true);
   expect(await page.locator("[data-results] a").count()).toBeGreaterThan(0);
   await expect(page.locator("script:not([src])")).toHaveCount(0);
   expect([...origins]).toEqual(["http://127.0.0.1:41733"]);
+  expect(paths).not.toContain("/data/notifications.json");
   const content = await page.content();
   expect(content).not.toMatch(/google-analytics|googletagmanager|fonts\.googleapis/i);
+});
+
+test("notification search defers partitions until a filter is used", async ({ page }) => {
+  const paths: string[] = [];
+  page.on("request", (request) => paths.push(new URL(request.url()).pathname));
+  await page.goto("/latest/");
+  await expect(page.locator("[data-result-count]")).toContainText("no search partitions loaded");
+  expect(paths).toContain("/data/notifications/manifest.json");
+  const isPartition = (path: string) =>
+    path.startsWith("/data/notifications/") &&
+    path.endsWith(".json") &&
+    !path.endsWith("/manifest.json");
+  expect(paths.some(isPartition)).toBe(false);
+  await page.locator('[name="source"]').selectOption("washington");
+  await expect(page.locator("[data-result-count]")).toContainText("matching source records");
+  expect(paths.some(isPartition)).toBe(true);
+});
+
+test("notification search preserves static records when the manifest fails", async ({ page }) => {
+  await page.route("**/data/notifications/manifest.json", (route) => route.abort());
+  await page.goto("/latest/");
+  await expect(page.locator("[data-result-count]")).toContainText("latest static records remain available");
+  expect(await page.locator("[data-results] tbody tr").count()).toBeGreaterThan(0);
 });
 
 test("full notification filters preserve source fields and population bands", async ({ page }) => {

@@ -10,7 +10,7 @@ const metrics = [
   ["Public notifications", publication.stats.public_notifications ?? 0],
   ["Aggregate metrics", publication.stats.aggregate_metrics ?? 0],
   ["Regulatory actions", publication.stats.regulatory_actions ?? 0],
-  ["Source health", Object.values(publication.quality.source_health).filter((state) => state === "complete").length],
+  ["Healthy sources", publication.source_health.sources.filter((source) => source.status === "healthy").length],
 ];
 ---
 
@@ -29,7 +29,7 @@ const metrics = [
       {metrics.map(([name, value]) => (
         <article class="card">
           <div class="metric">{compactNumber(Number(value))}</div>
-          <h3>{name}</h3>
+          <h3>{name === "Healthy sources" ? <a href={`${import.meta.env.BASE_URL}source-health/`}>{name}</a> : name}</h3>
         </article>
       ))}
     </div>

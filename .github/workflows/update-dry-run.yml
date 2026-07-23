@@ -30,5 +30,11 @@ jobs:
       - name: Run bounded fixed-source update
         run: |
           breachgazette validate-source-policies --json
+          breachgazette validate-monitoring --json
+          breachgazette validate-aliases --json
           breachgazette update --data-root "$RUNNER_TEMP/breachgazette-dry-run" --json
+          breachgazette source-health \
+            --data-root "$RUNNER_TEMP/breachgazette-dry-run" \
+            --output "$RUNNER_TEMP/source-health.json" \
+            --json
           breachgazette quality-report --data-root "$RUNNER_TEMP/breachgazette-dry-run" --json

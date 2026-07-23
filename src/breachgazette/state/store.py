@@ -98,6 +98,10 @@ class PrivateStateStore:
     def write_checkpoint(self, checkpoint: UpdateCheckpoint) -> None:
         atomic_write_json(self.checkpoint_path(checkpoint.source_id), checkpoint)
 
+    def load_checkpoint(self, source_id: str) -> UpdateCheckpoint | None:
+        payload = read_json(self.checkpoint_path(source_id))
+        return UpdateCheckpoint.model_validate(payload) if payload else None
+
     def source_ids(self) -> list[str]:
         state_root = self.root / "state"
         return (

@@ -26,6 +26,7 @@ from breachgazette.contracts import (
     UpdateCheckpoint,
 )
 from breachgazette.contracts.models import RecordProvenance
+from breachgazette.monitoring import guard_source_record_count
 from breachgazette.privacy.audit import require_public_safe
 from breachgazette.state import PrivateStateStore
 
@@ -78,6 +79,11 @@ def update_source(source_id: str, *, data_root: Path) -> dict[str, Any]:
     )
     try:
         result: AdapterResult = factory().collect(observed_at=observed_at)
+        guard_source_record_count(
+            source_id,
+            previous_count=len(previous_records),
+            incoming_count=len(result.records),
+        )
         result.records = _merge_observation_times(
             previous_by_id,
             result.records,
