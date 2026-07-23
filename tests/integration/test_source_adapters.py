@@ -15,6 +15,11 @@ from breachgazette.clients.base import SourceClientError
 from breachgazette.clients.california import CaliforniaAdapter
 from breachgazette.clients.hhs import HhsAdapter
 from breachgazette.clients.ipc_nsw import NswAggregateAdapter, NswPublicNotificationsAdapter
+from breachgazette.clients.massachusetts import (
+    EXPECTED_HEADERS,
+    MassachusettsAdapter,
+    _parse_rows,
+)
 from breachgazette.clients.oaic import EXPECTED_SHEETS, OaicNdbAdapter
 from breachgazette.clients.oaic_regulatory import OaicRegulatoryAdapter
 from breachgazette.clients.washington import MAIN_FIELDS, PII_FIELDS, WashingtonAdapter
@@ -125,6 +130,84 @@ def test_washington_schema_drift_is_rejected(observed_at: datetime) -> None:
 
     with pytest.raises(SourceClientError, match="schema"):
         WashingtonAdapter(transport=httpx.MockTransport(handler)).collect(observed_at=observed_at)
+
+
+def test_massachusetts_rows_preserve_roles_counts_flags_and_dates(
+    observed_at: datetime,
+) -> None:
+    row = dict.fromkeys(EXPECTED_HEADERS, "No")
+    row.update(
+        {
+            "Breach Number": "2026-1234",
+            "Date Reported To OCA": "23-Jul-26",
+            "Reporting Organization Name": "Example Health Services",
+            "Reporting Organization Type": "Health Care",
+            "MA Residents Affected": "1,250",
+            "SSN Breached": "Yes",
+            "Medical Records Breached": "Yes",
+        }
+    )
+    placeholder: dict[str, str] = {
+        **dict.fromkeys(EXPECTED_HEADERS, "-"),
+        "Breach Number": "2026- 9999",
+    }
+    duplicate: dict[str, str] = {
+        **dict.fromkeys(EXPECTED_HEADERS, ""),
+        "Breach Number": "2026- 9998",
+        "Date Reported To OCA": "23-Jul-26",
+        "Reporting Organization Name": "DUPLICATE OF 2026-9997",
+    }
+    records = _parse_rows(
+        {2026: [row, placeholder, duplicate]},
+        checksum="a" * 64,
+        observed_at=observed_at,
+    )
+    record = records[0]
+    assert record.source_record_id == "ma:2026-1234"
+    assert record.named_entity.role == "notifying_entity"
+    assert record.affected_population.count == 1_250
+    assert record.dates[0].normalized_date.isoformat() == "2026-07-23"
+    assert [category.normalized_label for category in record.information_categories] == [
+        "social_security_number",
+        "medical_records",
+    ]
+    assert record.source_detail_url is not None
+
+
+def test_massachusetts_adapter_is_bounded_and_rejects_changed_flags(
+    observed_at: datetime,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    valid = dict.fromkeys(EXPECTED_HEADERS, "No")
+    valid.update(
+        {
+            "Breach Number": "2025-0001",
+            "Date Reported To OCA": "02-Jan-25",
+            "Reporting Organization Name": "Example Services",
+            "Reporting Organization Type": "Professional Services",
+            "MA Residents Affected": "12",
+        }
+    )
+    reports = iter([[valid], [{**valid, "Breach Number": "2026-0001"}]])
+    monkeypatch.setattr(
+        "breachgazette.clients.massachusetts._extract_rows",
+        lambda _content: next(reports),
+    )
+    transport = httpx.MockTransport(
+        lambda _request: httpx.Response(
+            200,
+            headers={"Content-Type": "application/pdf"},
+            content=b"%PDF synthetic fixture",
+        )
+    )
+    result = MassachusettsAdapter(transport=transport).collect(observed_at=observed_at)
+    assert result.snapshot.records_discovered == 2
+    assert result.snapshot.records_accepted == 2
+    assert result.snapshot.bounded_limit == 10_000
+
+    invalid = {**valid, "SSN Breached": "Unknown"}
+    with pytest.raises(SourceClientError, match="flag"):
+        _parse_rows({2025: [invalid]}, checksum="b" * 64, observed_at=observed_at)
 
 
 def test_nsw_register_preserves_dates_links_and_window_state(

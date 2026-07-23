@@ -25,7 +25,7 @@ export const informationPages = {
     sections: [
       ["National aggregate", "OAIC statistics summarize notifications received during a reporting period and do not name entities."],
       ["Rolling registers", "NSW public links can expire from the public window. Disappearance is not deletion, resolution, or remediation."],
-      ["Threshold lists", "Washington, California, and HHS apply jurisdiction-specific reporting thresholds. Those thresholds are not directly comparable."],
+      ["Threshold lists", "Washington, California, Massachusetts, and HHS apply jurisdiction-specific reporting thresholds. Those thresholds are not directly comparable."],
     ],
   },
   "data-quality": {
@@ -67,7 +67,7 @@ export const informationPages = {
     title: "Legal and licensing",
     intro: "The project’s MIT licence does not relicense official source material.",
     sections: [
-      ["Attribution", "OAIC and NSW IPC materials retain their official attribution and source links. Washington and California material remains subject to each government source’s terms and documented conditions."],
+      ["Attribution", "OAIC and NSW IPC materials retain their official attribution and source links. Washington, California, and Massachusetts material remains subject to each government source’s terms and documented conditions."],
       ["Legal status", "Investigations, allegations, enforceable undertakings, determinations, judgments, and orders are not interchangeable. Each timeline record keeps exact source-backed status."],
       ["Logos and marks", "No regulator logos or source images are reproduced. Organization and regulator names identify source records and may be trademarks of their owners."],
     ],
@@ -78,7 +78,7 @@ export const informationPages = {
     sections: [
       ["Incomplete by design", "Official registers have different thresholds, windows, revision practices, and named-entity roles. Some records can disappear from rolling public windows."],
       ["No independent verification", "Breach Gazette does not independently verify events, causation, population counts, remediation, or compliance."],
-      ["Candidate links", "Cross-source links are evidence-backed candidates, not a declaration that two records describe the same incident."],
+      ["Candidate links", "Cross-source links begin as evidence-backed candidates. Reviewed confirmations still preserve every source record and do not establish legal or factual identity beyond the displayed evidence."],
     ],
   },
   "official-response-resources": {

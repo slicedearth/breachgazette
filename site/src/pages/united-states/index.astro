@@ -1,0 +1,44 @@
+---
+import Hero from "../../components/Hero.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+
+const publication = getPublication();
+const sources = [
+  {
+    id: "washington",
+    title: "Washington",
+    description: "Structured Attorney General notification records with source-defined roles and affected-resident counts.",
+  },
+  {
+    id: "california",
+    title: "California",
+    description: "Attorney General breach-list rows with reported and occurrence dates where published.",
+  },
+  {
+    id: "massachusetts",
+    title: "Massachusetts",
+    description: "Bounded annual notification-report rows with reporting-organization roles and information flags.",
+  },
+];
+---
+
+<BaseLayout title="United States" description="State public breach notification records." section="United States">
+  <Hero
+    eyebrow="State official sources"
+    title="United States public notifications"
+    intro="State sources publish different thresholds, roles, fields, and time windows. Breach Gazette keeps those source meanings visible rather than treating them as one national breach census."
+    warning="Counts across states are not directly comparable and do not automatically represent unique incidents."
+  />
+  <section class="section shell">
+    <div class="grid">
+      {sources.map((source) => (
+        <article class="card">
+          <span class="pill">{publication.policies[source.id]?.publication_level.replaceAll("_", " ") ?? "named notification"}</span>
+          <h2><a href={`${import.meta.env.BASE_URL}united-states/${source.id}/`}>{source.title}</a></h2>
+          <p>{source.description}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+</BaseLayout>

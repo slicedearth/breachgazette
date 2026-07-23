@@ -23,6 +23,14 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     />
     <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/png" sizes="32x32" href={`${import.meta.env.BASE_URL}favicon-32.png`} />
+    <link rel="apple-touch-icon" href={`${import.meta.env.BASE_URL}apple-touch-icon.png`} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Breach Gazette" />
+    <meta property="og:title" content={`${title} | Breach Gazette`} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={new URL(`${import.meta.env.BASE_URL}og-card.png`, Astro.site)} />
     <title>{title} | Breach Gazette</title>
   </head>
   <body>
@@ -30,19 +38,24 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <header class="site-header">
       <div class="shell masthead">
         <a class="brand" href={import.meta.env.BASE_URL}>
-          <span aria-hidden="true" class="brand-mark">B</span>
-          <span>Breach Gazette<small>Public-data observatory</small></span>
+          <span aria-hidden="true" class="brand-mark">
+            <span class="mark-spine"></span>
+            <span class="mark-register mark-register-one"></span>
+            <span class="mark-register mark-register-two"></span>
+            <span class="mark-register mark-register-three"></span>
+          </span>
+          <span>Breach Gazette<small>Public notification and regulatory record</small></span>
         </a>
         <nav aria-label="Primary">
           <a href={`${import.meta.env.BASE_URL}australia/`}>Australia</a>
-          <a href={`${import.meta.env.BASE_URL}united-states/washington/`}>United States</a>
+          <a href={`${import.meta.env.BASE_URL}united-states/`}>United States</a>
           <a href={`${import.meta.env.BASE_URL}latest/`}>Notifications</a>
           <a href={`${import.meta.env.BASE_URL}sources/`}>Sources</a>
           <a href={`${import.meta.env.BASE_URL}methodology/`}>Methodology</a>
         </nav>
       </div>
     </header>
-    <main id="main">
+    <main id="main" tabindex="-1">
       <div class="shell page-kicker"><span>{section}</span></div>
       <slot />
     </main>

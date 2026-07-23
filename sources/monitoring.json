@@ -9,6 +9,13 @@
       "minimum_retained_fraction": 0.9,
       "maximum_growth_factor": 1.5
     },
+    "massachusetts": {
+      "source_id": "massachusetts",
+      "stale_after_hours": 240,
+      "minimum_records": 2000,
+      "minimum_retained_fraction": 0.85,
+      "maximum_growth_factor": 1.75
+    },
     "nsw_mndb_aggregate": {
       "source_id": "nsw_mndb_aggregate",
       "stale_after_hours": 240,

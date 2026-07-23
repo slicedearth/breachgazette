@@ -16,6 +16,7 @@ REQUIRED_SOURCES = {
     "oaic_regulatory",
     "washington",
     "california",
+    "massachusetts",
 }
 
 

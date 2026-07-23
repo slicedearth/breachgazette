@@ -1,0 +1,25 @@
+---
+import Hero from "../../components/Hero.astro";
+import NotificationTable from "../../components/NotificationTable.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+
+const publication = getPublication();
+const details = publication.detail_notifications.length ? publication.detail_notifications : publication.latest_notifications;
+const records = details.filter((record) => record.source_id === "massachusetts");
+const policy = publication.policies.massachusetts;
+---
+
+<BaseLayout title="Massachusetts notifications" description="Massachusetts annual data breach notification report records." section="United States / Massachusetts">
+  <Hero
+    eyebrow="State annual reports"
+    title="Massachusetts public notifications"
+    intro="The Massachusetts Office of Consumer Affairs and Business Regulation publishes annual reporting-organization rows, affected-resident counts, organization types, and information-category flags."
+    warning="Coverage is bounded to the reviewed 2025 and 2026 reports. The reporting organization may differ from every affected entity, and consumer notification letters are excluded."
+  />
+  <section class="section shell">
+    <NotificationTable records={records} limit={250} />
+    {policy && <SourceNote href={policy.source_url} />}
+  </section>
+</BaseLayout>

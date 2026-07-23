@@ -15,6 +15,7 @@ on:
           - oaic_regulatory
           - washington
           - california
+          - massachusetts
 
 permissions:
   contents: read
