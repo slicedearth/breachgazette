@@ -49,15 +49,11 @@ def resolve_organizations(
                 match_method=method,
                 confidence_class="reviewed" if reviewed_decision else "exact",
                 supporting_evidence=(
-                    [
-                        f"Reviewed alias decision {reviewed_decision.decision_id}",
-                        *reviewed_decision.evidence,
-                    ]
+                    ["Reviewed alias decision applied"]
                     if reviewed_decision
                     else ["Exact normalized source name"]
                 ),
                 resolver_version=RESOLVER_VERSION,
-                review_note=reviewed_decision.review_note if reviewed_decision else None,
             )
         )
 

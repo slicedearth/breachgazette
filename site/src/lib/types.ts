@@ -131,7 +131,6 @@ export type Organization = {
     confidence_class?: string;
     supporting_evidence: string[];
     resolver_version?: string;
-    review_note?: string | null;
   }>;
 };
 
@@ -143,20 +142,7 @@ export type Relationship = {
   reviewed: boolean;
   review_status?: "confirmed_related" | "unresolved" | null;
   reviewed_on?: string | null;
-  review_note?: string | null;
-  review_evidence?: string[];
   limitations: string[];
-};
-
-export type RelationshipDecision = {
-  decision_id: string;
-  candidate_id: string;
-  status: "confirmed_related" | "rejected" | "unresolved";
-  record_ids: string[];
-  evidence: string[];
-  reviewed_on: string;
-  review_note: string;
-  decision_version: "1.0";
 };
 
 export type SourcePolicy = {
@@ -194,7 +180,6 @@ export type Publication = {
   regulatory_actions: RegulatoryAction[];
   detail_organizations: Organization[];
   relationships: Relationship[];
-  relationship_decisions: RelationshipDecision[];
   corrections: Array<Record<string, unknown>>;
   policies: Record<string, SourcePolicy>;
   snapshots: Array<Record<string, unknown>>;

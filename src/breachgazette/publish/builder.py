@@ -261,7 +261,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         )
     for action in regulatory_actions:
         action.canonical_organization_id = organization_by_alias.get(action.entity.normalized_name)
-    relationships, relationship_decisions = apply_relationship_decisions(
+    relationships, _relationship_decisions = apply_relationship_decisions(
         generate_candidates(notifications),
         catalogue=load_relationship_catalogue(
             data_root / "reviews" / "relationship-decisions.yml"
@@ -323,7 +323,6 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         "regulatory_actions": regulatory_actions,
         "detail_organizations": detail_organizations,
         "relationships": relationships,
-        "relationship_decisions": relationship_decisions,
         "corrections": sorted(
             events,
             key=lambda event: (event.first_observed_time, event.event_id),

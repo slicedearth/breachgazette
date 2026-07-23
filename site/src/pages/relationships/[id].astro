@@ -32,13 +32,6 @@ const { relationship } = Astro.props;
     <div class="prose">
       <h2>Displayed evidence</h2>
       <ul>{relationship.reasons.map((reason) => <li><strong>{label(reason.code)}:</strong> {reason.explanation} Evidence: {reason.evidence.join("; ")}.</li>)}</ul>
-      {relationship.review_note && <p><strong>Review note:</strong> {relationship.review_note}</p>}
-      {(relationship.review_evidence?.length ?? 0) > 0 && (
-        <>
-          <h2>Review evidence</h2>
-          <ul>{relationship.review_evidence?.map((evidence) => <li>{evidence}</li>)}</ul>
-        </>
-      )}
       {relationship.limitations.map((limitation) => <p>{limitation}</p>)}
     </div>
   </section>

@@ -72,8 +72,6 @@ def apply_relationship_decisions(
         candidate.reviewed = True
         candidate.review_status = decision.status
         candidate.reviewed_on = decision.reviewed_on
-        candidate.review_note = decision.review_note
-        candidate.review_evidence = decision.evidence
         candidate.relationship_class = (
             RelationshipClass.LIKELY_SAME_EVENT
             if decision.status == "confirmed_related"
