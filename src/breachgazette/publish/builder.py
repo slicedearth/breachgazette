@@ -20,6 +20,7 @@ from breachgazette.monitoring import build_source_health_report
 from breachgazette.policies import load_source_policies
 from breachgazette.privacy.audit import require_public_safe
 from breachgazette.quality import DataQualityError, build_quality_report
+from breachgazette.quality.temporal import exclude_temporal_conflicts
 from breachgazette.relationships import (
     apply_relationship_decisions,
     generate_candidates,
@@ -237,6 +238,8 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         for record in records
         if getattr(record, "record_type", None) == "notification"
     ]
+    for notification in notifications:
+        exclude_temporal_conflicts(notification)
     regulatory_actions = [
         RegulatoryAction.model_validate(record.model_dump(mode="json"))
         for records in records_by_source.values()

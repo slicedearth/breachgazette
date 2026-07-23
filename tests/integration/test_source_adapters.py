@@ -72,6 +72,30 @@ def test_california_future_schema_and_malformed_dates_fail(observed_at: datetime
         CaliforniaAdapter(transport=transport).collect(observed_at=observed_at)
 
 
+def test_california_source_date_after_submission_is_retained_but_not_normalized(
+    observed_at: datetime,
+) -> None:
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Organization Name", "Date(s) of Breach  (if known)", "Reported Date"])
+    writer.writerow(["Example Services", "11/20/2027, 12/14/2023", "07/03/2024"])
+    transport = httpx.MockTransport(
+        lambda _request: httpx.Response(
+            200,
+            headers={"Content-Type": "text/csv"},
+            content=output.getvalue().encode(),
+        )
+    )
+
+    record = CaliforniaAdapter(transport=transport).collect(observed_at=observed_at).records[0]
+
+    assert record.dates[0].raw_value == "11/20/2027"
+    assert record.dates[0].normalized_date is None
+    assert record.dates[0].state == "source_conflict"
+    assert record.dates[1].normalized_date.isoformat() == "2023-12-14"
+    assert any("post-dates the regulator submission date" in item for item in record.limitations)
+
+
 def test_washington_schema_join_counts_and_roles(observed_at: datetime) -> None:
     metadata = {
         "columns": [{"fieldName": field} for field in MAIN_FIELDS],

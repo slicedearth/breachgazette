@@ -25,6 +25,7 @@ from breachgazette.contracts.enums import (
     ValueState,
 )
 from breachgazette.contracts.models import RecordProvenance
+from breachgazette.quality.temporal import exclude_temporal_conflicts
 from breachgazette.utils import normalize_organization_name, normalize_text, sha256_hex
 
 CSV_URL = "https://oag.ca.gov/privacy/databreach/list-export"
@@ -128,40 +129,40 @@ class CaliforniaAdapter:
                 if name
                 else f"organization-name-not-published-{row_hash[:12]}"
             )
-            records.append(
-                SourceNotificationRecord(
-                    source_id=self.source_id,
-                    source_record_id=record_id,
-                    source_url=LIST_URL,
-                    source_revision=checksum[:16],
-                    source_checksum=checksum,
-                    source_completeness=Completeness.COMPLETE,
-                    source_retrieval_time=observed_at,
-                    local_first_observed_time=observed_at,
-                    local_last_observed_time=observed_at,
-                    parser_version=self.adapter_version,
-                    normalization_version=self.normalization_version,
-                    limitations=[
-                        "The source-labelled notifier may not be the entity where the "
-                        "event occurred.",
-                        "The CSV does not provide a stable source ID or detail URL.",
-                    ],
-                    regulator="California Department of Justice, Office of the Attorney General",
-                    jurisdiction="California",
-                    reporting_scheme="California Civil Code sections 1798.29 and 1798.82",
-                    publication_level=PublicationLevel.NAMED_NOTIFICATION,
-                    coverage_type=CoverageType.COMPLETE_PUBLISHED_DATASET,
-                    named_entity=OrganizationRole(
-                        source_name=source_name,
-                        normalized_name=normalized_name,
-                        role=EntityRole.NOTIFYING_ENTITY if name else EntityRole.UNKNOWN,
-                        origin=ValueOrigin.SOURCE_OBSERVED if name else ValueOrigin.NORMALIZED,
-                        state=ValueState.PRESENT if name else ValueState.SOURCE_OMITTED,
-                    ),
-                    dates=_date_observations(breach_dates, reported_date),
-                    register_window_state="not_applicable",
-                )
+            record = SourceNotificationRecord(
+                source_id=self.source_id,
+                source_record_id=record_id,
+                source_url=LIST_URL,
+                source_revision=checksum[:16],
+                source_checksum=checksum,
+                source_completeness=Completeness.COMPLETE,
+                source_retrieval_time=observed_at,
+                local_first_observed_time=observed_at,
+                local_last_observed_time=observed_at,
+                parser_version=self.adapter_version,
+                normalization_version=self.normalization_version,
+                limitations=[
+                    "The source-labelled notifier may not be the entity where the "
+                    "event occurred.",
+                    "The CSV does not provide a stable source ID or detail URL.",
+                ],
+                regulator="California Department of Justice, Office of the Attorney General",
+                jurisdiction="California",
+                reporting_scheme="California Civil Code sections 1798.29 and 1798.82",
+                publication_level=PublicationLevel.NAMED_NOTIFICATION,
+                coverage_type=CoverageType.COMPLETE_PUBLISHED_DATASET,
+                named_entity=OrganizationRole(
+                    source_name=source_name,
+                    normalized_name=normalized_name,
+                    role=EntityRole.NOTIFYING_ENTITY if name else EntityRole.UNKNOWN,
+                    origin=ValueOrigin.SOURCE_OBSERVED if name else ValueOrigin.NORMALIZED,
+                    state=ValueState.PRESENT if name else ValueState.SOURCE_OMITTED,
+                ),
+                dates=_date_observations(breach_dates, reported_date),
+                register_window_state="not_applicable",
             )
+            exclude_temporal_conflicts(record)
+            records.append(record)
         snapshot = source_snapshot(
             source_id=self.source_id,
             retrieved_at=observed_at,

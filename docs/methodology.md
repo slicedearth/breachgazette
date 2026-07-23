@@ -8,6 +8,11 @@ observation times, source URL, and limitations. Occurrence, discovery,
 awareness, consumer notification, regulator submission, public notification,
 source publication, and reporting-period dates remain distinct.
 
+A source-observed date remains visible as raw provenance when it conflicts with
+the source record's own chronology. It receives a `source_conflict` state and
+no normalized date, so it cannot influence year facets, ordering, feeds, or
+candidate relationships until the official source corrects it.
+
 ## Notification, incident, and aggregate
 
 A notification is a source record, not automatically one unique incident.
