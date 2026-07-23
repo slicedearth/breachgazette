@@ -29,6 +29,7 @@ def build_quality_report(
     records_by_source: dict[str, list[RecordProvenance]],
     snapshots: list[SourceSnapshot],
     public_payloads: list[Any] | None = None,
+    source_health: dict[str, str] | None = None,
 ) -> QualityReport:
     if dataset_class not in {"real_source_data", "test_fixture"}:
         raise DataQualityError("dataset class is absent or unsupported")
@@ -64,12 +65,17 @@ def build_quality_report(
         "privacy_audit_passed": not findings,
         "fixture_isolation": fixture_isolation,
     }
+    if source_health is not None:
+        checks["source_health_passed"] = all(
+            status == "healthy" for status in source_health.values()
+        )
     passed = all(checks.values())
     report = QualityReport(
         generated_at=datetime.now(UTC),
         passed=passed,
         dataset_class=dataset_class,
-        source_health={
+        source_health=source_health
+        or {
             source_id: (
                 "stale"
                 if snapshot_by_source.get(source_id) and snapshot_by_source[source_id].stale

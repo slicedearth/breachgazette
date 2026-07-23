@@ -1,0 +1,118 @@
+name: Scheduled private update
+
+on:
+  schedule:
+    - cron: "23 17 * * 1"
+  workflow_dispatch:
+    inputs:
+      persist_private_state:
+        description: Commit and push the verified candidate state to the private data repository
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-private-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.event_name == 'workflow_dispatch' || vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out private production state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ vars.BREACHGAZETTE_DATA_REPOSITORY }}
+          ssh-key: ${{ secrets.BREACHGAZETTE_DATA_DEPLOY_KEY }}
+          path: .private-production-data
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - name: Install locked dependencies
+        run: |
+          python -m pip install -r requirements.lock
+          python -m pip install --no-deps --no-build-isolation -e .
+      - name: Create isolated candidate state
+        run: |
+          mkdir -p "$RUNNER_TEMP/breachgazette-candidate"
+          rsync -a --exclude .git .private-production-data/ "$RUNNER_TEMP/breachgazette-candidate/"
+      - name: Validate source and monitoring policy
+        run: |
+          breachgazette validate-source-policies --json
+          breachgazette validate-monitoring --json
+      - name: Update bounded official sources in candidate state
+        id: source_update
+        continue-on-error: true
+        run: breachgazette update --data-root "$RUNNER_TEMP/breachgazette-candidate" --json
+      - name: Generate non-sensitive source-health report
+        id: source_health
+        if: always()
+        continue-on-error: true
+        run: |
+          breachgazette source-health \
+            --data-root "$RUNNER_TEMP/breachgazette-candidate" \
+            --output "$RUNNER_TEMP/breachgazette-candidate/reports/source-health.json" \
+            --json
+      - name: Verify candidate publication boundary
+        id: candidate_quality
+        if: steps.source_update.outcome == 'success' && steps.source_health.outcome == 'success'
+        continue-on-error: true
+        run: |
+          breachgazette quality-report \
+            --data-root "$RUNNER_TEMP/breachgazette-candidate" \
+            --json
+          breachgazette build-site-data \
+            --data-root "$RUNNER_TEMP/breachgazette-candidate" \
+            --output "$RUNNER_TEMP/breachgazette-publication" \
+            --json
+          breachgazette audit-public-tree "$RUNNER_TEMP/breachgazette-publication" --json
+      - name: Upload source-health report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: breachgazette-source-health
+          path: ${{ runner.temp }}/breachgazette-candidate/reports/source-health.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Promote complete candidate into private checkout
+        id: promote
+        if: >-
+          steps.source_update.outcome == 'success' &&
+          steps.source_health.outcome == 'success' &&
+          steps.candidate_quality.outcome == 'success'
+        run: |
+          rsync -a --delete --exclude .git \
+            "$RUNNER_TEMP/breachgazette-candidate/" \
+            .private-production-data/
+      - name: Commit verified private state
+        if: >-
+          steps.promote.outcome == 'success' &&
+          (github.event_name == 'schedule' || inputs.persist_private_state)
+        working-directory: .private-production-data
+        run: |
+          git config --local user.name "breachgazette-update"
+          git config --local user.email "breachgazette-update@users.noreply.github.com"
+          git add -- checkpoints events manifests metadata reports state
+          if git diff --cached --quiet; then
+            echo "No private state changes to commit."
+          else
+            git commit -m "Update verified Breach Gazette source state"
+            git push origin HEAD
+          fi
+      - name: Fail incomplete update after preserving health report
+        if: >-
+          steps.source_update.outcome != 'success' ||
+          steps.source_health.outcome != 'success' ||
+          steps.candidate_quality.outcome != 'success'
+        run: exit 1

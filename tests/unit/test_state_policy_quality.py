@@ -6,10 +6,27 @@ from pathlib import Path
 import pytest
 
 from breachgazette.clients.base import source_snapshot
-from breachgazette.contracts import NotificationChange, SourceNotificationRecord, UpdateCheckpoint
+from breachgazette.contracts import (
+    MonitoringCatalogue,
+    NotificationChange,
+    SourceMonitoringPolicy,
+    SourceNotificationRecord,
+    UpdateCheckpoint,
+)
 from breachgazette.contracts.enums import Completeness
+from breachgazette.monitoring import (
+    SourceDriftError,
+    build_source_health_report,
+    guard_source_record_count,
+    load_monitoring_catalogue,
+)
 from breachgazette.policies import load_source_policies
-from breachgazette.publish.builder import audit_public_tree, build_site_data
+from breachgazette.publish.builder import (
+    SEARCH_PARTITION_SIZE,
+    _build_search_assets,
+    audit_public_tree,
+    build_site_data,
+)
 from breachgazette.quality import DataQualityError, build_quality_report
 from breachgazette.state import PrivateStateStore
 
@@ -27,6 +44,8 @@ def test_source_policy_catalogue_is_complete() -> None:
     }
     assert policies["hhs"].implemented is False
     assert all(str(policy.source_url).startswith("https://") for policy in policies.values())
+    monitoring = load_monitoring_catalogue()
+    assert set(monitoring.sources) == set(policies) - {"hhs"}
 
 
 def test_private_state_is_atomic_and_refuses_fixture_mixing(
@@ -87,6 +106,101 @@ def test_snapshot_checkpoint_and_event_round_trip(tmp_path: Path) -> None:
     assert store.append_events([event]) == 1
     assert store.append_events([event]) == 0
     assert store.load_events() == [event]
+    assert store.load_checkpoint("washington") is not None
+
+
+def test_source_count_guards_block_suspicious_replacement() -> None:
+    policy = SourceMonitoringPolicy(
+        source_id="washington",
+        stale_after_hours=240,
+        minimum_records=10,
+        minimum_retained_fraction=0.9,
+        maximum_growth_factor=1.5,
+    )
+    guard_source_record_count(
+        "washington",
+        previous_count=100,
+        incoming_count=95,
+        policy=policy,
+    )
+    with pytest.raises(SourceDriftError, match="below its reviewed floor"):
+        guard_source_record_count(
+            "washington",
+            previous_count=0,
+            incoming_count=9,
+            policy=policy,
+        )
+    with pytest.raises(SourceDriftError, match="retained too few"):
+        guard_source_record_count(
+            "washington",
+            previous_count=100,
+            incoming_count=50,
+            policy=policy,
+        )
+    with pytest.raises(SourceDriftError, match="grew beyond"):
+        guard_source_record_count(
+            "washington",
+            previous_count=100,
+            incoming_count=151,
+            policy=policy,
+        )
+
+
+def test_source_health_reports_latest_failed_checkpoint(
+    tmp_path: Path,
+    notification_factory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "health-state"
+    store = PrivateStateStore(root)
+    store.initialize(dataset_class="real_source_data")
+    observed = datetime.now(UTC)
+    record = SourceNotificationRecord.model_validate(
+        notification_factory().model_dump(exclude={"canonical_organization_id"})
+    )
+    store.write_records("washington", [record])
+    store.write_snapshot(
+        source_snapshot(
+            source_id="washington",
+            retrieved_at=observed,
+            revision="revision",
+            checksum="a" * 64,
+            completeness="complete",
+            discovered=1,
+            accepted=1,
+            rejected=0,
+            bounded_limit=10,
+        )
+    )
+    monitoring = MonitoringCatalogue(
+        schedule_utc="23 17 * * 1",
+        sources={
+            "washington": SourceMonitoringPolicy(
+                source_id="washington",
+                stale_after_hours=240,
+                minimum_records=1,
+                minimum_retained_fraction=0.5,
+                maximum_growth_factor=2,
+            )
+        },
+    )
+    monkeypatch.setattr(
+        "breachgazette.monitoring.load_monitoring_catalogue",
+        lambda: monitoring,
+    )
+    assert build_source_health_report(data_root=root, generated_at=observed).passed is True
+    store.write_checkpoint(
+        UpdateCheckpoint(
+            source_id="washington",
+            attempted_at=observed,
+            completed_at=observed,
+            status="failed",
+            detail="Previous complete state was preserved.",
+        )
+    )
+    report = build_source_health_report(data_root=root, generated_at=observed)
+    assert report.passed is False
+    assert report.sources[0].status == "failed_update"
 
 
 def test_invalid_state_and_dataset_class_fail_closed(tmp_path: Path) -> None:
@@ -124,8 +238,24 @@ def test_production_builder_refuses_fixture_root(tmp_path: Path) -> None:
         build_site_data(data_root=root, output=tmp_path / "output")
 
 
+def test_search_assets_are_partitioned_and_bounded(notification_factory) -> None:
+    records = [
+        notification_factory(record_id=f"record-{index}")
+        for index in range(SEARCH_PARTITION_SIZE + 1)
+    ]
+    manifest, partitions = _build_search_assets(
+        records,
+        detail_ids=set(),
+        generated_at=datetime.now(UTC),
+    )
+    assert manifest["record_count"] == SEARCH_PARTITION_SIZE + 1
+    assert len(partitions) == 2
+    assert sum(partition["count"] for partition in manifest["partitions"]) == len(records)
+    assert all(len(payload["records"]) <= SEARCH_PARTITION_SIZE for _, payload in partitions)
+
+
 def test_production_builder_emits_minimised_real_publication(
-    tmp_path: Path, notification_factory
+    tmp_path: Path, notification_factory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root = tmp_path / "real-state"
     store = PrivateStateStore(root)
@@ -138,7 +268,24 @@ def test_production_builder_emits_minimised_real_publication(
         "washington",
         "california",
     )
-    observed = datetime(2026, 1, 1, tzinfo=UTC)
+    observed = datetime.now(UTC)
+    monitoring = MonitoringCatalogue(
+        schedule_utc="23 17 * * 1",
+        sources={
+            source_id: SourceMonitoringPolicy(
+                source_id=source_id,
+                stale_after_hours=240,
+                minimum_records=1,
+                minimum_retained_fraction=0.5,
+                maximum_growth_factor=2,
+            )
+            for source_id in source_ids
+        },
+    )
+    monkeypatch.setattr(
+        "breachgazette.monitoring.load_monitoring_catalogue",
+        lambda: monitoring,
+    )
     for index, source_id in enumerate(source_ids):
         normalized = notification_factory(
             source_id=source_id,
@@ -170,6 +317,9 @@ def test_production_builder_emits_minimised_real_publication(
     assert result["records"]["notifications"] == len(source_ids)
     assert (output / "publication.json").is_file()
     assert (output / "notifications.json").is_file()
+    assert (output / "search-manifest.json").is_file()
+    assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids)
+    assert (output / "source-health.json").is_file()
     assert audit_public_tree(output)["passed"] is True
 
 

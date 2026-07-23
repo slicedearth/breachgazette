@@ -13,8 +13,9 @@ export const informationPages = {
     title: "Entity-resolution methodology",
     intro: "Organization identities are joined only through exact normalized names or reviewed aliases.",
     sections: [
-      ["Conservative resolution", "Normalization is deterministic and limited to spacing, case, punctuation, and reviewed legal suffix handling. Fuzzy similarity never creates an identity."],
+      ["Conservative resolution", "Normalization is deterministic and limited to spacing, case, punctuation, and reviewed legal suffix handling. Similarity creates private proposals only and never creates an identity."],
       ["Source roles remain", "A notifying entity, public-sector agency, covered entity, business associate, and respondent are distinct roles even when they resolve to one organization profile."],
+      ["Reviewed decisions", "Approved or rejected alias decisions retain a stable ID, source set, evidence, date, and review note. Chains and cycles are rejected."],
       ["What is not inferred", "Parent and subsidiary relationships, brands, renamed companies, and near-matching names remain separate without reviewed evidence."],
     ],
   },
@@ -31,7 +32,7 @@ export const informationPages = {
     title: "Data quality",
     intro: "Publication is fail-closed when required real data, source attribution, legal status, privacy safety, or source schema cannot be established.",
     sections: [
-      ["Automated gates", "Required sources must be present and non-empty, snapshots complete, identifiers deterministic, regulatory statuses explicit, and public fields privacy-safe."],
+      ["Automated gates", "Required sources must be present and non-empty, snapshots fresh, record-count changes within reviewed bounds, identifiers deterministic, regulatory statuses explicit, and public fields privacy-safe."],
       ["Limits of validation", "A passing report validates the pipeline contract and published representation. It does not establish that an official source is complete or that an underlying event occurred as reported."],
     ],
   },

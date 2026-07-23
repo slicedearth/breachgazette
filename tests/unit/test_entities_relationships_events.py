@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from pathlib import Path
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
 from breachgazette.compare import compare_records
 from breachgazette.contracts.enums import Completeness
-from breachgazette.entities import resolve_organizations
+from breachgazette.entities import (
+    alias_decision_id,
+    load_alias_catalogue,
+    propose_alias_reviews,
+    resolve_organizations,
+)
 from breachgazette.relationships import generate_candidates
 from breachgazette.utils import canonical_json_bytes
 
@@ -33,6 +40,98 @@ def test_parent_and_subsidiary_remain_separate(notification_factory) -> None:
     parent = notification_factory(record_id="a", name="Example Holdings")
     child = notification_factory(record_id="b", name="Example Health Services")
     assert len(resolve_organizations([parent, child], [])) == 2
+
+
+def test_reviewed_alias_catalogue_merges_only_approved_decisions(
+    tmp_path: Path,
+    notification_factory,
+) -> None:
+    path = tmp_path / "aliases.yml"
+    decision_id = alias_decision_id("Example Health Services", "Example Health Group")
+    path.write_text(
+        f"""
+schema_version: "2.0"
+decisions:
+  - decision_id: "{decision_id}"
+    alias_name: "Example Health Services"
+    canonical_name: "Example Health Group"
+    status: approved
+    source_ids: [california, washington]
+    evidence:
+      - "Official source records identify the reviewed legal name."
+    reviewed_on: 2026-01-01
+    review_note: "Synthetic reviewed decision for deterministic testing."
+""".lstrip(),
+        encoding="utf-8",
+    )
+    catalogue = load_alias_catalogue(path)
+    alias = notification_factory(name="Example Health Services")
+    canonical = notification_factory(
+        source_id="california",
+        record_id="california:1",
+        name="Example Health Group",
+    )
+    identities = resolve_organizations(
+        [alias, canonical],
+        [],
+        alias_catalogue=catalogue,
+    )
+    assert len(identities) == 1
+    assert identities[0].canonical_name == "Example Health Group"
+    reviewed = next(
+        alias for alias in identities[0].aliases if alias.confidence_class == "reviewed"
+    )
+    assert decision_id in reviewed.supporting_evidence[0]
+
+
+def test_alias_catalogue_rejects_chains(tmp_path: Path) -> None:
+    first_id = alias_decision_id("Example One", "Example Two")
+    second_id = alias_decision_id("Example Two", "Example Three")
+    path = tmp_path / "aliases.yml"
+    path.write_text(
+        f"""
+schema_version: "2.0"
+decisions:
+  - decision_id: "{first_id}"
+    alias_name: "Example One"
+    canonical_name: "Example Two"
+    status: approved
+    source_ids: [washington]
+    evidence: ["Reviewed source evidence."]
+    reviewed_on: 2026-01-01
+    review_note: "First synthetic decision."
+  - decision_id: "{second_id}"
+    alias_name: "Example Two"
+    canonical_name: "Example Three"
+    status: approved
+    source_ids: [california]
+    evidence: ["Reviewed source evidence."]
+    reviewed_on: 2026-01-01
+    review_note: "Second synthetic decision."
+""".lstrip(),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="chains"):
+        load_alias_catalogue(path)
+
+
+def test_alias_proposals_are_private_leads_not_resolution_decisions(
+    notification_factory,
+) -> None:
+    left = notification_factory(name="Example Health")
+    right = notification_factory(
+        source_id="california",
+        record_id="california:1",
+        name="Example Health Services",
+    )
+    proposals = propose_alias_reviews(
+        [left, right],
+        [],
+        catalogue=load_alias_catalogue(),
+    )
+    assert len(proposals) == 1
+    assert proposals[0].similarity_score == pytest.approx(2 / 3, rel=0.01)
+    assert len(resolve_organizations([left, right], [])) == 2
 
 
 def test_candidate_requires_exact_entity_date_and_different_sources(notification_factory) -> None:

@@ -6,6 +6,7 @@ import { label } from "../../lib/format";
 
 const publication = getPublication();
 const policies = Object.values(publication.policies).sort((a, b) => a.name.localeCompare(b.name));
+const healthBySource = new Map(publication.source_health.sources.map((source) => [source.source_id, source]));
 ---
 
 <BaseLayout title="Source directory" description="Official source policies, thresholds, windows, licences, and limitations.">
@@ -18,7 +19,7 @@ const policies = Object.values(publication.policies).sort((a, b) => a.name.local
     <div class="grid">
       {policies.map((policy) => (
         <article class="card">
-          <span class="pill">{policy.implemented ? "Implemented" : "Deferred"}</span>
+          <span class="pill">{policy.implemented ? label(healthBySource.get(policy.source_id)?.status ?? "not monitored") : "Deferred"}</span>
           <h2><a href={`${import.meta.env.BASE_URL}sources/${policy.source_id}/`}>{policy.name}</a></h2>
           <p><strong>{policy.jurisdiction}</strong> · {label(policy.publication_level)}</p>
           <p>{policy.source_threshold}</p>
@@ -26,5 +27,6 @@ const policies = Object.values(publication.policies).sort((a, b) => a.name.local
         </article>
       ))}
     </div>
+    <p><a href={`${import.meta.env.BASE_URL}source-health/`}>Review source freshness and update checkpoints</a></p>
   </section>
 </BaseLayout>

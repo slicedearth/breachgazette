@@ -17,6 +17,23 @@ def test_source_policy_cli_commands_are_machine_readable() -> None:
     validated = runner.invoke(app, ["validate-source-policies", "--json"])
     assert validated.exit_code == 0
     assert json.loads(validated.stdout) == {"policies": 7, "valid": True}
+    monitoring = runner.invoke(app, ["validate-monitoring", "--json"])
+    assert monitoring.exit_code == 0
+    assert json.loads(monitoring.stdout)["sources"] == 6
+    aliases = runner.invoke(app, ["validate-aliases", "--json"])
+    assert aliases.exit_code == 0
+    assert json.loads(aliases.stdout) == {
+        "approved": 0,
+        "decisions": 0,
+        "rejected": 0,
+        "valid": True,
+    }
+    decision = runner.invoke(
+        app,
+        ["alias-decision-id", "Example Services", "Example Group", "--json"],
+    )
+    assert decision.exit_code == 0
+    assert json.loads(decision.stdout)["decision_id"].startswith("alias_")
 
 
 def test_cli_requires_a_private_data_root() -> None:
@@ -63,3 +80,18 @@ def test_fixture_and_inventory_cli(tmp_path: Path, notification_factory) -> None
     )
     assert links.exit_code == 0
     assert json.loads(links.stdout) == {"checked": 1, "unsafe": 0}
+    proposals_path = root / "reports" / "proposals.json"
+    proposals = runner.invoke(
+        app,
+        [
+            "propose-aliases",
+            "--data-root",
+            str(root),
+            "--output",
+            str(proposals_path),
+            "--json",
+        ],
+    )
+    assert proposals.exit_code == 0
+    assert json.loads(proposals.stdout)["proposal_count"] == 0
+    assert proposals_path.is_file()

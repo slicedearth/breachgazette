@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "record_count": 3,
+  "partition_size": 250,
+  "facets": {
+    "jurisdictions": ["California", "New South Wales", "Washington"],
+    "regulators": ["California Attorney General", "IPC NSW", "Washington Attorney General"],
+    "sources": ["california", "nsw_public_notifications", "washington"],
+    "years": ["2026"],
+    "causes": ["cyberattack"],
+    "information_categories": ["health_information"],
+    "population_bands": ["500_999", "not_published"],
+    "roles": ["notifying_entity", "public_sector_agency"],
+    "publication_levels": ["regulator_register_entry"]
+  },
+  "partitions": [
+    {
+      "id": "fixture-2026-001",
+      "count": 3,
+      "jurisdictions": ["California", "New South Wales", "Washington"],
+      "regulators": ["California Attorney General", "IPC NSW", "Washington Attorney General"],
+      "sources": ["california", "nsw_public_notifications", "washington"],
+      "years": ["2026"],
+      "causes": ["cyberattack"],
+      "information_categories": ["health_information"],
+      "population_bands": ["500_999", "not_published"],
+      "roles": ["notifying_entity", "public_sector_agency"],
+      "publication_levels": ["regulator_register_entry"]
+    }
+  ]
+}

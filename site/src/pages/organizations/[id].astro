@@ -24,8 +24,8 @@ const actions = publication.regulatory_actions.filter((record) => record.canonic
   />
   <section class="section shell">
     <h2>Source names and roles</h2>
-    <div class="table-wrap" tabindex="0"><table><thead><tr><th>Source name</th><th>Source</th><th>Role</th><th>Resolution evidence</th></tr></thead><tbody>
-      {organization.aliases.map((alias) => <tr><th scope="row">{alias.source_name}</th><td>{label(alias.source_id)}</td><td>{label(alias.role)}</td><td>{alias.supporting_evidence.join("; ")}</td></tr>)}
+    <div class="table-wrap" tabindex="0"><table><thead><tr><th>Source name</th><th>Source</th><th>Role</th><th>Resolution</th><th>Evidence</th></tr></thead><tbody>
+      {organization.aliases.map((alias) => <tr><th scope="row">{alias.source_name}</th><td>{label(alias.source_id)}</td><td>{label(alias.role)}</td><td>{label(alias.match_method)}{alias.review_note ? <small><br />{alias.review_note}</small> : null}</td><td>{alias.supporting_evidence.join("; ")}</td></tr>)}
     </tbody></table></div>
     <h2>Bounded source records</h2>
     <div class="grid">

@@ -1,0 +1,41 @@
+---
+import Hero from "../components/Hero.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getPublication } from "../lib/data";
+import { date, label } from "../lib/format";
+
+const publication = getPublication();
+const sources = publication.source_health.sources;
+---
+
+<BaseLayout title="Source health" description="Freshness and update state for each implemented official source.">
+  <Hero
+    eyebrow="Automated retrieval health"
+    title="Source health"
+    intro="Each status reflects bounded retrieval freshness, contract validation, record-count guards, and the latest update checkpoint."
+    warning="Healthy means the pipeline completed its checks. It does not establish that an official source is factually complete."
+  />
+  <section class="section shell">
+    <p class="notice">
+      {sources.filter((source) => source.status === "healthy").length} of {sources.length} implemented sources are healthy.
+      The reviewed schedule is <code>{publication.source_health.schedule_utc}</code> in UTC.
+    </p>
+    <div class="table-wrap" tabindex="0" aria-label="Scrollable source health table">
+      <table>
+        <thead><tr><th scope="col">Source</th><th scope="col">Status</th><th scope="col">Records</th><th scope="col">Snapshot age</th><th scope="col">Freshness limit</th><th scope="col">Last successful update</th></tr></thead>
+        <tbody>
+          {sources.map((source) => (
+            <tr>
+              <th scope="row"><a href={`${import.meta.env.BASE_URL}sources/${source.source_id}/`}>{label(source.source_id)}</a></th>
+              <td><span class="pill">{label(source.status)}</span></td>
+              <td>{source.record_count.toLocaleString()}</td>
+              <td>{source.snapshot_age_hours === null ? "Not available" : `${source.snapshot_age_hours.toLocaleString()} hours`}</td>
+              <td>{source.stale_after_hours.toLocaleString()} hours</td>
+              <td>{date(source.last_successful_update)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</BaseLayout>

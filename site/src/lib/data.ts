@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import type { Notification, Publication } from "./types";
+import type {
+  Notification,
+  Publication,
+  SearchManifest,
+  SearchPartition,
+} from "./types";
 
 function dataDirectory(): string {
   const configured = process.env.BREACHGAZETTE_SITE_DATA_DIR;
@@ -34,4 +39,31 @@ export function getNotifications(): Notification[] {
     throw new Error("notifications.json is not an array");
   }
   return notifications;
+}
+
+export function getSearchManifest(): SearchManifest {
+  const manifest = readJson<SearchManifest>("search-manifest.json");
+  if (
+    !manifest ||
+    !Array.isArray(manifest.partitions) ||
+    !Number.isInteger(manifest.record_count)
+  ) {
+    throw new Error("search-manifest.json is invalid");
+  }
+  return manifest;
+}
+
+export function getSearchPartition(id: string): SearchPartition {
+  if (!/^[a-z0-9_-]+$/.test(id)) {
+    throw new Error("search partition id is invalid");
+  }
+  const manifest = getSearchManifest();
+  if (!manifest.partitions.some((partition) => partition.id === id)) {
+    throw new Error("search partition id is not declared");
+  }
+  const partition = readJson<SearchPartition>(join("search-partitions", `${id}.json`));
+  if (partition.partition_id !== id || !Array.isArray(partition.records)) {
+    throw new Error("search partition payload is invalid");
+  }
+  return partition;
 }
