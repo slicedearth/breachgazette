@@ -416,8 +416,14 @@ def test_production_builder_emits_minimised_real_publication(
     assert result["quality_passed"] is True
     assert result["records"]["notifications"] == len(source_ids)
     assert (output / "publication.json").is_file()
+    publication = json.loads((output / "publication.json").read_text(encoding="utf-8"))
+    assert "latest_notifications" not in publication
     assert not (output / "notifications.json").exists()
     assert (output / "search-manifest.json").is_file()
+    search_manifest = json.loads(
+        (output / "search-manifest.json").read_text(encoding="utf-8")
+    )
+    assert search_manifest["record_count"] == len(source_ids)
     assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids)
     assert (output / "source-health.json").is_file()
     assert audit_public_tree(output)["passed"] is True

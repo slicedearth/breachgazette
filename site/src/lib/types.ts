@@ -174,7 +174,6 @@ export type Publication = {
   tagline: string;
   disclaimer: string;
   stats: Record<string, number>;
-  latest_notifications: Notification[];
   detail_notifications: Notification[];
   aggregates: Aggregate[];
   regulatory_actions: RegulatoryAction[];

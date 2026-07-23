@@ -3,11 +3,11 @@ import Hero from "../components/Hero.astro";
 import NotificationPagination from "../components/NotificationPagination.astro";
 import NotificationTable from "../components/NotificationTable.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { getPublication } from "../lib/data";
+import { getAllNotifications, getPublication } from "../lib/data";
 import { getNotificationPage, NOTIFICATIONS_PER_PAGE } from "../lib/notifications";
 
-const publication = getPublication();
-const staticPage = getNotificationPage(publication.latest_notifications, 1);
+getPublication();
+const staticPage = getNotificationPage(getAllNotifications(), 1);
 ---
 
 <BaseLayout title="Latest public notifications" description="Search official public notification records locally in your browser.">
@@ -48,8 +48,8 @@ const staticPage = getNotificationPage(publication.latest_notifications, 1);
     <p aria-live="polite" data-result-count>Loading bounded dataset…</p>
     <div data-results>
       <p class="directory-summary">
-        Showing the latest {staticPage.firstItem.toLocaleString()}–{staticPage.lastItem.toLocaleString()} of{" "}
-        {staticPage.total.toLocaleString()} statically published records.
+        Showing records {staticPage.firstItem.toLocaleString()}–{staticPage.lastItem.toLocaleString()} of{" "}
+        {staticPage.total.toLocaleString()} across the complete published register.
       </p>
       <NotificationPagination
         currentPage={staticPage.currentPage}
@@ -67,7 +67,7 @@ const staticPage = getNotificationPage(publication.latest_notifications, 1);
         position="bottom"
       />
     </div>
-    <noscript><p class="notice">JavaScript is unavailable. Use the static page links to review the latest published records in groups of 50.</p></noscript>
+    <noscript><p class="notice">JavaScript is unavailable. Use the static page links to review the complete published register in groups of 50.</p></noscript>
   </section>
   <script>
     import { label, date } from "../lib/format";
@@ -91,7 +91,7 @@ const staticPage = getNotificationPage(publication.latest_notifications, 1);
         credentials: "same-origin",
       }).catch(() => null);
       if (!response?.ok) {
-        count.textContent = "Search manifest could not be loaded. The latest static records remain available.";
+        count.textContent = "Search manifest could not be loaded. The complete static register remains available.";
       } else {
       const manifest = (await response.json()) as SearchManifest;
       const jurisdiction = controls.querySelector<HTMLSelectElement>('[name="jurisdiction"]')!;
@@ -490,7 +490,9 @@ const staticPage = getNotificationPage(publication.latest_notifications, 1);
           exportStatus.textContent = "Apply a filter to enable export.";
           results.replaceChildren(...[...initialResults.childNodes].map((node) => node.cloneNode(true)));
           results.removeAttribute("aria-busy");
-          count.textContent = `${manifest.record_count.toLocaleString()} matching source records. Showing the latest ${initialCount}; no search partitions loaded.`;
+          count.textContent =
+            `${manifest.record_count.toLocaleString()} published source records. ` +
+            `Showing ${initialCount.toLocaleString()} on this static page; no search partitions loaded.`;
           return;
         }
         const candidatePartitions = manifest.partitions.filter(matchesPartition);
@@ -536,7 +538,7 @@ const staticPage = getNotificationPage(publication.latest_notifications, 1);
           loadedPartitionCount = 0;
           exportButton.disabled = true;
           exportStatus.textContent = "Export is unavailable while search data is unavailable.";
-          count.textContent = "Search partitions could not be loaded. The latest static records remain available.";
+          count.textContent = "Search partitions could not be loaded. The complete static register remains available.";
         }
       };
 

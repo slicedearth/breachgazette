@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { getPublication } from "../../lib/data";
+import { getAllNotifications, getPublication } from "../../lib/data";
 import type { Notification } from "../../lib/types";
 
 const xml = (value: string) =>
@@ -21,7 +21,7 @@ export const GET: APIRoute = ({ site }) => {
     site,
   ).toString();
   const homeUrl = new URL(import.meta.env.BASE_URL, site).toString();
-  const entries = publication.latest_notifications.slice(0, 50).map((record) => {
+  const entries = getAllNotifications().slice(0, 50).map((record) => {
     const detailUrl = record.has_detail_page
       ? new URL(
           `${import.meta.env.BASE_URL}notifications/${encodeURIComponent(record.source_record_id)}/`,

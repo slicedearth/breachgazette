@@ -3,10 +3,10 @@ import Hero from "../../components/Hero.astro";
 import NotificationTable from "../../components/NotificationTable.astro";
 import SourceNote from "../../components/SourceNote.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getPublication } from "../../lib/data";
+import { getAllNotifications, getPublication } from "../../lib/data";
 
 const publication = getPublication();
-const details = publication.detail_notifications.length ? publication.detail_notifications : publication.latest_notifications;
+const details = publication.detail_notifications.length ? publication.detail_notifications : getAllNotifications();
 const records = details.filter((record) => record.source_id === "massachusetts");
 const policy = publication.policies.massachusetts;
 ---

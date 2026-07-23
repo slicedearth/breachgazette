@@ -3,12 +3,12 @@ import DefinitionGrid from "../../components/DefinitionGrid.astro";
 import Hero from "../../components/Hero.astro";
 import SourceNote from "../../components/SourceNote.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getPublication } from "../../lib/data";
+import { getAllNotifications, getPublication } from "../../lib/data";
 import { date, label } from "../../lib/format";
 
 export function getStaticPaths() {
   const publication = getPublication();
-  const details = publication.detail_notifications.length ? publication.detail_notifications : publication.latest_notifications;
+  const details = publication.detail_notifications.length ? publication.detail_notifications : getAllNotifications();
   return details.map((record) => ({
     params: { id: record.source_record_id },
     props: { record },

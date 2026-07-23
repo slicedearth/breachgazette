@@ -2,10 +2,11 @@
 import Hero from "../components/Hero.astro";
 import NotificationTable from "../components/NotificationTable.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { getPublication } from "../lib/data";
+import { getAllNotifications, getPublication } from "../lib/data";
 import { compactNumber } from "../lib/format";
 
 const publication = getPublication();
+const notifications = getAllNotifications();
 const metrics = [
   ["Public notifications", publication.stats.public_notifications ?? 0],
   ["Aggregate metrics", publication.stats.aggregate_metrics ?? 0],
@@ -65,6 +66,6 @@ const metrics = [
       <h2 id="latest">Latest public notifications</h2>
       <a href={`${import.meta.env.BASE_URL}latest/`}>Search all published records</a>
     </div>
-    <NotificationTable records={publication.latest_notifications} limit={12} />
+    <NotificationTable records={notifications} limit={12} />
   </section>
 </BaseLayout>

@@ -83,6 +83,7 @@ test("desktop and mobile layouts contain overflow without fragmenting text", asy
   const paths = [
     "/",
     "/latest/",
+    "/sources/",
     "/source-health/",
     "/australia/public-notifications/",
     "/sources/oaic_ndb/",
@@ -121,6 +122,26 @@ test("desktop and mobile layouts contain overflow without fragmenting text", asy
   expect(geometry.navigationScrollWidth).toBeLessThanOrEqual(geometry.navigationClientWidth);
   expect(geometry.tableScrollWidth).toBeGreaterThan(geometry.tableClientWidth);
   expect(geometry.tableHeaderWhiteSpace).toBe("nowrap");
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/sources/");
+  const sourceHeadingGeometry = await page.locator(".source-card h2").evaluateAll(
+    (headings) => headings.map((heading) => {
+      const style = getComputedStyle(heading);
+      return {
+        fontSize: Number.parseFloat(style.fontSize),
+        overflowWrap: style.overflowWrap,
+        wordBreak: style.wordBreak,
+      };
+    }),
+  );
+  expect(sourceHeadingGeometry.length).toBeGreaterThan(0);
+  expect(Math.max(...sourceHeadingGeometry.map((heading) => heading.fontSize)))
+    .toBeLessThanOrEqual(29);
+  expect(sourceHeadingGeometry.every((heading) => heading.overflowWrap === "normal"))
+    .toBe(true);
+  expect(sourceHeadingGeometry.every((heading) => heading.wordBreak === "normal"))
+    .toBe(true);
 });
 
 test("runtime requests remain same-origin and no remote font or analytics is present", async ({ page }) => {
@@ -129,7 +150,7 @@ test("runtime requests remain same-origin and no remote font or analytics is pre
   page.on("request", (request) => origins.add(new URL(request.url()).origin));
   page.on("request", (request) => paths.push(new URL(request.url()).pathname));
   await page.goto("/latest/");
-  await expect(page.locator("[data-result-count]")).toContainText("matching source records");
+  await expect(page.locator("[data-result-count]")).toContainText("published source records");
   const data = await page.evaluate(async () => {
     const manifestResponse = await fetch("/data/notifications/manifest.json");
     const manifest = await manifestResponse.json() as {
@@ -232,10 +253,10 @@ test("filtered notification pagination preserves URL state and every match", asy
   );
 });
 
-test("notification search preserves static records when the manifest fails", async ({ page }) => {
+test("notification search preserves the complete static register when the manifest fails", async ({ page }) => {
   await page.route("**/data/notifications/manifest.json", (route) => route.abort());
   await page.goto("/latest/");
-  await expect(page.locator("[data-result-count]")).toContainText("latest static records remain available");
+  await expect(page.locator("[data-result-count]")).toContainText("complete static register remains available");
   expect(await page.locator("[data-results] tbody tr").count()).toBeGreaterThan(0);
 });
 

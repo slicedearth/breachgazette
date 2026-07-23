@@ -16,14 +16,14 @@ const healthBySource = new Map(publication.source_health.sources.map((source) =>
     intro="Each policy defines what one row means, who can appear, what threshold applies, how long records remain visible, and which publication rights were reviewed."
   />
   <section class="section shell">
-    <div class="grid">
+    <div class="grid source-directory">
       {policies.map((policy) => (
-        <article class="card">
+        <article class="card source-card">
           <span class="pill">{policy.implemented ? label(healthBySource.get(policy.source_id)?.status ?? "not monitored") : "Deferred"}</span>
           <h2><a href={`${import.meta.env.BASE_URL}sources/${policy.source_id}/`}>{policy.name}</a></h2>
           <p><strong>{policy.jurisdiction}</strong> · {label(policy.publication_level)}</p>
-          <p>{policy.source_threshold}</p>
-          <p><small>Redistribution: {label(policy.redistribution_decision)}</small></p>
+          <p class="source-card__threshold">{policy.source_threshold}</p>
+          <p class="source-card__redistribution"><small>Redistribution: {label(policy.redistribution_decision)}</small></p>
         </article>
       ))}
     </div>

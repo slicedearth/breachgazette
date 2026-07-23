@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import type {
+  Notification,
   Publication,
   SearchManifest,
   SearchPartition,
@@ -19,7 +20,10 @@ function readJson<T>(name: string): T {
   return JSON.parse(readFileSync(path, "utf8")) as T;
 }
 
+let publicationCache: Publication | undefined;
+
 export function getPublication(): Publication {
+  if (publicationCache) return publicationCache;
   const publication = readJson<Publication>("publication.json");
   const datasetClass = publication.manifest?.dataset_class;
   const testBuild = process.env.BREACHGAZETTE_TEST_BUILD === "1";
@@ -29,10 +33,14 @@ export function getPublication(): Publication {
   if (!publication.quality?.passed) {
     throw new Error("Publication quality report did not pass");
   }
-  return publication;
+  publicationCache = publication;
+  return publicationCache;
 }
 
+let searchManifestCache: SearchManifest | undefined;
+
 export function getSearchManifest(): SearchManifest {
+  if (searchManifestCache) return searchManifestCache;
   const manifest = readJson<SearchManifest>("search-manifest.json");
   if (
     !manifest ||
@@ -46,10 +54,15 @@ export function getSearchManifest(): SearchManifest {
   ) {
     throw new Error("search-manifest.json is invalid");
   }
-  return manifest;
+  searchManifestCache = manifest;
+  return searchManifestCache;
 }
 
+const searchPartitionCache = new Map<string, SearchPartition>();
+
 export function getSearchPartition(id: string): SearchPartition {
+  const cached = searchPartitionCache.get(id);
+  if (cached) return cached;
   if (!/^[a-z0-9_-]+$/.test(id)) {
     throw new Error("search partition id is invalid");
   }
@@ -61,5 +74,34 @@ export function getSearchPartition(id: string): SearchPartition {
   if (partition.partition_id !== id || !Array.isArray(partition.records)) {
     throw new Error("search partition payload is invalid");
   }
+  searchPartitionCache.set(id, partition);
   return partition;
+}
+
+let notificationCache: Notification[] | undefined;
+
+function latestSourceDate(notification: Notification): string {
+  return notification.dates
+    .map((item) => item.normalized_date)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1) ?? "0001-01-01";
+}
+
+export function getAllNotifications(): Notification[] {
+  if (notificationCache) return notificationCache;
+  const manifest = getSearchManifest();
+  const notifications = manifest.partitions.flatMap(
+    (partition) => getSearchPartition(partition.id).records,
+  );
+  if (notifications.length !== manifest.record_count) {
+    throw new Error(
+      `notification partitions contain ${notifications.length} records; expected ${manifest.record_count}`,
+    );
+  }
+  notificationCache = notifications.sort((left, right) =>
+    latestSourceDate(right).localeCompare(latestSourceDate(left))
+    || right.source_record_id.localeCompare(left.source_record_id)
+  );
+  return notificationCache;
 }

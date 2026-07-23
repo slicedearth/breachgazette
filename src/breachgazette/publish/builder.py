@@ -30,13 +30,12 @@ from breachgazette.state import PrivateStateStore
 from breachgazette.utils import atomic_write_json, sha256_hex
 
 DETAIL_RECORDS_PER_SOURCE = 250
-LATEST_RECORDS = 100
 SEARCH_PARTITION_SIZE = 250
 SEARCH_BLOOM_BITS = 16_384
 SEARCH_BLOOM_HASHES = 3
-PUBLIC_TREE_MAX_FILES = 3_200
-PUBLIC_TREE_MAX_BYTES = 40_000_000
-PUBLIC_TREE_MAX_HTML_FILES = 3_050
+PUBLIC_TREE_MAX_FILES = 4_000
+PUBLIC_TREE_MAX_BYTES = 60_000_000
+PUBLIC_TREE_MAX_HTML_FILES = 3_800
 PUBLIC_TREE_MAX_HTML_BYTES = 300_000
 PUBLIC_TREE_ALLOWED_SUFFIXES = frozenset(
     {
@@ -347,7 +346,6 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
             "relationship_candidates": len(relationships),
             "corrections": len(events),
         },
-        "latest_notifications": ordered_notifications[:LATEST_RECORDS],
         "detail_notifications": detail_notifications,
         "aggregates": aggregates,
         "regulatory_actions": regulatory_actions,

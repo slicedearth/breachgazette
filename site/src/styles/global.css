@@ -110,6 +110,22 @@ h3 { font-size: 1.25rem; }
 .grid > .card:nth-child(3n) { border-top-color: var(--navy); }
 .card h2, .card h3 { overflow-wrap: break-word; word-break: normal; }
 .card p { line-height: 1.55; }
+.source-directory { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.source-card { display: flex; flex-direction: column; }
+.source-card h2 {
+  margin-block: 1rem .75rem;
+  font-size: clamp(1.4rem, 2.2vw, 1.8rem);
+  line-height: 1.15;
+  letter-spacing: -.015em;
+  overflow-wrap: normal;
+  text-wrap: pretty;
+  word-break: normal;
+  hyphens: none;
+}
+.source-card h2 a { overflow-wrap: normal; word-break: normal; }
+.source-card p { margin-block: .35rem; }
+.source-card__threshold { color: var(--muted); }
+.source-card__redistribution { margin-top: auto !important; padding-top: 1rem; }
 .directory-summary { margin: 0 0 1rem; color: var(--muted); font-weight: 700; }
 .directory-pagination {
   display: grid;

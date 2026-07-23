@@ -29,9 +29,13 @@ function observation(record: Notification): string | null {
       {visible.map((record) => (
         <tr>
           <th class="notification-table__entity" scope="row">
-            <a href={`${import.meta.env.BASE_URL}notifications/${record.source_record_id}/`}>
-              {record.named_entity.source_name}
-            </a>
+            {record.has_detail_page === false
+              ? record.named_entity.source_name
+              : (
+                <a href={`${import.meta.env.BASE_URL}notifications/${record.source_record_id}/`}>
+                  {record.named_entity.source_name}
+                </a>
+              )}
           </th>
           <td>{label(record.named_entity.role)}</td>
           <td>{record.jurisdiction}</td>
