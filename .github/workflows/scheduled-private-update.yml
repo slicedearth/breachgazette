@@ -40,12 +40,21 @@ jobs:
           echo "data_ref=$CONFIGURED_DATA_REF" >> "$GITHUB_OUTPUT"
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Mint write-scoped private-state token
+        id: state-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.BREACHGAZETTE_STATE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BREACHGAZETTE_STATE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ vars.BREACHGAZETTE_DATA_REPOSITORY }}
+          permission-contents: write
       - name: Check out private production state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ vars.BREACHGAZETTE_DATA_REPOSITORY }}
           ref: ${{ steps.data-ref.outputs.data_ref }}
-          ssh-key: ${{ secrets.BREACHGAZETTE_DATA_WRITE_KEY }}
+          token: ${{ steps.state-token.outputs.token }}
           path: .private-production-data
           persist-credentials: true
       - name: Set up Python
@@ -120,5 +129,5 @@ jobs:
     with:
       data_ref: ${{ vars.BREACHGAZETTE_DATA_REF }}
     secrets:
-      BREACHGAZETTE_DATA_READ_KEY: ${{ secrets.BREACHGAZETTE_DATA_READ_KEY }}
+      BREACHGAZETTE_STATE_APP_PRIVATE_KEY: ${{ secrets.BREACHGAZETTE_STATE_APP_PRIVATE_KEY }}
       NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}

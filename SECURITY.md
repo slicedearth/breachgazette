@@ -36,13 +36,14 @@ fixture state.
 Workflows use least privilege, immutable action SHAs, explicit timeouts, locked
 dependencies, and no live sources in CI. Netlify publication runs only after
 successful `main` CI, after a verified persisted private-state update, or by
-manual dispatch. It checks out private state with a read-only deploy key and
-uploads only the audited static tree. Dry-run update workflows make no commit,
-push, issue, or deployment. The separate scheduled workflow is disabled unless
-explicitly enabled and can push only its verified candidate to the configured
-private state repository through a distinct write-scoped deploy key. Its
-follow-on publication job receives only the read key and Netlify token. Neither
-job can write the public source repository.
+manual dispatch. A private GitHub App installed only on the state repository
+mints repository-specific installation tokens that expire after one hour. The
+publication job requests read-only Contents access and uploads only the audited
+static tree. Dry-run update workflows make no commit, push, issue, or
+deployment. The separate scheduled workflow is disabled unless explicitly
+enabled and requests write-scoped Contents access only while promoting and
+pushing its verified candidate. Its follow-on publication job mints a new
+read-only token. Neither job can write the public source repository.
 
 Python and npm dependencies are fully pinned in committed lockfiles. CI runs
 security-focused Ruff checks, `pip-audit`, `npm audit --audit-level=high`, and

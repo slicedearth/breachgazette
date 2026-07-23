@@ -8,7 +8,7 @@ on:
         required: false
         type: string
     secrets:
-      BREACHGAZETTE_DATA_READ_KEY:
+      BREACHGAZETTE_STATE_APP_PRIVATE_KEY:
         required: true
       NETLIFY_AUTH_TOKEN:
         required: true
@@ -72,12 +72,21 @@ jobs:
             exit 1
           fi
           echo "data_ref=$data_ref" >> "$GITHUB_OUTPUT"
+      - name: Mint read-only private-state token
+        id: state-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.BREACHGAZETTE_STATE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BREACHGAZETTE_STATE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ vars.BREACHGAZETTE_DATA_REPOSITORY }}
+          permission-contents: read
       - name: Check out configured private real-data state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ vars.BREACHGAZETTE_DATA_REPOSITORY }}
           ref: ${{ steps.data-ref.outputs.data_ref }}
-          ssh-key: ${{ secrets.BREACHGAZETTE_DATA_READ_KEY }}
+          token: ${{ steps.state-token.outputs.token }}
           path: .private-production-data
           persist-credentials: false
       - name: Record resolved revisions
