@@ -21,6 +21,10 @@ name. That row remains a notification with an explicit `source_omitted` state
 and is excluded from entity resolution. Sample letters are not retrieved or
 published.
 
+An occurrence date later than the same row's reported date is retained as raw
+source text with a `source_conflict` state. It is excluded from normalized date
+uses rather than silently corrected or presented as a verified chronology.
+
 ## Massachusetts
 
 The adapter retrieves only the fixed official 2025 and 2026 annual-report PDF

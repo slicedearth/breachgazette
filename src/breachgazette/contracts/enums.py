@@ -25,6 +25,7 @@ class ValueState(StrEnum):
     FAILED_PARSING = "failed_parsing"
     SUPPRESSED = "suppressed"
     ESTIMATED = "estimated"
+    SOURCE_CONFLICT = "source_conflict"
     INTENTIONALLY_EXCLUDED = "intentionally_excluded"
 
 

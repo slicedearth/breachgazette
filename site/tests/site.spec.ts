@@ -43,6 +43,9 @@ test("United States pages preserve source role warnings", async ({ page }) => {
 test("organization and candidate relationship pages explain evidence", async ({ page }) => {
   await page.goto("/organizations/org_1111111111111111/");
   await expect(page.getByText("Exact normalized source name")).toBeVisible();
+  await page.goto("/relationships/");
+  await expect(page.getByText("Showing relationships 1–1 of 1.")).toBeVisible();
+  await expect(page.getByText("Page 1 of 1")).toBeVisible();
   await page.goto("/relationships/candidate_fixture_1/");
   await expect(page.getByText(/not a declaration/i)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Displayed evidence" })).toBeVisible();

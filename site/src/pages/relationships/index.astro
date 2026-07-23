@@ -1,10 +1,12 @@
 ---
 import Hero from "../../components/Hero.astro";
+import RelationshipDirectory from "../../components/RelationshipDirectory.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getPublication } from "../../lib/data";
-import { label } from "../../lib/format";
+import { getRelationshipPage } from "../../lib/relationships";
 
 const publication = getPublication();
+const page = getRelationshipPage(publication.relationships, 1);
 ---
 
 <BaseLayout title="Candidate relationships" description="Evidence-backed candidate relationships between source records.">
@@ -14,16 +16,6 @@ const publication = getPublication();
     intro="These records may relate based on the displayed evidence. Breach Gazette does not declare that candidate records describe the same breach."
   />
   <section class="section shell">
-    {publication.relationships.length ? (
-      <div class="grid">
-        {publication.relationships.map((relationship) => (
-          <article class="card">
-            <span class="pill">{relationship.review_status ? label(relationship.review_status) : label(relationship.relationship_class)}</span>
-            <h2><a href={`${import.meta.env.BASE_URL}relationships/${relationship.candidate_id}/`}>{relationship.candidate_id}</a></h2>
-            <p>{relationship.reasons.map((reason) => reason.explanation).join(" ")}</p>
-          </article>
-        ))}
-      </div>
-    ) : <p class="notice">No source-record pair met the strict entity-and-date blocking rule in this publication.</p>}
+    <RelationshipDirectory page={page} />
   </section>
 </BaseLayout>

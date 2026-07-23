@@ -32,6 +32,7 @@ from breachgazette.publish.builder import (
     build_site_data,
 )
 from breachgazette.quality import DataQualityError, build_quality_report
+from breachgazette.quality.temporal import exclude_temporal_conflicts
 from breachgazette.state import PrivateStateStore
 
 
@@ -264,6 +265,43 @@ def test_production_builder_refuses_fixture_root(tmp_path: Path) -> None:
     PrivateStateStore(root).initialize(dataset_class="test_fixture")
     with pytest.raises(DataQualityError, match="real source"):
         build_site_data(data_root=root, output=tmp_path / "output")
+
+
+def test_existing_california_state_excludes_temporal_conflicts_from_publication(
+    notification_factory,
+) -> None:
+    record = notification_factory(
+        source_id="california",
+        dates=[
+            {
+                "meaning": "occurrence_start",
+                "raw_value": "11/20/2027",
+                "normalized_date": "2027-11-20",
+                "origin": "source_observed",
+                "state": "present",
+            },
+            {
+                "meaning": "regulator_submission_date",
+                "raw_value": "07/03/2024",
+                "normalized_date": "2024-07-03",
+                "origin": "source_observed",
+                "state": "present",
+            },
+        ],
+    )
+
+    assert exclude_temporal_conflicts(record) == 1
+    assert record.dates[0].raw_value == "11/20/2027"
+    assert record.dates[0].normalized_date is None
+    assert record.dates[0].state == "source_conflict"
+    assert exclude_temporal_conflicts(record) == 0
+    assert len(
+        [
+            item
+            for item in record.limitations
+            if "post-dates the regulator submission date" in item
+        ]
+    ) == 1
 
 
 def test_search_assets_are_partitioned_and_bounded(notification_factory) -> None:

@@ -1,0 +1,53 @@
+---
+import { label } from "../lib/format";
+import type { RelationshipPage } from "../lib/relationships";
+
+interface Props {
+  page: RelationshipPage;
+}
+
+const { page } = Astro.props;
+const pageUrl = (pageNumber: number) =>
+  pageNumber === 1
+    ? `${import.meta.env.BASE_URL}relationships/`
+    : `${import.meta.env.BASE_URL}relationships/pages/${pageNumber}/`;
+---
+
+{page.items.length ? (
+  <>
+    <p class="directory-summary">
+      Showing relationships {page.firstItem.toLocaleString()}–{page.lastItem.toLocaleString()} of{" "}
+      {page.total.toLocaleString()}.
+    </p>
+    <div class="grid" data-relationship-directory>
+      {page.items.map((relationship) => (
+        <article class="card">
+          <span class="pill">
+            {relationship.review_status
+              ? label(relationship.review_status)
+              : label(relationship.relationship_class)}
+          </span>
+          <h2>
+            <a href={`${import.meta.env.BASE_URL}relationships/${relationship.candidate_id}/`}>
+              {relationship.candidate_id}
+            </a>
+          </h2>
+          <p>{relationship.reasons.map((reason) => reason.explanation).join(" ")}</p>
+        </article>
+      ))}
+    </div>
+    <nav class="pagination" aria-label="Relationship directory pages">
+      {page.currentPage > 1 ? (
+        <a href={pageUrl(page.currentPage - 1)} rel="prev">Previous page</a>
+      ) : <span aria-hidden="true"></span>}
+      <span>Page {page.currentPage.toLocaleString()} of {page.pageCount.toLocaleString()}</span>
+      {page.currentPage < page.pageCount ? (
+        <a href={pageUrl(page.currentPage + 1)} rel="next">Next page</a>
+      ) : <span aria-hidden="true"></span>}
+    </nav>
+  </>
+) : (
+  <p class="notice">
+    No source-record pair met the strict entity-and-date blocking rule in this publication.
+  </p>
+)}

@@ -1,0 +1,35 @@
+---
+import Hero from "../../../components/Hero.astro";
+import RelationshipDirectory from "../../../components/RelationshipDirectory.astro";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { getPublication } from "../../../lib/data";
+import { getRelationshipPage } from "../../../lib/relationships";
+
+export function getStaticPaths() {
+  const relationships = getPublication().relationships;
+  const firstPage = getRelationshipPage(relationships, 1);
+  return Array.from({ length: firstPage.pageCount - 1 }, (_, index) => {
+    const pageNumber = index + 2;
+    return {
+      params: { page: String(pageNumber) },
+      props: { page: getRelationshipPage(relationships, pageNumber) },
+    };
+  });
+}
+
+const { page } = Astro.props;
+---
+
+<BaseLayout
+  title={`Candidate relationships, page ${page.currentPage}`}
+  description={`Evidence-backed candidate relationships between source records, page ${page.currentPage} of ${page.pageCount}.`}
+>
+  <Hero
+    eyebrow="Conservative cross-source links"
+    title="Candidate record relationships"
+    intro="These records may relate based on the displayed evidence. Breach Gazette does not declare that candidate records describe the same breach."
+  />
+  <section class="section shell">
+    <RelationshipDirectory page={page} />
+  </section>
+</BaseLayout>
