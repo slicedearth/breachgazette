@@ -1,0 +1,61 @@
+name: Source drift
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Fixed source adapter to inspect
+        required: true
+        default: oaic_ndb
+        type: choice
+        options:
+          - oaic_ndb
+          - nsw_public_notifications
+          - nsw_mndb_aggregate
+          - oaic_regulatory
+          - washington
+          - california
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-drift-${{ inputs.source }}
+  cancel-in-progress: true
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - name: Install locked dependencies
+        run: |
+          python -m pip install -r requirements.lock
+          python -m pip install --no-deps --no-build-isolation -e .
+      - name: Inspect fixed source
+        id: inspect
+        continue-on-error: true
+        run: breachgazette update-source "${{ inputs.source }}" --data-root "$RUNNER_TEMP/source-drift" --json
+      - name: Write bounded failure report
+        if: steps.inspect.outcome == 'failure'
+        run: |
+          mkdir -p "$RUNNER_TEMP/drift-report"
+          printf '{"schema_version":"1.0","source":"%s","outcome":"schema_or_retrieval_failure","contains_source_records":false}\n' "${{ inputs.source }}" > "$RUNNER_TEMP/drift-report/report.json"
+      - name: Upload failure report
+        if: steps.inspect.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: source-drift-${{ inputs.source }}
+          path: ${{ runner.temp }}/drift-report/report.json
+          retention-days: 7
+      - name: Fail after preserving report
+        if: steps.inspect.outcome == 'failure'
+        run: exit 1
