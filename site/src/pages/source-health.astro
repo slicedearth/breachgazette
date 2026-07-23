@@ -6,6 +6,8 @@ import { date, label } from "../lib/format";
 
 const publication = getPublication();
 const sources = publication.source_health.sources;
+const sourceName = (sourceId: string) =>
+  publication.policies[sourceId]?.name ?? label(sourceId);
 ---
 
 <BaseLayout title="Source health" description="Freshness and update state for each implemented official source.">
@@ -26,7 +28,11 @@ const sources = publication.source_health.sources;
         <tbody>
           {sources.map((source) => (
             <tr>
-              <th scope="row"><a href={`${import.meta.env.BASE_URL}sources/${source.source_id}/`}>{label(source.source_id)}</a></th>
+              <th scope="row">
+                <a href={`${import.meta.env.BASE_URL}sources/${source.source_id}/`}>
+                  {sourceName(source.source_id)}
+                </a>
+              </th>
               <td><span class="pill">{label(source.status)}</span></td>
               <td>{source.record_count.toLocaleString()}</td>
               <td>{source.snapshot_age_hours === null ? "Not available" : `${source.snapshot_age_hours.toLocaleString()} hours`}</td>

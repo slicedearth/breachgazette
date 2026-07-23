@@ -9,6 +9,9 @@ interface Props {
 
 const { title, description, section = "Observatory" } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
+const base = import.meta.env.BASE_URL;
+const isCurrent = (path: string) =>
+  Astro.url.pathname.startsWith(new URL(`${base}${path}`, Astro.site).pathname);
 ---
 
 <!doctype html>
@@ -47,14 +50,17 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
             <span class="mark-register mark-register-two"></span>
             <span class="mark-register mark-register-three"></span>
           </span>
-          <span>Breach Gazette<small>Public notification and regulatory record</small></span>
+          <span class="brand-copy">
+            <span class="brand-title">Breach Gazette</span>
+            <small>Public notification and regulatory record</small>
+          </span>
         </a>
         <nav aria-label="Primary">
-          <a href={`${import.meta.env.BASE_URL}australia/`}>Australia</a>
-          <a href={`${import.meta.env.BASE_URL}united-states/`}>United States</a>
-          <a href={`${import.meta.env.BASE_URL}latest/`}>Notifications</a>
-          <a href={`${import.meta.env.BASE_URL}sources/`}>Sources</a>
-          <a href={`${import.meta.env.BASE_URL}methodology/`}>Methodology</a>
+          <a href={`${base}australia/`} aria-current={isCurrent("australia/") ? "page" : undefined}>Australia</a>
+          <a href={`${base}united-states/`} aria-current={isCurrent("united-states/") ? "page" : undefined}>United States</a>
+          <a href={`${base}latest/`} aria-current={isCurrent("latest/") ? "page" : undefined}>Notifications</a>
+          <a href={`${base}sources/`} aria-current={isCurrent("sources/") ? "page" : undefined}>Sources</a>
+          <a href={`${base}methodology/`} aria-current={isCurrent("methodology/") ? "page" : undefined}>Methodology</a>
         </nav>
       </div>
     </header>

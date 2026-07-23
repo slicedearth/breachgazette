@@ -1,10 +1,13 @@
 ---
 import Hero from "../components/Hero.astro";
+import NotificationPagination from "../components/NotificationPagination.astro";
 import NotificationTable from "../components/NotificationTable.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { getPublication } from "../lib/data";
+import { getNotificationPage, NOTIFICATIONS_PER_PAGE } from "../lib/notifications";
 
 const publication = getPublication();
+const staticPage = getNotificationPage(publication.latest_notifications, 1);
 ---
 
 <BaseLayout title="Latest public notifications" description="Search official public notification records locally in your browser.">
@@ -15,32 +18,63 @@ const publication = getPublication();
     warning="A notification is not automatically a unique incident. The source role of the named entity is preserved."
   />
   <section class="section shell">
-    <div class="filters" data-notification-filters>
-      <label>Organization or agency<input type="search" name="query" autocomplete="off" maxlength="120" /></label>
-      <label>Jurisdiction<select name="jurisdiction"><option value="">All jurisdictions</option></select></label>
-      <label>Regulator<select name="regulator"><option value="">All regulators</option></select></label>
-      <label>Source<select name="source"><option value="">All sources</option></select></label>
-      <label>Source date<input type="date" name="date" /></label>
-      <label>Breach cause<select name="cause"><option value="">All published causes</option></select></label>
-      <label>Information category<select name="information"><option value="">All published categories</option></select></label>
-      <label>Affected population<select name="population"><option value="">All population bands</option><option value="not_published">Not published</option><option value="500_999">500–999</option><option value="1000_9999">1,000–9,999</option><option value="10000_99999">10,000–99,999</option><option value="100000_plus">100,000+</option></select></label>
-      <label>Entity role<select name="role"><option value="">All roles</option></select></label>
-      <label>Publication level<select name="publication"><option value="">All publication levels</option></select></label>
-    </div>
-    <div class="result-actions">
-      <button type="button" data-export-results disabled>Export matching CSV</button>
-      <button type="button" data-copy-search disabled>Copy search link</button>
-      <span class="table-note" data-export-status>Apply a filter to enable export.</span>
-      <span class="table-note" data-share-status>Search-link filters stay in the URL fragment and are not sent in HTTP requests.</span>
+    <div class="search-panel">
+      <div class="search-panel__heading">
+        <div>
+          <span class="eyebrow">Local register search</span>
+          <h2>Find a published source record</h2>
+        </div>
+        <p>Filters run in this browser. Pagination changes only the visible results; exports retain every match.</p>
+      </div>
+      <div class="filters" data-notification-filters>
+        <label>Organization or agency<input type="search" name="query" autocomplete="off" maxlength="120" /></label>
+        <label>Jurisdiction<select name="jurisdiction"><option value="">All jurisdictions</option></select></label>
+        <label>Regulator<select name="regulator"><option value="">All regulators</option></select></label>
+        <label>Source<select name="source"><option value="">All sources</option></select></label>
+        <label>Source date<input type="date" name="date" /></label>
+        <label>Breach cause<select name="cause"><option value="">All published causes</option></select></label>
+        <label>Information category<select name="information"><option value="">All published categories</option></select></label>
+        <label>Affected population<select name="population"><option value="">All population bands</option><option value="not_published">Not published</option><option value="500_999">500–999</option><option value="1000_9999">1,000–9,999</option><option value="10000_99999">10,000–99,999</option><option value="100000_plus">100,000+</option></select></label>
+        <label>Entity role<select name="role"><option value="">All roles</option></select></label>
+        <label>Publication level<select name="publication"><option value="">All publication levels</option></select></label>
+      </div>
+      <div class="result-actions">
+        <button type="button" data-export-results disabled>Export matching CSV</button>
+        <button type="button" data-copy-search disabled>Copy search link</button>
+        <span class="table-note" data-export-status>Apply a filter to enable export.</span>
+        <span class="table-note" data-share-status>Search-link filters stay in the URL fragment and are not sent in HTTP requests.</span>
+      </div>
     </div>
     <p aria-live="polite" data-result-count>Loading bounded dataset…</p>
     <div data-results>
-      <NotificationTable records={publication.latest_notifications} limit={50} />
+      <p class="directory-summary">
+        Showing the latest {staticPage.firstItem.toLocaleString()}–{staticPage.lastItem.toLocaleString()} of{" "}
+        {staticPage.total.toLocaleString()} statically published records.
+      </p>
+      <NotificationPagination
+        currentPage={staticPage.currentPage}
+        pageCount={staticPage.pageCount}
+        position="top"
+      />
+      <NotificationTable
+        records={staticPage.items}
+        limit={NOTIFICATIONS_PER_PAGE}
+        showSummary={false}
+      />
+      <NotificationPagination
+        currentPage={staticPage.currentPage}
+        pageCount={staticPage.pageCount}
+        position="bottom"
+      />
     </div>
-    <noscript><p class="notice">JavaScript is unavailable. The latest 50 records remain visible; use the source pages for static views.</p></noscript>
+    <noscript><p class="notice">JavaScript is unavailable. Use the static page links to review the latest published records in groups of 50.</p></noscript>
   </section>
   <script>
     import { label, date } from "../lib/format";
+    import {
+      getNotificationPaginationItems,
+      NOTIFICATIONS_PER_PAGE,
+    } from "../lib/notifications";
     import type {
       Notification,
       SearchManifest,
@@ -85,6 +119,7 @@ const publication = getPublication();
       const filterControls = [
         ...controls.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select"),
       ];
+      let currentPage = 1;
       const hasFilters = () =>
         filterControls.some((control) => control.value.trim() !== "");
       const applyHashState = () => {
@@ -103,19 +138,23 @@ const publication = getPublication();
             control.value = value;
           }
         }
+        const requestedPage = Number.parseInt(parameters.get("page") ?? "1", 10);
+        currentPage = Number.isFinite(requestedPage) && requestedPage > 0
+          ? requestedPage
+          : 1;
       };
-      const syncHashState = () => {
+      const syncHashState = (mode: "push" | "replace" = "replace") => {
         const parameters = new URLSearchParams();
         for (const control of filterControls) {
           const value = control.value.trim();
           if (value) parameters.set(control.name, value);
         }
+        if (hasFilters() && currentPage > 1) parameters.set("page", String(currentPage));
         const fragment = parameters.toString();
-        window.history.replaceState(
-          null,
-          "",
-          `${window.location.pathname}${window.location.search}${fragment ? `#${fragment}` : ""}`,
-        );
+        const nextUrl =
+          `${window.location.pathname}${window.location.search}${fragment ? `#${fragment}` : ""}`;
+        if (mode === "push") window.history.pushState(null, "", nextUrl);
+        else window.history.replaceState(null, "", nextUrl);
         copySearchButton.disabled = !hasFilters();
         shareStatus.textContent = fragment
           ? "This search can be bookmarked without sending its filters in HTTP requests."
@@ -134,6 +173,7 @@ const publication = getPublication();
       const initialCount = results.querySelectorAll("tbody tr").length;
       const partitionCache = new Map<string, Promise<Notification[]>>();
       let filteredRecords: Notification[] = [];
+      let loadedPartitionCount = 0;
       const loadPartition = (partition: SearchPartitionMetadata) => {
         const existing = partitionCache.get(partition.id);
         if (existing) return existing;
@@ -215,12 +255,12 @@ const publication = getPublication();
         return element;
       };
       const renderTable = (records: Notification[]) => {
-        const visible = records.slice(0, 50);
         const container = document.createElement("div");
         container.className = "table-wrap";
         container.tabIndex = 0;
         container.setAttribute("aria-label", "Scrollable filtered public notification table");
         const table = document.createElement("table");
+        table.className = "notification-table";
         const head = table.createTHead();
         const headingRow = head.insertRow();
         for (const heading of ["Named entity", "Source role", "Jurisdiction", "Source date", "Publication level"]) {
@@ -229,10 +269,11 @@ const publication = getPublication();
           headingRow.append(header);
         }
         const body = table.createTBody();
-        for (const record of visible) {
+        for (const record of records) {
           const row = body.insertRow();
           const entity = cell("th", "");
           entity.scope = "row";
+          entity.className = "notification-table__entity";
           const observed = record.dates.find((item) => item.normalized_date)?.normalized_date;
           if (record.has_detail_page) {
             const link = document.createElement("a");
@@ -251,7 +292,128 @@ const publication = getPublication();
           );
         }
         container.append(table);
-        results.replaceChildren(container);
+        return container;
+      };
+      const filterPageHref = (page: number) => {
+        const parameters = new URLSearchParams();
+        for (const control of filterControls) {
+          const value = control.value.trim();
+          if (value) parameters.set(control.name, value);
+        }
+        if (page > 1) parameters.set("page", String(page));
+        return `${window.location.pathname}${window.location.search}#${parameters.toString()}`;
+      };
+      const createPaginationStep = (
+        page: number | null,
+        direction: "Previous" | "Next",
+      ) => {
+        const step = document.createElement(page === null ? "span" : "a");
+        step.className = "pagination__step";
+        if (page === null) {
+          step.setAttribute("aria-disabled", "true");
+        } else {
+          const link = step as HTMLAnchorElement;
+          link.href = filterPageHref(page);
+          link.dataset.filterPage = String(page);
+          link.rel = direction === "Previous" ? "prev" : "next";
+        }
+        const arrow = document.createElement("span");
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.textContent = direction === "Previous" ? "←" : "→";
+        const text = document.createElement("span");
+        text.className = "pagination__step-label";
+        text.textContent = direction;
+        if (direction === "Previous") step.append(arrow, text);
+        else step.append(text, arrow);
+        return step;
+      };
+      const renderPagination = (
+        position: "top" | "bottom",
+        pageCount: number,
+      ) => {
+        const navigation = document.createElement("nav");
+        navigation.className = `pagination pagination--${position}`;
+        navigation.setAttribute(
+          "aria-label",
+          position === "top"
+            ? "Filtered notification pages above results"
+            : "Filtered notification pages below results",
+        );
+        if (position === "top") navigation.id = "notification-results";
+        const previous = createPaginationStep(
+          currentPage > 1 ? currentPage - 1 : null,
+          "Previous",
+        );
+        const pages = document.createElement("ol");
+        pages.className = "pagination__pages";
+        for (const page of getNotificationPaginationItems(currentPage, pageCount)) {
+          const item = document.createElement("li");
+          if (page === null) {
+            item.className = "pagination__ellipsis";
+            item.setAttribute("aria-hidden", "true");
+            item.textContent = "…";
+          } else if (page === currentPage) {
+            item.className = "is-current";
+            const current = document.createElement("span");
+            current.setAttribute("aria-current", "page");
+            const hidden = document.createElement("span");
+            hidden.className = "visually-hidden";
+            hidden.textContent = "Page ";
+            current.append(hidden, document.createTextNode(String(page)));
+            item.append(current);
+          } else {
+            const link = document.createElement("a");
+            link.href = filterPageHref(page);
+            link.dataset.filterPage = String(page);
+            link.setAttribute("aria-label", `Go to filtered notification page ${page}`);
+            link.textContent = String(page);
+            item.append(link);
+          }
+          pages.append(item);
+        }
+        const next = createPaginationStep(
+          currentPage < pageCount ? currentPage + 1 : null,
+          "Next",
+        );
+        navigation.append(previous, pages, next);
+        return navigation;
+      };
+      const renderFilteredPage = () => {
+        const pageCount = Math.max(
+          1,
+          Math.ceil(filteredRecords.length / NOTIFICATIONS_PER_PAGE),
+        );
+        currentPage = Math.min(Math.max(1, currentPage), pageCount);
+        if (!filteredRecords.length) {
+          const empty = document.createElement("p");
+          empty.className = "notice";
+          empty.textContent = "No published source records match these filters.";
+          results.replaceChildren(empty);
+          count.textContent =
+            `0 matching source records across the complete bounded dataset; ` +
+            `loaded ${loadedPartitionCount.toLocaleString()} of ${manifest.partitions.length.toLocaleString()} partitions.`;
+          return;
+        }
+        const offset = (currentPage - 1) * NOTIFICATIONS_PER_PAGE;
+        const visible = filteredRecords.slice(offset, offset + NOTIFICATIONS_PER_PAGE);
+        const first = offset + 1;
+        const last = offset + visible.length;
+        const summary = document.createElement("p");
+        summary.className = "directory-summary";
+        summary.textContent =
+          `Showing records ${first.toLocaleString()}–${last.toLocaleString()} of ` +
+          `${filteredRecords.length.toLocaleString()} matches.`;
+        results.replaceChildren(
+          summary,
+          renderPagination("top", pageCount),
+          renderTable(visible),
+          renderPagination("bottom", pageCount),
+        );
+        count.textContent =
+          `${filteredRecords.length.toLocaleString()} matching source records across the complete bounded dataset. ` +
+          `Showing ${first.toLocaleString()}–${last.toLocaleString()} on filtered page ` +
+          `${currentPage.toLocaleString()} of ${pageCount.toLocaleString()}; loaded ` +
+          `${loadedPartitionCount.toLocaleString()} of ${manifest.partitions.length.toLocaleString()} partitions.`;
       };
 
       const csvCell = (value: string | number | null | undefined) => {
@@ -321,7 +483,9 @@ const publication = getPublication();
       const render = async () => {
         const version = ++renderVersion;
         if (!hasFilters()) {
+          currentPage = 1;
           filteredRecords = [];
+          loadedPartitionCount = 0;
           exportButton.disabled = true;
           exportStatus.textContent = "Apply a filter to enable export.";
           results.replaceChildren(...[...initialResults.childNodes].map((node) => node.cloneNode(true)));
@@ -356,19 +520,20 @@ const publication = getPublication();
             (!publication.value || record.publication_level === publication.value)
           );
           filteredRecords = filtered;
+          loadedPartitionCount = candidatePartitions.length;
           exportButton.disabled = filtered.length === 0;
           exportStatus.textContent = filtered.length
             ? `Ready to export all ${filtered.length.toLocaleString()} matches.`
             : "No matching records to export.";
-          const visible = filtered.slice(0, 50);
-          count.textContent = `${filtered.length.toLocaleString()} matching source records. Showing ${visible.length}; loaded ${candidatePartitions.length.toLocaleString()} of ${manifest.partitions.length.toLocaleString()} partitions.`;
-          renderTable(visible);
+          renderFilteredPage();
+          syncHashState();
           results.removeAttribute("aria-busy");
         } catch {
           if (version !== renderVersion) return;
           results.replaceChildren(...[...initialResults.childNodes].map((node) => node.cloneNode(true)));
           results.removeAttribute("aria-busy");
           filteredRecords = [];
+          loadedPartitionCount = 0;
           exportButton.disabled = true;
           exportStatus.textContent = "Export is unavailable while search data is unavailable.";
           count.textContent = "Search partitions could not be loaded. The latest static records remain available.";
@@ -376,9 +541,24 @@ const publication = getPublication();
       };
 
       controls.addEventListener("input", () => {
+        currentPage = 1;
         syncHashState();
         window.clearTimeout(debounce);
         debounce = window.setTimeout(() => void render(), query.value ? 180 : 0);
+      });
+      results.addEventListener("click", (event) => {
+        if (!(event.target instanceof Element)) return;
+        const link = event.target.closest<HTMLAnchorElement>("a[data-filter-page]");
+        if (!link || !results.contains(link)) return;
+        event.preventDefault();
+        const page = Number.parseInt(link.dataset.filterPage ?? "1", 10);
+        if (!Number.isFinite(page) || page < 1) return;
+        currentPage = page;
+        syncHashState("push");
+        renderFilteredPage();
+        document.querySelector<HTMLElement>("[data-result-count]")?.scrollIntoView({
+          block: "start",
+        });
       });
       window.addEventListener("hashchange", () => {
         applyHashState();

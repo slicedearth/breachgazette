@@ -18,7 +18,12 @@ test("source health exposes freshness without claiming factual completeness", as
   await page.goto("/source-health/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Source health");
   await expect(page.getByText(/does not establish that an official source is factually complete/i)).toBeVisible();
-  await expect(page.getByRole("table")).toContainText("Healthy");
+  const table = page.getByRole("table");
+  await expect(table).toContainText("Healthy");
+  await expect(table).toContainText("OAIC NDB statistics");
+  await expect(table).toContainText("NSW MNDB aggregate snapshot");
+  await expect(table).not.toContainText("Oaic");
+  await expect(table).not.toContainText("Nsw");
 });
 
 test("OAIC allegations and orders retain distinct labels", async ({ page }) => {
@@ -66,18 +71,56 @@ test("keyboard navigation exposes skip link and table alternatives", async ({ pa
   await expect(page.locator("#main")).toBeFocused();
   await page.goto("/australia/");
   await expect(page.getByRole("table", { name: /OAIC aggregate metrics/i })).toBeVisible();
+  await page.goto("/latest/");
+  await expect(
+    page.getByRole("navigation", { name: "Primary" }).getByRole("link", {
+      name: "Notifications",
+    }),
+  ).toHaveAttribute("aria-current", "page");
 });
 
-test("320 pixel layout has no document-level horizontal overflow", async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 720 });
-  for (const path of ["/", "/latest/", "/source-health/", "/australia/public-notifications/", "/sources/oaic_ndb/"]) {
-    await page.goto(path);
-    const sizes = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-    }));
-    expect(sizes.scrollWidth, `page overflowed at ${path}`).toBeLessThanOrEqual(sizes.clientWidth);
+test("desktop and mobile layouts contain overflow without fragmenting text", async ({ page }) => {
+  const paths = [
+    "/",
+    "/latest/",
+    "/source-health/",
+    "/australia/public-notifications/",
+    "/sources/oaic_ndb/",
+  ];
+  for (const width of [320, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const path of paths) {
+      await page.goto(path);
+      const sizes = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(sizes.scrollWidth, `${path} overflowed at ${width}px`)
+        .toBeLessThanOrEqual(sizes.clientWidth);
+    }
   }
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.goto("/latest/");
+  const geometry = await page.evaluate(() => {
+    const heading = document.querySelector("h1");
+    const navigation = document.querySelector<HTMLElement>(".masthead nav");
+    const wrapper = document.querySelector<HTMLElement>(".table-wrap");
+    const header = document.querySelector<HTMLElement>("thead th");
+    return {
+      headingOverflowWrap: heading ? getComputedStyle(heading).overflowWrap : "",
+      headingWordBreak: heading ? getComputedStyle(heading).wordBreak : "",
+      navigationClientWidth: navigation?.clientWidth ?? 0,
+      navigationScrollWidth: navigation?.scrollWidth ?? 0,
+      tableClientWidth: wrapper?.clientWidth ?? 0,
+      tableScrollWidth: wrapper?.scrollWidth ?? 0,
+      tableHeaderWhiteSpace: header ? getComputedStyle(header).whiteSpace : "",
+    };
+  });
+  expect(geometry.headingOverflowWrap).toBe("normal");
+  expect(geometry.headingWordBreak).toBe("normal");
+  expect(geometry.navigationScrollWidth).toBeLessThanOrEqual(geometry.navigationClientWidth);
+  expect(geometry.tableScrollWidth).toBeGreaterThan(geometry.tableClientWidth);
+  expect(geometry.tableHeaderWhiteSpace).toBe("nowrap");
 });
 
 test("runtime requests remain same-origin and no remote font or analytics is present", async ({ page }) => {
@@ -125,6 +168,68 @@ test("notification search defers partitions until a filter is used", async ({ pa
   await page.locator('[name="source"]').selectOption("washington");
   await expect(page.locator("[data-result-count]")).toContainText("matching source records");
   expect(paths.some(isPartition)).toBe(true);
+});
+
+test("filtered notification pagination preserves URL state and every match", async ({
+  page,
+}) => {
+  const fixture = JSON.parse(
+    await readFile(
+      "../tests/fixtures/site/search-partitions/fixture-2026-001.json",
+      "utf8",
+    ),
+  ) as {
+    schema_version: string;
+    partition_id: string;
+    records: Array<Record<string, unknown> & {
+      named_entity: Record<string, unknown>;
+    }>;
+  };
+  const template = fixture.records.find(
+    (record) => record.source_id === "washington",
+  );
+  expect(template).toBeDefined();
+  const records = Array.from({ length: 55 }, (_, index) => ({
+    ...template!,
+    source_record_id: `fixture-wa-${String(index + 1).padStart(2, "0")}`,
+    named_entity: {
+      ...template!.named_entity,
+      source_name: `Example Services Cooperative ${String(index + 1).padStart(2, "0")}`,
+    },
+  }));
+  await page.route("**/data/notifications/fixture-2026-001.json", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ ...fixture, records }),
+    }),
+  );
+
+  await page.goto("/latest/");
+  await page.locator('[name="source"]').selectOption("washington");
+  await expect(page.locator("[data-result-count]")).toContainText(
+    "55 matching source records",
+  );
+  await expect(page.locator("[data-result-count]")).toContainText(
+    "Showing 1–50 on filtered page 1 of 2",
+  );
+  await expect(page.locator("[data-results] tbody tr")).toHaveCount(50);
+
+  await page
+    .getByRole("navigation", { name: "Filtered notification pages above results" })
+    .getByRole("link", { name: "Next" })
+    .click();
+  await expect(page).toHaveURL(/#source=washington&page=2$/);
+  await expect(page.locator("[data-results] tbody tr")).toHaveCount(5);
+  await expect(page.locator("[data-result-count]")).toContainText(
+    "Showing 51–55 on filtered page 2 of 2",
+  );
+
+  await page.reload();
+  await expect(page.locator("[data-results] tbody tr")).toHaveCount(5);
+  await expect(page.locator('[name="source"]')).toHaveValue("washington");
+  await expect(page.locator("[data-result-count]")).toContainText(
+    "Showing 51–55 on filtered page 2 of 2",
+  );
 });
 
 test("notification search preserves static records when the manifest fails", async ({ page }) => {

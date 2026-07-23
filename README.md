@@ -12,6 +12,23 @@ Breach Gazette does not independently verify the underlying events. It does not
 score organizations, identify victims, retrieve notification letters, or turn
 an allegation into a finding.
 
+[Visit Breach Gazette](https://breachgazette.netlify.app/)
+
+## Public site
+
+- Evidence layers keep aggregate statistics, named notifications, and
+  legal-status records distinct.
+- Static notification pages remain usable without JavaScript and present the
+  latest published records in groups of 50.
+- Browser-local filters search the complete bounded publication, paginate all
+  matches in groups of 50, preserve filter and page state in the URL fragment,
+  and export every match rather than only the visible page.
+- Source-health views use the reviewed public source names and preserve
+  acronyms such as NSW, MNDB, OAIC, NDB, and HHS.
+- Responsive tables contain horizontal scrolling within the table region;
+  page headings, navigation, and record labels retain normal word boundaries
+  on desktop and mobile.
+
 ## Source coverage
 
 | Source | Publication model | Publication boundary |
@@ -42,10 +59,11 @@ Astro renders a static website from a temporary privacy-minimised publication
 directory. Production builds refuse test fixtures and missing required real
 sources. Browser search uses a compact facet and trigram-Bloom manifest, loads
 only candidate source/year partitions, and can export every filtered match to
-a formula-safe CSV. Filter state can be copied as a URL fragment without
-sending the search to a server. A privacy-minimised Atom feed exposes the
-latest public notifications. There is no runtime application server, account
-system, analytics, cookie, or remotely collected search query.
+a formula-safe CSV. Static and filtered results paginate in groups of 50.
+Filter and page state can be copied as a URL fragment without sending the
+search to a server. A privacy-minimised Atom feed exposes the latest public
+notifications. There is no runtime application server, account system,
+analytics, cookie, or remotely collected search query.
 
 See [the architecture](docs/architecture.md), [methodology](docs/methodology.md),
 and [data dictionary](docs/data-dictionary.md) for the complete model.
@@ -163,6 +181,9 @@ Every run invokes the same tested candidate transaction used locally, writes a
 sanitized source-ID/status/count job summary, uploads only the non-sensitive
 health report, and pushes private state only if all source, freshness, quality,
 privacy, and publication gates pass. See [operations](docs/operations.md).
+Successful `main` CI runs publish the audited static tree automatically from
+the configured private production state; source-data collection remains
+disabled until the schedule variable is deliberately enabled.
 
 ## Production static build
 
@@ -221,9 +242,8 @@ documented in [docs/methodology.md](docs/methodology.md).
 - No generic Australia-versus-US comparison is calculated.
 - Search routing uses a false-positive-only Bloom index; candidate partitions
   can be loaded unnecessarily, but matching partitions must never be omitted.
-- Scheduled updates and their automatic publication remain inert until the
-  private repository, production branch, repository-scoped GitHub App, hosting
-  settings, and explicit enablement variable are configured.
+- Scheduled source-data collection remains inert while
+  `BREACHGAZETTE_SCHEDULE_ENABLED` is not set to `true`.
 - Washington's dataset has no dataset-specific licence identifier; its
   publication boundary requires ongoing review.
 - HHS remains deferred rather than using brittle browser automation.

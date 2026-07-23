@@ -1,0 +1,75 @@
+---
+import Hero from "../../../components/Hero.astro";
+import NotificationPagination from "../../../components/NotificationPagination.astro";
+import NotificationTable from "../../../components/NotificationTable.astro";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { getPublication } from "../../../lib/data";
+import {
+  getNotificationPage,
+  NOTIFICATIONS_PER_PAGE,
+  type NotificationPage,
+} from "../../../lib/notifications";
+
+export function getStaticPaths() {
+  const publication = getPublication();
+  const pageCount = Math.max(
+    1,
+    Math.ceil(publication.latest_notifications.length / NOTIFICATIONS_PER_PAGE),
+  );
+  return Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) => {
+    const currentPage = index + 2;
+    return {
+      params: { page: String(currentPage) },
+      props: { page: getNotificationPage(publication.latest_notifications, currentPage) },
+    };
+  });
+}
+
+interface Props {
+  page: NotificationPage;
+}
+
+const { page } = Astro.props;
+---
+
+<BaseLayout
+  title={`Latest public notifications — Page ${page.currentPage}`}
+  description={`Static page ${page.currentPage} of the latest official public notification records.`}
+>
+  <Hero
+    eyebrow="Named source records"
+    title={`Latest public notifications — Page ${page.currentPage}`}
+    intro="This static view preserves access to the latest published records without requiring JavaScript."
+    warning="A notification is not automatically a unique incident. The source role of the named entity is preserved."
+  />
+  <section class="section shell">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Static register page</p>
+        <h2>Published records {page.firstItem.toLocaleString()}–{page.lastItem.toLocaleString()}</h2>
+      </div>
+      <p>
+        <a href={`${import.meta.env.BASE_URL}latest/`}>Return to full-dataset search</a>
+      </p>
+    </div>
+    <p class="directory-summary">
+      Showing the latest {page.firstItem.toLocaleString()}–{page.lastItem.toLocaleString()} of{" "}
+      {page.total.toLocaleString()} statically published records.
+    </p>
+    <NotificationPagination
+      currentPage={page.currentPage}
+      pageCount={page.pageCount}
+      position="top"
+    />
+    <NotificationTable
+      records={page.items}
+      limit={NOTIFICATIONS_PER_PAGE}
+      showSummary={false}
+    />
+    <NotificationPagination
+      currentPage={page.currentPage}
+      pageCount={page.pageCount}
+      position="bottom"
+    />
+  </section>
+</BaseLayout>

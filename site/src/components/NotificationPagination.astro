@@ -1,0 +1,73 @@
+---
+import { getNotificationPaginationItems } from "../lib/notifications";
+
+interface Props {
+  currentPage: number;
+  pageCount: number;
+  position: "top" | "bottom";
+}
+
+const { currentPage, pageCount, position } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const pages = getNotificationPaginationItems(currentPage, pageCount);
+const pageHref = (page: number) => page === 1
+  ? `${base}latest/#notification-results`
+  : `${base}latest/pages/${page}/#notification-results`;
+const label = position === "top"
+  ? "Notification pages above results"
+  : "Notification pages below results";
+---
+
+<nav
+  id={position === "top" ? "notification-results" : undefined}
+  class:list={["pagination", `pagination--${position}`]}
+  aria-label={label}
+>
+  {currentPage > 1
+    ? (
+      <a class="pagination__step" href={pageHref(currentPage - 1)} rel="prev">
+        <span aria-hidden="true">←</span>
+        <span class="pagination__step-label">Previous</span>
+      </a>
+    )
+    : (
+      <span class="pagination__step" aria-disabled="true">
+        <span aria-hidden="true">←</span>
+        <span class="pagination__step-label">Previous</span>
+      </span>
+    )}
+
+  <ol class="pagination__pages">
+    {pages.map((page) => page === null
+      ? <li class="pagination__ellipsis" aria-hidden="true">…</li>
+      : (
+        <li class:list={{ "is-current": page === currentPage }}>
+          {page === currentPage
+            ? (
+              <span aria-current="page">
+                <span class="visually-hidden">Page </span>{page}
+              </span>
+            )
+            : (
+              <a href={pageHref(page)} aria-label={`Go to notification page ${page}`}>
+                {page}
+              </a>
+            )}
+        </li>
+      ))}
+  </ol>
+
+  {currentPage < pageCount
+    ? (
+      <a class="pagination__step" href={pageHref(currentPage + 1)} rel="next">
+        <span class="pagination__step-label">Next</span>
+        <span aria-hidden="true">→</span>
+      </a>
+    )
+    : (
+      <span class="pagination__step" aria-disabled="true">
+        <span class="pagination__step-label">Next</span>
+        <span aria-hidden="true">→</span>
+      </span>
+    )}
+</nav>

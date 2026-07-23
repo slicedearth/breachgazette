@@ -36,7 +36,7 @@ const pageUrl = (pageNumber: number) =>
         </article>
       ))}
     </div>
-    <nav class="pagination" aria-label="Relationship directory pages">
+    <nav class="directory-pagination" aria-label="Relationship directory pages">
       {page.currentPage > 1 ? (
         <a href={pageUrl(page.currentPage - 1)} rel="prev">Previous page</a>
       ) : <span aria-hidden="true"></span>}

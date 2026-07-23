@@ -5,8 +5,9 @@ import type { Notification } from "../lib/types";
 interface Props {
   records: Notification[];
   limit?: number;
+  showSummary?: boolean;
 }
-const { records, limit = 50 } = Astro.props;
+const { records, limit = 50, showSummary = true } = Astro.props;
 const visible = records.slice(0, limit);
 function observation(record: Notification): string | null {
   return record.dates.find((item) => item.normalized_date)?.normalized_date ?? null;
@@ -14,7 +15,7 @@ function observation(record: Notification): string | null {
 ---
 
 <div class="table-wrap" tabindex="0" aria-label="Scrollable public notification table">
-  <table>
+  <table class="notification-table">
     <thead>
       <tr>
         <th scope="col">Named entity</th>
@@ -27,7 +28,7 @@ function observation(record: Notification): string | null {
     <tbody>
       {visible.map((record) => (
         <tr>
-          <th scope="row">
+          <th class="notification-table__entity" scope="row">
             <a href={`${import.meta.env.BASE_URL}notifications/${record.source_record_id}/`}>
               {record.named_entity.source_name}
             </a>
@@ -41,4 +42,6 @@ function observation(record: Notification): string | null {
     </tbody>
   </table>
 </div>
-{records.length > limit && <p class="table-note">Showing the first {limit} records on this static view.</p>}
+{showSummary && records.length > limit && (
+  <p class="table-note">Showing the first {limit} records on this static view.</p>
+)}
