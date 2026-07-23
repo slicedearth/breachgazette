@@ -41,6 +41,7 @@ class ObservedValue(ContractModel):
 
 class SourcePolicy(ContractModel):
     schema_version: Literal["1.0"] = "1.0"
+    rights_reviewed_on: date
     source_id: str = Field(pattern=r"^[a-z0-9_]+$")
     name: str = Field(min_length=1, max_length=200)
     country: str = Field(min_length=2, max_length=100)

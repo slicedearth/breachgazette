@@ -119,15 +119,19 @@ def validate_monitoring(
 
 @app.command("validate-aliases")
 def validate_aliases(
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    catalogue: Annotated[Path | None, typer.Option("--catalogue")] = None,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    catalogue = load_alias_catalogue()
+    selected = load_alias_catalogue(
+        catalogue or _data_root(data_root) / "reviews" / "organization-aliases.yml"
+    )
     _emit(
         {
             "valid": True,
-            "decisions": len(catalogue.decisions),
-            "approved": sum(decision.status == "approved" for decision in catalogue.decisions),
-            "rejected": sum(decision.status == "rejected" for decision in catalogue.decisions),
+            "decisions": len(selected.decisions),
+            "approved": sum(decision.status == "approved" for decision in selected.decisions),
+            "rejected": sum(decision.status == "rejected" for decision in selected.decisions),
         },
         json_output=json_output,
     )
@@ -135,21 +139,25 @@ def validate_aliases(
 
 @app.command("validate-relationships")
 def validate_relationships(
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    catalogue: Annotated[Path | None, typer.Option("--catalogue")] = None,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    catalogue = load_relationship_catalogue()
+    selected = load_relationship_catalogue(
+        catalogue or _data_root(data_root) / "reviews" / "relationship-decisions.yml"
+    )
     _emit(
         {
             "valid": True,
-            "decisions": len(catalogue.decisions),
+            "decisions": len(selected.decisions),
             "confirmed_related": sum(
-                decision.status == "confirmed_related" for decision in catalogue.decisions
+                decision.status == "confirmed_related" for decision in selected.decisions
             ),
             "rejected": sum(
-                decision.status == "rejected" for decision in catalogue.decisions
+                decision.status == "rejected" for decision in selected.decisions
             ),
             "unresolved": sum(
-                decision.status == "unresolved" for decision in catalogue.decisions
+                decision.status == "unresolved" for decision in selected.decisions
             ),
         },
         json_output=json_output,
@@ -187,6 +195,7 @@ def alias_decision_id_command(
 @app.command("propose-aliases")
 def propose_aliases_command(
     data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    catalogue: Annotated[Path | None, typer.Option("--catalogue")] = None,
     output: Annotated[Path | None, typer.Option("--output")] = None,
     limit: Annotated[int, typer.Option("--limit", min=1, max=2_000)] = 500,
     json_output: Annotated[bool, typer.Option("--json")] = False,
@@ -208,7 +217,9 @@ def propose_aliases_command(
     report = build_alias_proposal_report(
         notifications,
         regulatory_actions,
-        catalogue=load_alias_catalogue(),
+        catalogue=load_alias_catalogue(
+            catalogue or root / "reviews" / "organization-aliases.yml"
+        ),
         limit=limit,
     )
     report_path = output or root / "reports" / "alias-proposals.json"

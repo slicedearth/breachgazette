@@ -26,6 +26,7 @@ def _policy(*, history: int = 53) -> RetentionPolicy:
             "manifests",
             "metadata",
             "reports",
+            "reviews",
             "state",
         ),
         maximum_history_reports=history,

@@ -47,8 +47,8 @@ jobs:
         run: |
           breachgazette validate-source-policies --json
           breachgazette validate-monitoring --json
-          breachgazette validate-aliases --json
-          breachgazette validate-relationships --json
+          breachgazette validate-aliases --data-root .private-production-data --json
+          breachgazette validate-relationships --data-root .private-production-data --json
       - name: Verify and promote an isolated candidate
         id: update_cycle
         continue-on-error: true
@@ -84,7 +84,7 @@ jobs:
         run: |
           git config --local user.name "breachgazette-update"
           git config --local user.email "breachgazette-update@users.noreply.github.com"
-          git add -- checkpoints events manifests metadata reports state
+          git add -- checkpoints events manifests metadata reports reviews state
           if git diff --cached --quiet; then
             echo "No private state changes to commit."
           else

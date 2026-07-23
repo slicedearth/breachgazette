@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -30,7 +32,6 @@ from breachgazette.publish.builder import (
     build_site_data,
 )
 from breachgazette.quality import DataQualityError, build_quality_report
-from breachgazette.relationships import RelationshipCatalogue
 from breachgazette.state import PrivateStateStore
 
 
@@ -50,6 +51,29 @@ def test_source_policy_catalogue_is_complete() -> None:
     assert all(str(policy.source_url).startswith("https://") for policy in policies.values())
     monitoring = load_monitoring_catalogue()
     assert set(monitoring.sources) == set(policies) - {"hhs"}
+
+
+def test_source_policy_catalogue_rejects_stale_or_future_rights_reviews(
+    tmp_path: Path,
+) -> None:
+    source = Path(__file__).resolve().parents[2] / "sources" / "policies"
+    stale_root = tmp_path / "stale"
+    shutil.copytree(source, stale_root / "sources" / "policies")
+    stale_path = stale_root / "sources" / "policies" / "washington.json"
+    stale_payload = json.loads(stale_path.read_text(encoding="utf-8"))
+    stale_payload["rights_reviewed_on"] = "2000-01-01"
+    stale_path.write_text(json.dumps(stale_payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="rights review is stale: washington"):
+        load_source_policies(stale_root)
+
+    future_root = tmp_path / "future"
+    shutil.copytree(source, future_root / "sources" / "policies")
+    future_path = future_root / "sources" / "policies" / "washington.json"
+    future_payload = json.loads(future_path.read_text(encoding="utf-8"))
+    future_payload["rights_reviewed_on"] = "2999-01-01"
+    future_path.write_text(json.dumps(future_payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="rights review is future-dated: washington"):
+        load_source_policies(future_root)
 
 
 def test_private_state_is_atomic_and_refuses_fixture_mixing(
@@ -314,9 +338,15 @@ def test_production_builder_emits_minimised_real_publication(
         "breachgazette.monitoring.load_monitoring_catalogue",
         lambda: monitoring,
     )
-    monkeypatch.setattr(
-        "breachgazette.publish.builder.load_relationship_catalogue",
-        lambda: RelationshipCatalogue(decisions=()),
+    reviews = root / "reviews"
+    reviews.mkdir(parents=True)
+    (reviews / "organization-aliases.yml").write_text(
+        'schema_version: "2.0"\ndecisions: []\n',
+        encoding="utf-8",
+    )
+    (reviews / "relationship-decisions.yml").write_text(
+        'schema_version: "1.0"\ndecisions: []\n',
+        encoding="utf-8",
     )
     for index, source_id in enumerate(source_ids):
         normalized = notification_factory(
@@ -359,7 +389,13 @@ def test_public_tree_audit_passes_safe_tree_and_rejects_remote_assets(tmp_path: 
     safe = tmp_path / "safe"
     safe.mkdir()
     (safe / "index.html").write_text("<p>Safe static page</p>", encoding="utf-8")
-    assert audit_public_tree(safe)["passed"] is True
+    report = audit_public_tree(safe)
+    assert report["passed"] is True
+    assert report["html_files"] == 1
+    with pytest.raises(DataQualityError, match="budget"):
+        audit_public_tree(safe, max_files=0)
+    with pytest.raises(DataQualityError, match="HTML page exceeds"):
+        audit_public_tree(safe, max_html_bytes=5)
     (safe / "bad.js").write_text('google-analytics("x")', encoding="utf-8")
     with pytest.raises(DataQualityError, match="forbidden marker"):
         audit_public_tree(safe)

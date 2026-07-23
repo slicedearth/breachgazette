@@ -2,7 +2,7 @@
 
 | Contract | Meaning |
 | --- | --- |
-| `SourcePolicy` | Reviewed semantics, rights, limits, and correction boundary |
+| `SourcePolicy` | Reviewed semantics, dated rights assessment, limits, and correction boundary |
 | `SourceSnapshot` | One bounded retrieval attempt and completeness state |
 | `SourceAggregateRecord` | One source-published aggregate cell |
 | `SourceNotificationRecord` | One named source notification row |
@@ -19,6 +19,10 @@
 | `QualityReport` | Machine-readable publication checks and source health |
 | `PublicationManifest` | Data class, counts, checksums, snapshots, and limits |
 | `RetentionPolicy` | Managed state directories, report retention, and byte bounds |
+
+Alias proposals and review-decision catalogues are private operational state.
+The public repository contains only their contracts and empty synthetic
+catalogue fixtures.
 
 The browser-search manifest lists global facets, bounded partition metadata,
 and a deterministic hex-encoded trigram Bloom value for each partition. Bloom

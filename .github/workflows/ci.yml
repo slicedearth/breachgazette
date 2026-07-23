@@ -35,7 +35,10 @@ jobs:
           mypy src
           pytest --cov=breachgazette --cov-report=term-missing --cov-fail-under=80
           breachgazette validate-monitoring --json
-          breachgazette validate-aliases --json
+          breachgazette validate-aliases \
+            --catalogue tests/fixtures/reviews/organization-aliases.yml --json
+          breachgazette validate-relationships \
+            --catalogue tests/fixtures/reviews/relationship-decisions.yml --json
           pip-audit -r requirements.lock
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -53,11 +56,18 @@ jobs:
           npm audit --audit-level=high
           npm run build:test
           breachgazette audit-public-tree dist --json
-      - name: Install Chromium
+      - name: Install browser engines
         working-directory: site
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox webkit
       - name: Run browser tests
         working-directory: site
-        run: npm run test:e2e
+        run: npm run test:e2e:ci
+      - name: Verify GitHub Pages subpath build
+        working-directory: site
+        env:
+          BREACHGAZETTE_PAGES_BUILD: "1"
+        run: |
+          npm run build:test
+          breachgazette audit-public-tree dist --json
       - name: Check patches
         run: git diff --check

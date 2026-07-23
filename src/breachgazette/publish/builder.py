@@ -33,6 +33,10 @@ LATEST_RECORDS = 100
 SEARCH_PARTITION_SIZE = 250
 SEARCH_BLOOM_BITS = 16_384
 SEARCH_BLOOM_HASHES = 3
+PUBLIC_TREE_MAX_FILES = 3_200
+PUBLIC_TREE_MAX_BYTES = 40_000_000
+PUBLIC_TREE_MAX_HTML_FILES = 3_050
+PUBLIC_TREE_MAX_HTML_BYTES = 300_000
 
 
 def _latest_date(record: SourceNotificationRecord) -> str:
@@ -242,7 +246,9 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     organizations = resolve_organizations(
         notifications,
         regulatory_actions,
-        alias_catalogue=load_alias_catalogue(),
+        alias_catalogue=load_alias_catalogue(
+            data_root / "reviews" / "organization-aliases.yml"
+        ),
     )
     organization_by_alias = {
         alias.normalized_name: identity.organization_id
@@ -257,7 +263,9 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         action.canonical_organization_id = organization_by_alias.get(action.entity.normalized_name)
     relationships, relationship_decisions = apply_relationship_decisions(
         generate_candidates(notifications),
-        catalogue=load_relationship_catalogue(),
+        catalogue=load_relationship_catalogue(
+            data_root / "reviews" / "relationship-decisions.yml"
+        ),
     )
     events = [
         event for event in store.load_events() if event.event_type != "notification_first_observed"
@@ -392,7 +400,14 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     }
 
 
-def audit_public_tree(path: Path) -> dict[str, Any]:
+def audit_public_tree(
+    path: Path,
+    *,
+    max_files: int = PUBLIC_TREE_MAX_FILES,
+    max_bytes: int = PUBLIC_TREE_MAX_BYTES,
+    max_html_files: int = PUBLIC_TREE_MAX_HTML_FILES,
+    max_html_bytes: int = PUBLIC_TREE_MAX_HTML_BYTES,
+) -> dict[str, Any]:
     if not path.exists() or not path.is_dir():
         raise ValueError("public tree does not exist")
     forbidden = (
@@ -404,11 +419,16 @@ def audit_public_tree(path: Path) -> dict[str, Any]:
     )
     scanned_files = 0
     scanned_bytes = 0
+    html_files = 0
     violations: list[str] = []
     for file in sorted(candidate for candidate in path.rglob("*") if candidate.is_file()):
         size = file.stat().st_size
         scanned_files += 1
         scanned_bytes += size
+        if file.suffix.lower() == ".html":
+            html_files += 1
+            if size > max_html_bytes:
+                violations.append(f"{file}: HTML page exceeds {max_html_bytes} bytes")
         if size > 15_000_000:
             violations.append(f"{file}: file exceeds 15 MB")
             continue
@@ -427,11 +447,24 @@ def audit_public_tree(path: Path) -> dict[str, Any]:
         for marker in forbidden:
             if marker.casefold() in text:
                 violations.append(f"{file}: forbidden marker {marker}")
+    if scanned_files > max_files:
+        violations.append(f"public tree has {scanned_files} files; budget is {max_files}")
+    if scanned_bytes > max_bytes:
+        violations.append(f"public tree has {scanned_bytes} bytes; budget is {max_bytes}")
+    if html_files > max_html_files:
+        violations.append(f"public tree has {html_files} HTML pages; budget is {max_html_files}")
     if violations:
         raise DataQualityError("public tree audit failed: " + "; ".join(violations[:10]))
     return {
         "path": str(path),
         "files": scanned_files,
         "bytes": scanned_bytes,
+        "html_files": html_files,
+        "budgets": {
+            "max_files": max_files,
+            "max_bytes": max_bytes,
+            "max_html_files": max_html_files,
+            "max_html_bytes": max_html_bytes,
+        },
         "passed": True,
     }

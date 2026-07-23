@@ -23,6 +23,8 @@ from breachgazette.relationships import (
 )
 from breachgazette.utils import canonical_json_bytes
 
+FIXTURE_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "reviews"
+
 
 def test_exact_aliases_resolve_and_false_fuzzy_names_do_not(notification_factory) -> None:
     exact = notification_factory(record_id="a", name="Example Health Limited")
@@ -132,7 +134,7 @@ def test_alias_proposals_are_private_leads_not_resolution_decisions(
     proposals = propose_alias_reviews(
         [left, right],
         [],
-        catalogue=load_alias_catalogue(),
+        catalogue=load_alias_catalogue(FIXTURE_ROOT / "organization-aliases.yml"),
     )
     assert len(proposals) == 1
     assert proposals[0].similarity_score == pytest.approx(2 / 3, rel=0.01)

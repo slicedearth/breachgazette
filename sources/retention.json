@@ -6,6 +6,7 @@
     "manifests",
     "metadata",
     "reports",
+    "reviews",
     "state"
   ],
   "maximum_history_reports": 53,

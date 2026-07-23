@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 from breachgazette.contracts import AliasReviewDecision
-from breachgazette.policies import load_source_policies, repository_root
+from breachgazette.policies import load_source_policies
 from breachgazette.utils import normalize_organization_name, stable_id
 
 
@@ -47,9 +47,8 @@ def alias_decision_id(alias_name: str, canonical_name: str) -> str:
     )
 
 
-def load_alias_catalogue(path: Path | None = None) -> AliasCatalogue:
-    catalogue_path = path or repository_root() / "sources" / "organization-aliases.yml"
-    payload = yaml.safe_load(catalogue_path.read_text(encoding="utf-8"))
+def load_alias_catalogue(path: Path) -> AliasCatalogue:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or payload.get("schema_version") != "2.0":
         raise ValueError("organization alias catalogue must use schema_version 2.0")
     raw_decisions = payload.get("decisions")

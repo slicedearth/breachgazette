@@ -27,4 +27,9 @@ publications, names, logos, or third-party material.
 Derived database records and change events preserve attribution and do not
 remove source terms. Project-authored explanations remain MIT-licensed.
 Organization and regulator names are used for identification; no logos are
-included. Consult the official links for current terms.
+included. Reviewed alias and relationship catalogues are private operational
+state rather than redistributed source material. Generated publication output
+is not committed. Each source policy records when its rights boundary was last
+reviewed; that date is an operational checkpoint rather than legal advice.
+Consult the official links for current terms and re-check them before enabling
+or materially expanding a source.

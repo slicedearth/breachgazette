@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 from breachgazette.cli import app
 
 runner = CliRunner()
+REVIEW_FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "reviews"
 
 
 def test_source_policy_cli_commands_are_machine_readable() -> None:
@@ -20,12 +21,20 @@ def test_source_policy_cli_commands_are_machine_readable() -> None:
     monitoring = runner.invoke(app, ["validate-monitoring", "--json"])
     assert monitoring.exit_code == 0
     assert json.loads(monitoring.stdout)["sources"] == 7
-    aliases = runner.invoke(app, ["validate-aliases", "--json"])
+    aliases = runner.invoke(
+        app,
+        [
+            "validate-aliases",
+            "--catalogue",
+            str(REVIEW_FIXTURES / "organization-aliases.yml"),
+            "--json",
+        ],
+    )
     assert aliases.exit_code == 0
     assert json.loads(aliases.stdout) == {
-        "approved": 18,
-        "decisions": 25,
-        "rejected": 7,
+        "approved": 0,
+        "decisions": 0,
+        "rejected": 0,
         "valid": True,
     }
     decision = runner.invoke(
@@ -34,13 +43,21 @@ def test_source_policy_cli_commands_are_machine_readable() -> None:
     )
     assert decision.exit_code == 0
     assert json.loads(decision.stdout)["decision_id"].startswith("alias_")
-    relationships = runner.invoke(app, ["validate-relationships", "--json"])
+    relationships = runner.invoke(
+        app,
+        [
+            "validate-relationships",
+            "--catalogue",
+            str(REVIEW_FIXTURES / "relationship-decisions.yml"),
+            "--json",
+        ],
+    )
     assert relationships.exit_code == 0
     assert json.loads(relationships.stdout) == {
-        "confirmed_related": 3,
-        "decisions": 4,
+        "confirmed_related": 0,
+        "decisions": 0,
         "rejected": 0,
-        "unresolved": 1,
+        "unresolved": 0,
         "valid": True,
     }
     relationship_id = runner.invoke(
@@ -110,6 +127,8 @@ def test_fixture_and_inventory_cli(tmp_path: Path, notification_factory) -> None
             "propose-aliases",
             "--data-root",
             str(root),
+            "--catalogue",
+            str(REVIEW_FIXTURES / "organization-aliases.yml"),
             "--output",
             str(proposals_path),
             "--json",

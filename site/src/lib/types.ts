@@ -161,6 +161,7 @@ export type RelationshipDecision = {
 
 export type SourcePolicy = {
   source_id: string;
+  rights_reviewed_on: string;
   name: string;
   country: string;
   jurisdiction: string;

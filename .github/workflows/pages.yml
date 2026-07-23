@@ -56,10 +56,11 @@ jobs:
       - name: Build production site
         env:
           BREACHGAZETTE_SITE_DATA_DIR: ${{ runner.temp }}/publication
+          BREACHGAZETTE_PAGES_BUILD: "1"
         working-directory: site
         run: |
           npm run check
-          npm run build
+          npm run build:budget
           breachgazette audit-public-tree dist --json
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6

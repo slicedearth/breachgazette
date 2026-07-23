@@ -32,6 +32,7 @@ const health = pagePublication.source_health.sources.find((source) => source.sou
       { term: "Reporting threshold", description: policy.source_threshold },
       { term: "Source population", description: policy.source_population },
       { term: "Licence state", description: policy.source_licence },
+      { term: "Rights boundary reviewed", description: date(policy.rights_reviewed_on) },
       { term: "Redistribution decision", description: label(policy.redistribution_decision) },
       { term: "Automated health", description: policy.implemented ? label(health?.status ?? "not monitored") : "Deferred" },
       { term: "Last successful update", description: date(health?.last_successful_update) },
