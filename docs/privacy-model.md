@@ -14,3 +14,8 @@ path, detector ID, and record identity, never the matched sensitive value.
 Real state stays outside Git. Public data are temporary, bounded, derived, and
 attributed. Synthetic fixtures use fictitious organizations and an explicit
 dataset class that production rejects.
+
+Alias proposals remain private operational reports and cannot change public
+identities. Source-health artifacts contain source IDs, counts, checksums,
+timestamps, statuses, and bounded reasons, not source records. Public search
+uses static same-origin partitions and sends no query to an application server.

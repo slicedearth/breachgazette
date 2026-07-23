@@ -6,10 +6,18 @@ key. Diacritics are normalized deterministically. It does not use edit
 distance, embeddings, web search, domain inference, or organization metadata.
 
 A curated alias maps one exact normalized source name to a reviewed canonical
-key and records its evidence and resolver version. Parent and subsidiary,
-brand and legal entity, renamed companies, and near matches remain separate
-without an explicit reviewed alias.
+key and records a deterministic decision ID, status, source set, review date,
+evidence, note, and resolver version. Approved alias chains and cycles are
+rejected. Parent and subsidiary, brand and legal entity, renamed companies,
+and near matches remain separate without an explicit reviewed alias.
 
 Every alias retains the source name and role. One resolved organization can
 therefore appear as a notifier in one source and an alleged respondent in
 another without collapsing those meanings.
+
+`breachgazette propose-aliases` produces a bounded private report from
+token-spacing and contained-token blocks. Proposals never enter the resolver.
+An operator verifies official evidence, records an approved or rejected
+decision in `sources/organization-aliases.yml`, generates its stable ID with
+`breachgazette alias-decision-id`, and runs `breachgazette validate-aliases`.
+Rejected decisions remain in the catalogue to suppress repeat proposals.

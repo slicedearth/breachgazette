@@ -31,14 +31,17 @@ relationships remain explainable candidates until reviewed.
 ## Architecture
 
 The Python 3.12 pipeline uses source-specific HTTPS clients, Pydantic v2
-contracts, deterministic normalization, immutable comparison events, exact
-organization aliases, and fail-closed privacy checks. Durable source state
-lives outside this repository under `BREACHGAZETTE_DATA_ROOT`.
+contracts, deterministic normalization, immutable comparison events, reviewed
+organization-alias decisions, source-freshness monitoring, record-count drift
+guards, and fail-closed privacy checks. Durable source state lives outside this
+repository under `BREACHGAZETTE_DATA_ROOT`.
 
 Astro renders a static website from a temporary privacy-minimised publication
 directory. Production builds refuse test fixtures and missing required real
-sources. There is no runtime application server, account system, analytics,
-cookie, or remotely collected search query.
+sources. Browser search starts with a compact manifest and loads only relevant
+bounded source/year partitions after a visitor applies a filter. There is no
+runtime application server, account system, analytics, cookie, or remotely
+collected search query.
 
 See [the architecture](docs/architecture.md), [methodology](docs/methodology.md),
 and [data dictionary](docs/data-dictionary.md) for the complete model.
@@ -66,6 +69,8 @@ Run deterministic tests:
 .venv/bin/ruff check .
 .venv/bin/mypy src
 .venv/bin/pytest --cov=breachgazette --cov-report=term-missing --cov-fail-under=80
+.venv/bin/breachgazette validate-monitoring --json
+.venv/bin/breachgazette validate-aliases --json
 cd site
 npm run check:test
 npm run build:test
@@ -89,12 +94,47 @@ The live update is deliberate, bounded, and separate from ordinary tests:
 ```bash
 export BREACHGAZETTE_DATA_ROOT=/absolute/private/path/breachgazette-data
 .venv/bin/breachgazette validate-source-policies
+.venv/bin/breachgazette validate-monitoring
 .venv/bin/breachgazette update --data-root "$BREACHGAZETTE_DATA_ROOT"
+.venv/bin/breachgazette source-health \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" \
+  --output "$BREACHGAZETTE_DATA_ROOT/reports/source-health.json"
 ```
 
 Each source keeps its previous complete snapshot when a new retrieval fails.
 The update reports retrieval time, source revision, accepted and rejected
 counts, bounded limits, and completeness state.
+
+## Reviewed organization aliases
+
+Near-name matching creates private review proposals only. It never changes a
+public organization identity:
+
+```bash
+.venv/bin/breachgazette propose-aliases \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" \
+  --output "$BREACHGAZETTE_DATA_ROOT/reports/alias-proposals.json"
+.venv/bin/breachgazette alias-decision-id \
+  "Source-reported alias" "Reviewed canonical name" --json
+.venv/bin/breachgazette validate-aliases --json
+```
+
+An operator must verify official evidence and add an approved or rejected
+decision to `sources/organization-aliases.yml`. Decisions are deterministic,
+evidence-bearing, non-chained, and auditable. Rejected pairs are retained so
+they are not repeatedly proposed.
+
+## Scheduled private updates
+
+The scheduled workflow is implemented but disabled by default. It runs only
+after the repository variable `BREACHGAZETTE_SCHEDULE_ENABLED` is explicitly set
+to `true`. Manual runs default to dry-run behavior unless
+`persist_private_state` is selected.
+
+Every run copies private state into an isolated candidate directory, updates
+and audits the candidate, uploads only the non-sensitive health report, and
+promotes or pushes private state only if all source, freshness, quality,
+privacy, and publication gates pass. See [operations](docs/operations.md).
 
 ## Production static build
 
@@ -143,6 +183,10 @@ documented in [docs/methodology.md](docs/methodology.md).
 - Organization names are source-reported and can be corrected.
 - Relationship candidates are not proof of a shared event.
 - No generic Australia-versus-US comparison is calculated.
+- An unqualified name search may still load many small partitions; source,
+  jurisdiction, date, and categorical filters reduce that work.
+- Scheduled updates remain inert until the private repository, scoped deploy
+  key, and explicit enablement variable are configured.
 - Washington's dataset has no dataset-specific licence identifier; its
   publication boundary requires ongoing review.
 - HHS remains deferred rather than using brittle browser automation.

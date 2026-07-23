@@ -9,8 +9,9 @@ history, publication integrity, source attribution, and legal-status accuracy.
 
 - **Server-side request forgery:** no arbitrary URLs; exact HTTPS origins,
   paths, redirects, content types, deadlines, pages, rows, and bytes.
-- **Source compromise or drift:** exact schemas and markers; implausible empty,
-  partial, duplicate, or changed results stop publication.
+- **Source compromise or drift:** exact schemas and markers; reviewed count
+  floors, retained fractions, growth bounds, freshness windows, and failed
+  checkpoints stop publication.
 - **Hostile text:** normalization, escaped Astro rendering, safe URLs, CSP,
   no-referrer, and audits for markup, scripts, controls, bidi characters, and
   formula prefixes.
@@ -21,6 +22,9 @@ history, publication integrity, source attribution, and legal-status accuracy.
   explicit; allegations cannot become findings; candidate links are not merges.
 - **Supply chain:** pinned locks, audit gates, immutable action SHAs, and least
   workflow permissions.
+- **Scheduled-state corruption:** schedule enablement is explicit; updates run
+  in a candidate copy; only a fully verified candidate can replace and commit
+  private state.
 - **Fixture contamination:** private-root dataset marker and production
   publication refusal.
 

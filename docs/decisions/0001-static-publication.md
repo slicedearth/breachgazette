@@ -7,6 +7,7 @@ outside Git and deploy no runtime database or application server.
 
 ## Consequences
 
-Search is browser-local, details are bounded, production builds require a
-generated real-data directory, and scheduled updates are not enabled by
-default.
+Search is browser-local and partitioned, details are bounded, production builds
+require a generated real-data directory, and the implemented schedule remains
+disabled until an operator explicitly configures its private repository and
+enablement variable.
