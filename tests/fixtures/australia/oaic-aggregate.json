@@ -1,0 +1,45 @@
+{
+  "dataset_class": "test_fixture",
+  "source_id": "oaic_ndb",
+  "records": [
+    {
+      "record_type": "aggregate",
+      "source_id": "oaic_ndb",
+      "source_record_id": "fixture:oaic:notifications:july",
+      "source_url": "https://data.gov.au/data/dataset/5781dc17-2ad0-4dd1-bced-01c544943ce3",
+      "source_revision": "test-fixture-1",
+      "source_checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_completeness": "complete",
+      "source_retrieval_time": "2026-01-01T00:00:00Z",
+      "local_first_observed_time": "2026-01-01T00:00:00Z",
+      "local_last_observed_time": "2026-01-01T00:00:00Z",
+      "parser_version": "test",
+      "normalization_version": "test",
+      "limitations": [
+        "Synthetic test-only aggregate."
+      ],
+      "regulator": "Office of the Australian Information Commissioner",
+      "reporting_scheme": "Notifiable Data Breaches scheme",
+      "publication_level": "national_aggregate",
+      "reporting_period_start": "2025-07-01",
+      "reporting_period_end": "2025-12-31",
+      "dimension": "notifications_by_month",
+      "category": "July",
+      "parent_category": null,
+      "value": {
+        "value": 101,
+        "origin": "source_observed",
+        "state": "present",
+        "source_label": "101",
+        "note": null
+      },
+      "unit": "count",
+      "population_scope": "Notifications received under the NDB scheme",
+      "denominator": null,
+      "rounding_state": "present",
+      "source_notes": [
+        "Synthetic test-only source note."
+      ]
+    }
+  ]
+}

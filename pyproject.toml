@@ -1,0 +1,76 @@
+[build-system]
+requires = ["editables==0.6", "hatchling==1.28.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "breachgazette"
+version = "0.1.0"
+description = "Provenance-first public breach notification and regulatory data"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "slicedearth" }]
+dependencies = [
+  "beautifulsoup4==4.14.3",
+  "httpx==0.28.1",
+  "openpyxl==3.1.5",
+  "pdfplumber==0.11.10",
+  "pydantic==2.13.4",
+  "PyYAML==6.0.3",
+  "typer==0.21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "hypothesis==6.151.9",
+  "mypy==1.19.1",
+  "pip-audit==2.10.1",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "respx==0.23.1",
+  "ruff==0.15.4",
+  "types-PyYAML==6.0.12.20250915",
+]
+
+[project.scripts]
+breachgazette = "breachgazette.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/breachgazette"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers --strict-config -q"
+testpaths = ["tests"]
+markers = [
+  "integration: deterministic multi-component tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["breachgazette"]
+
+[tool.coverage.report]
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+]
+fail_under = 80
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["breachgazette"]
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["openpyxl", "openpyxl.*"]
+ignore_missing_imports = true

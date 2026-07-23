@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "source_id": "california",
+  "name": "California Attorney General Data Security Breach List",
+  "country": "United States",
+  "jurisdiction": "California",
+  "regulator": "California Department of Justice, Office of the Attorney General",
+  "reporting_scheme": "California Civil Code sections 1798.29 and 1798.82",
+  "publication_level": "named_notification",
+  "unit_of_observation": "One row in the official full data breach CSV",
+  "source_threshold": "The source list concerns sample notices submitted when more than 500 California residents are notified.",
+  "source_population": "Organizations that sent sample breach notices published by the California Attorney General.",
+  "public_window": "Historical public CSV.",
+  "coverage_type": "complete_published_dataset",
+  "aggregate": false,
+  "organizations_named": true,
+  "records_may_be_amended": true,
+  "records_may_disappear": false,
+  "counts_may_be_estimates": false,
+  "duplicate_notifications_may_be_consolidated": false,
+  "notifier_may_differ_from_affected_entity": true,
+  "source_licence": "California Department of Justice website content is considered public domain, subject to third-party exclusions.",
+  "attribution": "State of California Department of Justice, Office of the Attorney General",
+  "redistribution_decision": "approved_with_conditions",
+  "correction_process": "Check the current official CSV and list page; do not retrieve or reproduce sample notification letters.",
+  "source_url": "https://oag.ca.gov/privacy/databreach/list",
+  "limitations": [
+    "The organization is the source-labelled notifier and may not be the entity where the event occurred.",
+    "The current official CSV includes one historical row where the organization name is omitted; Breach Gazette preserves that state without creating an organization identity.",
+    "The CSV has no stable source record identifier or detail URL.",
+    "The first release does not retrieve sample notification letters."
+  ]
+}

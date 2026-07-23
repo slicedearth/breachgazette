@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "source_id": "hhs",
+  "name": "HHS OCR Breach Portal",
+  "country": "United States",
+  "jurisdiction": "United States",
+  "regulator": "U.S. Department of Health and Human Services Office for Civil Rights",
+  "reporting_scheme": "HIPAA Breach Notification Rule",
+  "publication_level": "named_notification",
+  "unit_of_observation": "One public portal row for a breach affecting 500 or more individuals",
+  "source_threshold": "The public list covers reported breaches of unsecured protected health information affecting 500 or more individuals.",
+  "source_population": "HIPAA cases in the current investigated and archive windows.",
+  "public_window": "The current list describes the last 24 months and separate archive behavior.",
+  "coverage_type": "rolling_public_window",
+  "aggregate": false,
+  "organizations_named": true,
+  "records_may_be_amended": true,
+  "records_may_disappear": true,
+  "counts_may_be_estimates": true,
+  "duplicate_notifications_may_be_consolidated": false,
+  "notifier_may_differ_from_affected_entity": true,
+  "source_licence": "United States federal government source material; publication terms remain subject to source review.",
+  "attribution": "U.S. Department of Health and Human Services Office for Civil Rights",
+  "redistribution_decision": "deferred",
+  "correction_process": "Review the official portal and HHS reporting guidance.",
+  "source_url": "https://ocrportal.hhs.gov/ocr/breach/breach_report_hip.jsf",
+  "implemented": false,
+  "limitations": [
+    "The verified public list is a stateful JSF interface.",
+    "No stable bounded machine-readable export was identified.",
+    "Browser automation and submission endpoints are deliberately unsupported."
+  ]
+}

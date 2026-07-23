@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "source_id": "nsw_mndb_aggregate",
+  "name": "NSW IPC MNDB Scheme Data Snapshot",
+  "country": "Australia",
+  "jurisdiction": "New South Wales",
+  "regulator": "Information and Privacy Commission NSW",
+  "reporting_scheme": "Mandatory Notification of Data Breach Scheme",
+  "publication_level": "state_aggregate",
+  "unit_of_observation": "One explicitly identified cell in the sector snapshot table",
+  "source_threshold": "Eligible data breach notifications made by NSW public sector agencies under Part 6A of the PPIP Act.",
+  "source_population": "Notifications received from NSW government, local government, university and state-owned corporation sectors.",
+  "public_window": "Historical six-month PDF snapshots indexed by the IPC.",
+  "coverage_type": "aggregate_reporting_periods",
+  "aggregate": true,
+  "organizations_named": false,
+  "records_may_be_amended": true,
+  "records_may_disappear": false,
+  "counts_may_be_estimates": true,
+  "duplicate_notifications_may_be_consolidated": false,
+  "notifier_may_differ_from_affected_entity": true,
+  "source_licence": "Creative Commons Attribution 4.0 International, subject to the IPC copyright notice",
+  "attribution": "Information and Privacy Commission NSW",
+  "redistribution_decision": "approved_with_conditions",
+  "correction_process": "Check the latest IPC Reporting on the Scheme index and the identified source table.",
+  "source_url": "https://www.ipc.nsw.gov.au/Reporting-on-the-Scheme",
+  "limitations": [
+    "The first adapter extracts only the page 5 sector table.",
+    "Values shown only in chart graphics are deliberately excluded.",
+    "Percentages may not total 100 percent and multi-cause categories can overlap."
+  ]
+}
