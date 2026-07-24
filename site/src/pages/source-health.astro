@@ -8,6 +8,7 @@ const publication = getPublication();
 const sources = publication.source_health.sources;
 const sourceName = (sourceId: string) =>
   publication.policies[sourceId]?.name ?? label(sourceId);
+const collectionMode = publication.source_health.collection_mode ?? "manual";
 const snapshots = new Map(
   publication.manifest.source_snapshots.map((snapshot) => [snapshot.source_id, snapshot]),
 );
@@ -21,9 +22,13 @@ const snapshots = new Map(
     warning="Healthy means the pipeline completed its checks. It does not establish that an official source is factually complete."
   />
   <section class="section shell">
+    <p><a href={`${import.meta.env.BASE_URL}source-coverage/`}>Review source windows and comparison boundaries</a></p>
     <p class="notice">
       {sources.filter((source) => source.status === "healthy").length} of {sources.length} implemented sources are healthy.
-      The reviewed schedule is <code>{publication.source_health.schedule_utc}</code> in UTC.
+      Collection mode is <strong>{collectionMode}</strong>.
+      {collectionMode === "scheduled"
+        ? <> The active schedule is <code>{publication.source_health.schedule_utc}</code> in UTC.</>
+        : <> The reviewed schedule <code>{publication.source_health.schedule_utc}</code> is not active.</>}
     </p>
     <div class="table-wrap" tabindex="0" aria-label="Scrollable source health table">
       <table>

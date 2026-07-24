@@ -23,6 +23,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      BREACHGAZETTE_SCHEDULE_ENABLED: ${{ vars.BREACHGAZETTE_SCHEDULE_ENABLED }}
     steps:
       - name: Resolve private production-data branch
         id: data-ref

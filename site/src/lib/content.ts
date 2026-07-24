@@ -19,15 +19,6 @@ export const informationPages = {
       ["What is not inferred", "Parent and subsidiary relationships, brands, renamed companies, and near-matching names remain separate without reviewed evidence."],
     ],
   },
-  "source-coverage": {
-    title: "Source coverage",
-    intro: "Coverage is a property of each official source, not a claim that all breaches are represented.",
-    sections: [
-      ["National aggregate", "OAIC statistics summarize notifications received during a reporting period and do not name entities."],
-      ["Rolling registers", "NSW public links can expire from the public window. Disappearance is not deletion, resolution, or remediation."],
-      ["Threshold lists", "Washington, California, Massachusetts, and HHS apply jurisdiction-specific reporting thresholds. Those thresholds are not directly comparable."],
-    ],
-  },
   "data-quality": {
     title: "Data quality",
     intro: "Publication is fail-closed when required real data, source attribution, legal status, privacy safety, or source schema cannot be established.",

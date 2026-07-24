@@ -38,6 +38,19 @@ test("source health exposes freshness without claiming factual completeness", as
   await expect(page.getByText("10,000")).toBeVisible();
 });
 
+test("source coverage exposes record units and comparison boundaries", async ({ page }) => {
+  await page.goto("/source-coverage/");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "What can—and cannot—be compared",
+  );
+  const table = page.getByRole("table", { name: "Source coverage matrix" });
+  await expect(table).toContainText("Regulator Register Entry");
+  await expect(table).toContainText("State Aggregate");
+  await expect(table).toContainText("Compare only matching periods");
+  await expect(table).toContainText("not a count of unique incidents");
+  await expect(page.getByRole("heading", { name: "Four publication lanes" })).toBeVisible();
+});
+
 test("OAIC allegations and orders retain distinct labels", async ({ page }) => {
   await page.goto("/australia/regulatory-actions/");
   const timeline = page.getByLabel("OAIC regulatory timeline");
@@ -94,7 +107,7 @@ test("keyboard navigation exposes skip link and table alternatives", async ({ pa
 test("representative desktop and mobile pages pass automated accessibility checks", async ({
   page,
 }) => {
-  const routes = ["/", "/latest/", "/source-health/", "/corrections/"];
+  const routes = ["/", "/latest/", "/source-health/", "/source-coverage/", "/corrections/"];
   for (const viewport of [
     { width: 1440, height: 900 },
     { width: 320, height: 900 },
@@ -205,6 +218,7 @@ test("desktop and mobile layouts contain overflow without fragmenting text", asy
     "/latest/",
     "/sources/",
     "/source-health/",
+    "/source-coverage/",
     "/australia/public-notifications/",
     "/sources/oaic_ndb/",
   ];
