@@ -138,7 +138,7 @@ jobs:
         run: |
           python -m pip install -r requirements.lock
           python -m pip install --no-deps --no-build-isolation -e .
-          npm ci --ignore-scripts --prefix site
+          npm ci --ignore-scripts --no-audit --prefix site
       - name: Generate privacy-minimised real publication
         id: publication
         env:
