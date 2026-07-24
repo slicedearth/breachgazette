@@ -90,15 +90,32 @@ test("United States pages preserve source role warnings", async ({ page }) => {
   await expect(page.getByText(/does not retrieve or reproduce sample notification letters/i)).toBeVisible();
 });
 
-test("organization and candidate relationship pages explain evidence", async ({ page }) => {
+test("organization profiles and paginated relationships explain evidence", async ({
+  page,
+  request,
+}) => {
   await page.goto("/organizations/org_1111111111111111/");
   await expect(page.getByText("Exact normalized source name")).toBeVisible();
   await page.goto("/relationships/");
   await expect(page.getByText("Showing relationships 1–1 of 1.")).toBeVisible();
   await expect(page.getByText("Page 1 of 1")).toBeVisible();
-  await page.goto("/relationships/candidate_fixture_1/");
-  await expect(page.getByText(/not a declaration/i)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Displayed evidence" })).toBeVisible();
+  await expect(page.getByText(/does not merge source provenance/i)).toBeVisible();
+  const relationship = page.locator("#candidate_fixture_1");
+  await expect(relationship).toBeVisible();
+  await expect(
+    relationship.getByRole("heading", { name: "candidate_fixture_1" }),
+  ).toBeVisible();
+  await expect(relationship.getByText("fixture-ca-1 and fixture-wa-1")).toBeVisible();
+  await expect(
+    relationship.getByRole("heading", { name: "Displayed evidence" }),
+  ).toBeVisible();
+  await expect(
+    relationship.getByRole("heading", { name: "Limitations" }),
+  ).toBeVisible();
+  await expect(relationship.getByRole("link", { name: "candidate_fixture_1" }))
+    .toHaveAttribute("href", "/relationships/#candidate_fixture_1");
+  const redundantDetail = await request.get("/relationships/candidate_fixture_1/");
+  expect(redundantDetail.status()).toBe(404);
 });
 
 test("keyboard navigation exposes skip link and table alternatives", async ({ page, browserName }) => {
@@ -135,6 +152,7 @@ test("representative desktop and mobile pages pass automated accessibility check
     "/source-health/",
     "/source-coverage/",
     "/corrections/",
+    "/relationships/",
   ];
   for (const viewport of [
     { width: 1440, height: 900 },
@@ -249,6 +267,7 @@ test("desktop and mobile layouts contain overflow without fragmenting text", asy
     "/france/",
     "/source-health/",
     "/source-coverage/",
+    "/relationships/",
     "/australia/public-notifications/",
     "/sources/oaic_ndb/",
   ];

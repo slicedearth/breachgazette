@@ -28,6 +28,8 @@ an allegation into a finding.
   acronyms such as NSW, MNDB, OAIC, NDB, and HHS.
 - Jurisdiction and coverage views expose source units, periods, thresholds,
   and comparison boundaries rather than presenting a cross-country ranking.
+- Candidate relationships publish their complete evidence and limitations in
+  anchored pages of 50 instead of generating a redundant page for every pair.
 - Responsive tables contain horizontal scrolling within the table region;
   page headings, navigation, and record labels retain normal word boundaries
   on desktop and mobile.
@@ -64,6 +66,8 @@ directory. Production builds refuse test fixtures and missing required real
 sources. Browser search uses a compact facet and trigram-Bloom manifest, loads
 only candidate source/year partitions, and can export every filtered match to
 a formula-safe CSV. Static and filtered results paginate in groups of 50.
+Relationship evidence uses the same bounded pagination with stable fragment
+links, keeping every candidate reviewable without unbounded route generation.
 Filter and page state can be copied as a URL fragment without sending the
 search to a server. A privacy-minimised Atom feed exposes the latest public
 notifications. There is no runtime application server, account system,
