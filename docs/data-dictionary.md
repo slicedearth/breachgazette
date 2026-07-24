@@ -36,6 +36,7 @@ All provenance-bearing records include source ID, record ID, safe official URL,
 revision, SHA-256 checksum, source completeness, retrieval time, first and last
 local observation, parser and normalization versions, and limitations.
 Date observations also retain source precision, including month-level dates.
-The implemented CNIL path validates anonymous rows transiently and stores only
-grouped `SourceAggregateRecord` metrics, reducing privacy and repository-size
-risk.
+The implemented CNIL and UK ICO paths validate anonymous rows transiently and
+store only grouped `SourceAggregateRecord` metrics. The UK path first groups
+rows by source report reference and excludes unresolved reporting-period
+conflicts, reducing privacy and repository-size risk.

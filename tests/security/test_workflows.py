@@ -67,6 +67,7 @@ def test_source_drift_can_inspect_every_implemented_adapter() -> None:
         "california",
         "massachusetts",
         "france_cnil",
+        "united_kingdom_ico",
     ):
         assert f"          - {source_id}" in workflow
 

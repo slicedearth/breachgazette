@@ -26,6 +26,10 @@ publications, names, logos, or third-party material.
   metrics, not raw row combinations, and preserves the source warnings that
   rows are notifications rather than unique incidents and that the most recent
   three months are excluded.
+- **UK ICO:** the incident-trends page and downloadable workbook are available
+  under the Open Government Licence v3.0. Breach Gazette publishes attributed
+  grouped counts by unique report reference and retains neither raw workbook
+  rows nor report-level characteristic combinations.
 - **HHS:** the portal is linked and assessed but no source records are
   redistributed.
 

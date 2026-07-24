@@ -71,6 +71,21 @@ test("France view publishes grouped CNIL counts without organization inference",
   ).toHaveAttribute("aria-current", "page");
 });
 
+test("United Kingdom view preserves unique-report and category boundaries", async ({ page }) => {
+  await page.goto("/united-kingdom/");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "UK ICO data security incident trends",
+  );
+  await expect(page.getByText(/Category totals can exceed unique reports/i)).toBeVisible();
+  await expect(page.getByText("This source is not present in the current publication."))
+    .toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Primary" }).getByRole("link", {
+      name: "Jurisdictions",
+    }),
+  ).toHaveAttribute("aria-current", "page");
+});
+
 test("OAIC allegations and orders retain distinct labels", async ({ page }) => {
   await page.goto("/australia/regulatory-actions/");
   const timeline = page.getByLabel("OAIC regulatory timeline");
@@ -149,6 +164,7 @@ test("representative desktop and mobile pages pass automated accessibility check
     "/latest/",
     "/jurisdictions/",
     "/france/",
+    "/united-kingdom/",
     "/source-health/",
     "/source-coverage/",
     "/corrections/",
@@ -258,17 +274,23 @@ test("mobile notification search keeps advanced controls compact and resettable"
   await expect(page.getByLabel("Breach cause")).toBeVisible();
 });
 
-test("desktop and mobile layouts contain overflow without fragmenting text", async ({ page }) => {
+test("desktop and mobile layouts contain content without horizontal scrollers", async ({ page }) => {
   const paths = [
     "/",
     "/latest/",
     "/sources/",
     "/jurisdictions/",
+    "/australia/",
+    "/australia/nsw/",
+    "/australia/public-notifications/",
     "/france/",
+    "/united-kingdom/",
+    "/united-states/california/",
+    "/united-states/massachusetts/",
+    "/united-states/washington/",
     "/source-health/",
     "/source-coverage/",
     "/relationships/",
-    "/australia/public-notifications/",
     "/sources/oaic_ndb/",
   ];
   for (const width of [320, 768, 1440]) {
@@ -290,6 +312,9 @@ test("desktop and mobile layouts contain overflow without fragmenting text", asy
     const navigation = document.querySelector<HTMLElement>(".masthead nav");
     const wrapper = document.querySelector<HTMLElement>(".table-wrap");
     const header = document.querySelector<HTMLElement>("thead th");
+    const unlabeledCells = [
+      ...document.querySelectorAll<HTMLElement>(".table-wrap tbody tr > th, .table-wrap tbody tr > td"),
+    ].filter((cell) => !cell.dataset.label).length;
     return {
       headingOverflowWrap: heading ? getComputedStyle(heading).overflowWrap : "",
       headingWordBreak: heading ? getComputedStyle(heading).wordBreak : "",
@@ -298,13 +323,39 @@ test("desktop and mobile layouts contain overflow without fragmenting text", asy
       tableClientWidth: wrapper?.clientWidth ?? 0,
       tableScrollWidth: wrapper?.scrollWidth ?? 0,
       tableHeaderWhiteSpace: header ? getComputedStyle(header).whiteSpace : "",
+      unlabeledCells,
     };
   });
   expect(geometry.headingOverflowWrap).toBe("normal");
   expect(geometry.headingWordBreak).toBe("normal");
   expect(geometry.navigationScrollWidth).toBeLessThanOrEqual(geometry.navigationClientWidth);
-  expect(geometry.tableScrollWidth).toBeGreaterThan(geometry.tableClientWidth);
+  expect(geometry.tableScrollWidth).toBeLessThanOrEqual(geometry.tableClientWidth);
   expect(geometry.tableHeaderWhiteSpace).toBe("nowrap");
+  expect(geometry.unlabeledCells).toBe(0);
+
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const path of paths) {
+      await page.goto(path);
+      const tableRegions = await page.locator(".table-wrap").evaluateAll((wrappers) =>
+        wrappers.map((wrapper) => ({
+          clientWidth: wrapper.clientWidth,
+          scrollWidth: wrapper.scrollWidth,
+          unlabeledCells: [
+            ...wrapper.querySelectorAll<HTMLElement>("tbody tr > th, tbody tr > td"),
+          ].filter((cell) => !cell.dataset.label).length,
+        })),
+      );
+      expect(
+        tableRegions.every((region) => region.scrollWidth <= region.clientWidth),
+        `${path} contained a horizontal table scroller at ${width}px`,
+      ).toBe(true);
+      expect(
+        tableRegions.every((region) => region.unlabeledCells === 0),
+        `${path} contained an unlabeled mobile table cell`,
+      ).toBe(true);
+    }
+  }
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/sources/");

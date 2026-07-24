@@ -35,7 +35,13 @@ const contentSecurityPolicy = [
 ].join("; ");
 const isCurrent = (path: string) =>
   Astro.url.pathname.startsWith(new URL(`${base}${path}`, Astro.site).pathname);
-const isJurisdiction = ["jurisdictions/", "australia/", "united-states/", "france/"]
+const isJurisdiction = [
+  "jurisdictions/",
+  "australia/",
+  "united-states/",
+  "france/",
+  "united-kingdom/",
+]
   .some((path) => isCurrent(path));
 ---
 

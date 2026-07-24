@@ -14,7 +14,7 @@ function observation(record: Notification): string | null {
 }
 ---
 
-<div class="table-wrap" tabindex="0" aria-label="Scrollable public notification table">
+<div class="table-wrap" tabindex="0" aria-label="Public notification table">
   <table class="notification-table">
     <thead>
       <tr>
@@ -28,7 +28,7 @@ function observation(record: Notification): string | null {
     <tbody>
       {visible.map((record) => (
         <tr>
-          <th class="notification-table__entity" scope="row">
+          <th class="notification-table__entity" scope="row" data-label="Named entity">
             {record.has_detail_page === false
               ? record.named_entity.source_name
               : (
@@ -37,10 +37,10 @@ function observation(record: Notification): string | null {
                 </a>
               )}
           </th>
-          <td>{label(record.named_entity.role)}</td>
-          <td>{record.jurisdiction}</td>
-          <td>{date(observation(record))}</td>
-          <td>{label(record.publication_level)}</td>
+          <td data-label="Source role">{label(record.named_entity.role)}</td>
+          <td data-label="Jurisdiction">{record.jurisdiction}</td>
+          <td data-label="Source date">{date(observation(record))}</td>
+          <td data-label="Publication level">{label(record.publication_level)}</td>
         </tr>
       ))}
     </tbody>

@@ -100,7 +100,7 @@ const countries = new Set(implemented.map((policy) => policy.country));
       <h2>Source coverage matrix</h2>
       <p>Periods are calculated from the records in this exact publication.</p>
     </div>
-    <div class="table-wrap" tabindex="0" aria-label="Scrollable source coverage matrix">
+    <div class="table-wrap" tabindex="0" aria-label="Source coverage matrix">
       <table class="coverage-table" aria-label="Source coverage matrix">
         <thead>
           <tr>
@@ -118,7 +118,7 @@ const countries = new Set(implemented.map((policy) => policy.country));
             const health = healthBySource.get(policy.source_id);
             return (
               <tr>
-                <th scope="row">
+                <th scope="row" data-label="Source">
                   <a href={`${import.meta.env.BASE_URL}sources/${policy.source_id}/`}>
                     {policy.name}
                   </a>
@@ -126,12 +126,12 @@ const countries = new Set(implemented.map((policy) => policy.country));
                     {policy.implemented ? label(health?.status ?? "not monitored") : "Deferred"}
                   </small>
                 </th>
-                <td>{policy.country}<br /><small>{policy.jurisdiction}</small></td>
-                <td>{label(policy.publication_level)}<br /><small>{policy.unit_of_observation}</small></td>
-                <td>{recordCount(policy.source_id)}</td>
-                <td>{coveragePeriod(policy.source_id)}</td>
-                <td>{policy.public_window}</td>
-                <td>{comparisonBoundary(policy.publication_level)}</td>
+                <td data-label="Jurisdiction">{policy.country}<br /><small>{policy.jurisdiction}</small></td>
+                <td data-label="Published unit">{label(policy.publication_level)}<br /><small>{policy.unit_of_observation}</small></td>
+                <td data-label="Records">{recordCount(policy.source_id)}</td>
+                <td data-label="Observed period">{coveragePeriod(policy.source_id)}</td>
+                <td data-label="Public window">{policy.public_window}</td>
+                <td data-label="Comparison boundary">{comparisonBoundary(policy.publication_level)}</td>
               </tr>
             );
           })}

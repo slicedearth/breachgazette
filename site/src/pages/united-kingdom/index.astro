@@ -1,0 +1,149 @@
+---
+import Hero from "../../components/Hero.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+import { date } from "../../lib/format";
+
+const publication = getPublication();
+const records = publication.aggregates.filter(
+  (record) => record.source_id === "united_kingdom_ico",
+);
+const policy = publication.policies.united_kingdom_ico;
+const snapshot = publication.manifest.source_snapshots.find(
+  (item) => item.source_id === "united_kingdom_ico",
+);
+const conflictNote = snapshot?.notes.find((note) =>
+  note.includes("conflicting reporting periods")
+);
+const numericValue = (value: string | number | null): number =>
+  typeof value === "number" ? value : 0;
+const byDimension = (dimension: string) =>
+  records
+    .filter((record) => record.dimension === dimension)
+    .sort(
+      (left, right) =>
+        numericValue(right.value.value) - numericValue(left.value.value)
+        || left.category.localeCompare(right.category),
+    );
+const total = records.find((record) => record.dimension === "unique_reports");
+const quarters = records
+  .filter((record) => record.dimension === "reporting_quarter")
+  .sort((left, right) => right.category.localeCompare(left.category));
+const maxQuarter = Math.max(
+  1,
+  ...quarters.map((record) => numericValue(record.value.value)),
+);
+const firstQuarter = quarters.at(-1);
+const lastQuarter = quarters[0];
+const dimensions = [
+  ["incident_category", "Incident category"],
+  ["incident_type", "Incident type"],
+  ["sector", "Sector"],
+  ["affected_population_band", "Affected-population band"],
+  ["time_to_report", "Time taken to report"],
+  ["decision_taken", "Decision taken"],
+  ["data_subject_type", "Data-subject type"],
+  ["data_type", "Data type"],
+] as const;
+const populatedDimensions = dimensions.filter(
+  ([dimension]) => byDimension(dimension).length > 0,
+);
+---
+
+<BaseLayout
+  title="United Kingdom"
+  description="Privacy-minimised summaries of UK ICO personal data breach report references."
+  section="United Kingdom"
+>
+  <Hero
+    eyebrow="Anonymized national reporting"
+    title="UK ICO data security incident trends"
+    intro="The ICO publishes report-level characteristics without organization names. Breach Gazette groups workbook rows by their source reference, excludes unresolved period conflicts, and retains only aggregate counts."
+    warning="The figures cover reports received by the ICO, not every UK breach. Category totals can exceed unique reports because one report can hold multiple characteristics."
+  />
+  <section class="section shell">
+    <div class="stat-grid" aria-label="ICO publication summary">
+      <article>
+        <strong>{numericValue(total?.value.value ?? 0).toLocaleString()}</strong>
+        <span>unambiguous report references</span>
+      </article>
+      <article>
+        <strong>{quarters.length.toLocaleString()}</strong>
+        <span>comparable quarters</span>
+      </article>
+      <article>
+        <strong>{byDimension("sector").length.toLocaleString()}</strong>
+        <span>source sectors</span>
+      </article>
+      <article>
+        <strong>{firstQuarter && lastQuarter ? `${date(firstQuarter.reporting_period_start)}–${date(lastQuarter.reporting_period_end)}` : "Not published"}</strong>
+        <span>observed window</span>
+      </article>
+    </div>
+    {!records.length && (
+      <p class="notice">This source is not present in the current publication.</p>
+    )}
+  </section>
+  <section class="section section--ink">
+    <div class="shell">
+      <div class="section-head">
+        <h2>Unique reports by quarter</h2>
+        <p>Q1 2019 is omitted because the ICO identifies Q2 2019 as the comparable series start.</p>
+      </div>
+      <div class="table-wrap" tabindex="0" aria-label="ICO quarterly report table">
+        <table aria-label="ICO unique reports by quarter">
+          <thead><tr><th scope="col">Quarter</th><th scope="col">Reports</th><th scope="col">Relative volume</th></tr></thead>
+          <tbody>
+            {quarters.map((record) => {
+              const count = numericValue(record.value.value);
+              return (
+                <tr>
+                  <th scope="row" data-label="Quarter">{record.category}</th>
+                  <td data-label="Reports">{count.toLocaleString()}</td>
+                  <td data-label="Relative volume">
+                    <meter min="0" max={maxQuarter} value={count}>
+                      {count.toLocaleString()} of {maxQuarter.toLocaleString()}
+                    </meter>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  <section class="section shell">
+    <div class="section-head">
+      <h2>Source-labelled distributions</h2>
+      <p>Membership counts preserve the ICO’s categories and do not imply mutually exclusive incidents.</p>
+    </div>
+    <div class="grid france-distributions">
+      {populatedDimensions.map(([dimension, heading]) => (
+        <article class="card">
+          <h3>{heading}</h3>
+          <div class="table-wrap" tabindex="0" aria-label={`${heading} table`}>
+            <table>
+              <thead><tr><th scope="col">Source category</th><th scope="col">Reports</th></tr></thead>
+              <tbody>
+                {byDimension(dimension).map((record) => (
+                  <tr>
+                    <th scope="row" data-label="Source category">{record.category}</th>
+                    <td data-label="Reports">{numericValue(record.value.value).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      ))}
+    </div>
+    {conflictNote && (
+      <aside class="notice">
+        {conflictNote} The conflicted material is omitted from every grouped total rather than assigned by inference.
+      </aside>
+    )}
+    <SourceNote href={policy?.source_url ?? null} />
+  </section>
+</BaseLayout>

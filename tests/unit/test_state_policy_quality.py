@@ -56,6 +56,7 @@ def test_source_policy_catalogue_is_complete() -> None:
         "california",
         "massachusetts",
         "france_cnil",
+        "united_kingdom_ico",
         "hhs",
     }
     assert policies["hhs"].implemented is False
@@ -413,6 +414,7 @@ def test_production_builder_emits_minimised_real_publication(
         "california",
         "massachusetts",
         "france_cnil",
+        "united_kingdom_ico",
     )
     observed = datetime.now(UTC)
     monitoring = MonitoringCatalogue(
@@ -444,36 +446,51 @@ def test_production_builder_emits_minimised_real_publication(
     )
     for index, source_id in enumerate(source_ids):
         checksum = (f"{index + 1:x}" * 64)[:64]
-        if source_id == "france_cnil":
+        if source_id in {"france_cnil", "united_kingdom_ico"}:
+            is_uk = source_id == "united_kingdom_ico"
             store.write_records(
                 source_id,
                 [
                     SourceAggregateRecord(
                         source_id=source_id,
-                        source_record_id="fr:cnil:notification_rows:fixture",
+                        source_record_id=(
+                            "uk:ico:unique_reports:fixture"
+                            if is_uk
+                            else "fr:cnil:notification_rows:fixture"
+                        ),
                         source_url="https://example.gov/source",
                         source_revision=f"revision-{source_id}",
                         source_checksum=checksum,
-                        source_completeness=Completeness.COMPLETE,
+                        source_completeness=(
+                            Completeness.PARTIAL if is_uk else Completeness.COMPLETE
+                        ),
                         source_retrieval_time=observed,
                         local_first_observed_time=observed,
                         local_last_observed_time=observed,
                         parser_version="1.0",
                         normalization_version="1.0",
                         limitations=["Test-only synthetic aggregate."],
-                        regulator="CNIL",
+                        regulator="ICO" if is_uk else "CNIL",
                         reporting_scheme="Test-only anonymous notifications",
                         publication_level=PublicationLevel.ANONYMIZED_NOTIFICATION,
                         reporting_period_start=date(2025, 12, 1),
                         reporting_period_end=date(2025, 12, 31),
-                        dimension="notification_rows",
-                        category="All published notification rows",
+                        dimension="unique_reports" if is_uk else "notification_rows",
+                        category=(
+                            "All unambiguous in-scope report references"
+                            if is_uk
+                            else "All published notification rows"
+                        ),
                         value=ObservedValue(
                             value=2,
                             origin=ValueOrigin.CALCULATED,
                             state=ValueState.PRESENT,
                         ),
-                        unit="notification_rows",
+                        unit=(
+                            "unique_source_report_references"
+                            if is_uk
+                            else "notification_rows"
+                        ),
                         population_scope="Test-only anonymous rows",
                     )
                 ],
@@ -484,7 +501,7 @@ def test_production_builder_emits_minimised_real_publication(
                     retrieved_at=observed,
                     revision=f"revision-{source_id}",
                     checksum=checksum,
-                    completeness="complete",
+                    completeness="partial" if is_uk else "complete",
                     discovered=2,
                     accepted=2,
                     rejected=0,
@@ -519,7 +536,7 @@ def test_production_builder_emits_minimised_real_publication(
     output = tmp_path / "publication"
     result = build_site_data(data_root=root, output=output)
     assert result["quality_passed"] is True
-    assert result["records"]["notifications"] == len(source_ids) - 1
+    assert result["records"]["notifications"] == len(source_ids) - 2
     assert result["records"]["anonymized_notification_rows"] == 2
     assert (output / "publication.json").is_file()
     publication = json.loads((output / "publication.json").read_text(encoding="utf-8"))
@@ -529,8 +546,8 @@ def test_production_builder_emits_minimised_real_publication(
     search_manifest = json.loads(
         (output / "search-manifest.json").read_text(encoding="utf-8")
     )
-    assert search_manifest["record_count"] == len(source_ids) - 1
-    assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids) - 1
+    assert search_manifest["record_count"] == len(source_ids) - 2
+    assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids) - 2
     for metadata in search_manifest["partitions"]:
         encoded = (
             output / "search-partitions" / f"{metadata['id']}.json"
