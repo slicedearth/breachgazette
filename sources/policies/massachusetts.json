@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "rights_reviewed_on": "2026-07-23",
+  "rights_reviewed_on": "2026-07-24",
   "source_id": "massachusetts",
   "name": "Massachusetts Data Breach Notification Reports",
   "country": "United States",
@@ -11,7 +11,7 @@
   "unit_of_observation": "One reporting-organization row in a reviewed annual report",
   "source_threshold": "Reports concern breaches affecting Massachusetts residents under the state reporting framework.",
   "source_population": "Reporting organizations listed in the official annual notification reports.",
-  "public_window": "Bounded to the complete published 2025 and 2026 annual reports.",
+  "public_window": "Bounded to the complete published 2024 through 2026 annual reports.",
   "coverage_type": "bounded_historical_dataset",
   "aggregate": false,
   "organizations_named": true,
@@ -28,7 +28,7 @@
   "implemented": true,
   "limitations": [
     "The reporting organization may differ from every affected entity.",
-    "Coverage is bounded to the reviewed 2025 and 2026 annual reports rather than the full series beginning in 2007.",
+    "Coverage is bounded to the reviewed 2024 through 2026 annual reports rather than the full series beginning in 2007.",
     "Affected-resident totals may change as reporting organizations update counts.",
     "The source can publish placeholder and duplicate-marker rows without independent notification facts; those rows are counted and excluded.",
     "Consumer notification letters are excluded."

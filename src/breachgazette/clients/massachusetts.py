@@ -35,9 +35,12 @@ from breachgazette.utils import normalize_organization_name, normalize_text, sha
 
 REPORTS_URL = "https://www.mass.gov/lists/data-breach-notification-reports"
 REPORT_URLS = {
+    2024: "https://www.mass.gov/doc/data-breach-report-2024/download",
     2025: "https://www.mass.gov/doc/data-breach-report-2025/download",
     2026: "https://www.mass.gov/doc/data-breach-report-2026/download",
 }
+REPORT_YEARS = tuple(sorted(REPORT_URLS))
+REPORT_RANGE = f"{REPORT_YEARS[0]}-{REPORT_YEARS[-1]}"
 EXPECTED_HEADERS = (
     "Breach Number",
     "Date Reported To OCA",
@@ -56,6 +59,9 @@ INFORMATION_COLUMNS = {
     "Financial Account Breached": "financial_account",
     "Drivers Licenses Breached": "drivers_license",
     "Credit/Debit Numbers Breached": "credit_debit_card",
+}
+EXTRACTION_REPAIRS = {
+    "B a n k s & C r e d i t U n i o n s": "Banks & Credit Unions",
 }
 
 
@@ -95,10 +101,14 @@ def _extract_rows(pdf_bytes: bytes) -> list[dict[str, str]]:
 
 
 def _excluded_row_reason(row: dict[str, str]) -> str | None:
-    if all(
-        value == "-"
-        for header, value in row.items()
-        if header != "Breach Number"
+    if (
+        row["Date Reported To OCA"] == "-"
+        and row["Reporting Organization Name"] == "-"
+        and all(
+            value in {"-", "0"}
+            for header, value in row.items()
+            if header != "Breach Number"
+        )
     ):
         return "placeholder"
     if re.fullmatch(
@@ -118,7 +128,7 @@ def _parse_rows(
     checksum: str,
     observed_at: datetime,
 ) -> list[RecordProvenance]:
-    revision = f"annual-reports-2025-2026:{checksum[:16]}"
+    revision = f"annual-reports-{REPORT_RANGE}:{checksum[:16]}"
     records: list[RecordProvenance] = []
     seen_ids: set[str] = set()
     for year, rows in sorted(rows_by_year.items()):
@@ -133,18 +143,34 @@ def _parse_rows(
                 reported_date = datetime.strptime(
                     row["Date Reported To OCA"], "%d-%b-%y"
                 ).date()
-                affected = int(row["MA Residents Affected"].replace(",", ""))
             except ValueError as exc:
-                raise SourceClientError("Massachusetts date or population format changed") from exc
+                raise SourceClientError("Massachusetts date format changed") from exc
+            affected_raw = row["MA Residents Affected"]
+            try:
+                affected = (
+                    int(affected_raw.replace(",", ""))
+                    if affected_raw
+                    else None
+                )
+            except ValueError as exc:
+                raise SourceClientError("Massachusetts population format changed") from exc
             organization = row["Reporting Organization Name"]
             if not organization:
                 raise SourceClientError("Massachusetts record omitted reporting organization")
             categories: list[InformationCategory] = []
+            information_flags = [row[column] for column in INFORMATION_COLUMNS]
+            if any(not value for value in information_flags) and any(
+                information_flags
+            ):
+                raise SourceClientError(
+                    "Massachusetts information flags were only partially populated"
+                )
             for column, normalized in INFORMATION_COLUMNS.items():
                 source_value = row[column]
-                if source_value not in {"Yes", "No"}:
+                compact_value = source_value.replace(" ", "")
+                if compact_value not in {"", "Yes", "No"}:
                     raise SourceClientError("Massachusetts information flag changed")
-                if source_value == "Yes":
+                if compact_value == "Yes":
                     categories.append(
                         InformationCategory(
                             source_label=column.removesuffix(" Breached"),
@@ -152,6 +178,25 @@ def _parse_rows(
                             origin=ValueOrigin.SOURCE_OBSERVED,
                         )
                     )
+            limitations = [
+                "The reporting organization may differ from every affected entity.",
+                f"Coverage is bounded to the reviewed {REPORT_YEARS[0]} through "
+                f"{REPORT_YEARS[-1]} annual reports.",
+                "Consumer notification letters are not retrieved or reproduced.",
+            ]
+            if affected is None:
+                limitations.append(
+                    "The source row omitted the Massachusetts-resident count."
+                )
+            if not any(information_flags):
+                limitations.append(
+                    "The source row omitted all reviewed information-category flags."
+                )
+            affected_state = ValueState.PRESENT
+            if affected is None:
+                affected_state = ValueState.SOURCE_OMITTED
+            elif affected == 0:
+                affected_state = ValueState.ZERO
             records.append(
                 SourceNotificationRecord(
                     source_id="massachusetts",
@@ -166,11 +211,7 @@ def _parse_rows(
                     local_last_observed_time=observed_at,
                     parser_version="1.0",
                     normalization_version="1.0",
-                    limitations=[
-                        "The reporting organization may differ from every affected entity.",
-                        "Coverage is bounded to the reviewed 2025 and 2026 annual reports.",
-                        "Consumer notification letters are not retrieved or reproduced.",
-                    ],
+                    limitations=limitations,
                     regulator="Massachusetts Office of Consumer Affairs and Business Regulation",
                     jurisdiction="Massachusetts",
                     reporting_scheme="Massachusetts data breach notification reporting",
@@ -196,10 +237,16 @@ def _parse_rows(
                         scope="Massachusetts residents",
                         estimated=False,
                         origin=ValueOrigin.SOURCE_OBSERVED,
-                        state=ValueState.ZERO if affected == 0 else ValueState.PRESENT,
+                        state=affected_state,
                     ),
                     information_categories=categories,
-                    industry=row["Reporting Organization Type"] or None,
+                    industry=(
+                        EXTRACTION_REPAIRS.get(
+                            row["Reporting Organization Type"],
+                            row["Reporting Organization Type"],
+                        )
+                        or None
+                    ),
                     register_window_state="not_applicable",
                 )
             )
@@ -260,7 +307,7 @@ class MassachusettsAdapter:
         snapshot = source_snapshot(
             source_id=self.source_id,
             retrieved_at=observed_at,
-            revision=f"annual-reports-2025-2026:{checksum[:16]}",
+            revision=f"annual-reports-{REPORT_RANGE}:{checksum[:16]}",
             checksum=checksum,
             completeness=Completeness.COMPLETE,
             discovered=discovered,
@@ -268,7 +315,8 @@ class MassachusettsAdapter:
             rejected=0,
             bounded_limit=self.max_rows,
             notes=[
-                "Parsed the official 2025 and 2026 annual report tables.",
+                f"Parsed the official {REPORT_YEARS[0]} through "
+                f"{REPORT_YEARS[-1]} annual report tables.",
                 "Consumer notification letters were not retrieved.",
                 (
                     f"Excluded {exclusion_counts['placeholder']} source placeholder rows and "
