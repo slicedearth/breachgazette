@@ -421,6 +421,37 @@ def test_massachusetts_preserves_reviewed_sparse_and_character_spaced_rows(
     assert records[1].information_categories[0].normalized_label == "credit_debit_card"
 
 
+def test_massachusetts_withholds_address_like_reporting_organization(
+    observed_at: datetime,
+) -> None:
+    row = dict.fromkeys(EXPECTED_HEADERS, "No")
+    row.update(
+        {
+            "Breach Number": "2024-0944",
+            "Date Reported To OCA": "15-May-24",
+            "Reporting Organization Name": "123 Example Street",
+            "Reporting Organization Type": "Professional Services",
+            "MA Residents Affected": "1",
+        }
+    )
+
+    record = _parse_rows(
+        {2024: [row]},
+        checksum="d" * 64,
+        observed_at=observed_at,
+    )[0]
+
+    assert record.named_entity.source_name == "Reporting organization withheld"
+    assert record.named_entity.normalized_name == (
+        "reporting-organization-withheld-ma-2024-0944"
+    )
+    assert record.named_entity.role == "unknown"
+    assert record.named_entity.origin == "normalized"
+    assert record.named_entity.state == "source_omitted"
+    assert "123 Example Street" not in record.model_dump_json()
+    assert "public-output privacy detector" in " ".join(record.limitations)
+
+
 def test_nsw_register_preserves_dates_links_and_window_state(
     observed_at: datetime,
 ) -> None:
