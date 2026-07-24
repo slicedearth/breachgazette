@@ -9,6 +9,7 @@ from typing import Any
 from breachgazette.contracts import (
     NotificationChange,
     SourceAggregateRecord,
+    SourceAnonymizedNotificationRecord,
     SourceNotificationRecord,
     SourceRegulatoryRecord,
     SourceSnapshot,
@@ -19,6 +20,7 @@ from breachgazette.utils import atomic_write_json, read_json
 
 RECORD_MODELS: dict[str, type[RecordProvenance]] = {
     "aggregate": SourceAggregateRecord,
+    "anonymized_notification": SourceAnonymizedNotificationRecord,
     "notification": SourceNotificationRecord,
     "regulatory": SourceRegulatoryRecord,
 }

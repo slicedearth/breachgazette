@@ -29,10 +29,20 @@ class ValueState(StrEnum):
     INTENTIONALLY_EXCLUDED = "intentionally_excluded"
 
 
+class DatePrecision(StrEnum):
+    DAY = "day"
+    MONTH = "month"
+    QUARTER = "quarter"
+    YEAR = "year"
+    RANGE = "range"
+    UNKNOWN = "unknown"
+
+
 class PublicationLevel(StrEnum):
     NATIONAL_AGGREGATE = "national_aggregate"
     STATE_AGGREGATE = "state_aggregate"
     NAMED_NOTIFICATION = "named_notification"
+    ANONYMIZED_NOTIFICATION = "anonymized_notification"
     REGULATOR_REGISTER_ENTRY = "regulator_register_entry"
     REGULATORY_ACTION = "regulatory_action"
     COURT_ACTION = "court_action"
@@ -41,6 +51,7 @@ class PublicationLevel(StrEnum):
 
 class CoverageType(StrEnum):
     COMPLETE_PUBLISHED_DATASET = "complete_published_dataset"
+    COMPLETE_ANONYMIZED_DATASET = "complete_anonymized_dataset"
     BOUNDED_HISTORICAL_DATASET = "bounded_historical_dataset"
     ROLLING_PUBLIC_WINDOW = "rolling_public_window"
     SELECTIVE_PUBLIC_NOTIFICATIONS = "selective_public_notifications"

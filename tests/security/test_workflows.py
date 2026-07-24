@@ -25,6 +25,7 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     update_job, publish_job = workflow.split("\n  publish:\n", maxsplit=1)
     assert "permissions:\n  contents: read" in workflow
     assert "vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true'" in workflow
+    assert "BREACHGAZETTE_SCHEDULE_ENABLED: ${{ vars.BREACHGAZETTE_SCHEDULE_ENABLED }}" in workflow
     assert "vars.BREACHGAZETTE_DATA_REF" in update_job
     assert "default: false" in workflow
     assert "breachgazette update-cycle --data-root .private-production-data --promote" in workflow
@@ -99,6 +100,7 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert "github.event.workflow_run.head_sha" in workflow
     assert "actions: read" in workflow
     assert "Verify source revision passed the complete CI gate" in workflow
+    assert "BREACHGAZETTE_SCHEDULE_ENABLED: ${{ vars.BREACHGAZETTE_SCHEDULE_ENABLED }}" in workflow
     assert "Manual publication requires an exact 40-character private-state commit." in workflow
     assert "vars.BREACHGAZETTE_DATA_REF" in workflow
     assert "steps.data-ref.outputs.data_ref" in workflow

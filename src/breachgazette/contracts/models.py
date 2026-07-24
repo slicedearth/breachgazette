@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 from breachgazette.contracts.enums import (
     Completeness,
     CoverageType,
+    DatePrecision,
     EntityRole,
     LegalStatus,
     PublicationLevel,
@@ -149,6 +150,7 @@ class DateObservation(ContractModel):
     ]
     raw_value: str | None = Field(default=None, max_length=500)
     normalized_date: date | None = None
+    precision: DatePrecision = DatePrecision.DAY
     origin: ValueOrigin
     state: ValueState
 
@@ -200,6 +202,27 @@ class SourceNotificationRecord(RecordProvenance):
     source_detail_url: HttpUrl | None = None
 
 
+class SourceAnonymizedNotificationRecord(RecordProvenance):
+    record_type: Literal["anonymized_notification"] = "anonymized_notification"
+    regulator: str
+    country: str
+    jurisdiction: str
+    reporting_scheme: str
+    publication_level: Literal[PublicationLevel.ANONYMIZED_NOTIFICATION] = (
+        PublicationLevel.ANONYMIZED_NOTIFICATION
+    )
+    coverage_type: CoverageType
+    dates: list[DateObservation]
+    affected_population_band: ObservedValue
+    industry: str | None = Field(default=None, max_length=300)
+    breach_natures: list[str] = Field(default_factory=list, max_length=20)
+    information_categories: list[InformationCategory] = Field(default_factory=list)
+    sensitive_data_categories: list[str] = Field(default_factory=list, max_length=20)
+    incident_origins: list[str] = Field(default_factory=list, max_length=20)
+    incident_causes: list[str] = Field(default_factory=list, max_length=20)
+    individuals_informed: ObservedValue
+
+
 class SourceRegulatoryRecord(RecordProvenance):
     record_type: Literal["regulatory"] = "regulatory"
     regulator: str
@@ -239,6 +262,10 @@ class NormalizedAggregateMetric(SourceAggregateRecord):
 
 class NormalizedNotification(SourceNotificationRecord):
     canonical_organization_id: str | None = None
+
+
+class NormalizedAnonymizedNotification(SourceAnonymizedNotificationRecord):
+    pass
 
 
 class RegulatoryAction(SourceRegulatoryRecord):
@@ -364,7 +391,13 @@ class RegulatoryStatusChange(NotificationChange):
 
 class PublicationRecord(ContractModel):
     record_id: str
-    record_type: Literal["aggregate", "notification", "regulatory", "relationship"]
+    record_type: Literal[
+        "aggregate",
+        "anonymized_notification",
+        "notification",
+        "regulatory",
+        "relationship",
+    ]
     source_id: str
     payload: dict[str, Any]
 
@@ -447,6 +480,7 @@ class SourceHealthReport(ContractModel):
     generated_at: datetime
     dataset_class: Literal["real_source_data", "test_fixture", "unknown"]
     passed: bool
+    collection_mode: Literal["manual", "scheduled"] = "manual"
     schedule_utc: str
     sources: list[SourceHealthEntry]
     limitations: list[str] = Field(min_length=1, max_length=10)

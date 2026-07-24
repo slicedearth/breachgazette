@@ -141,6 +141,8 @@ jobs:
           npm ci --ignore-scripts --prefix site
       - name: Generate privacy-minimised real publication
         id: publication
+        env:
+          BREACHGAZETTE_SCHEDULE_ENABLED: ${{ vars.BREACHGAZETTE_SCHEDULE_ENABLED }}
         run: |
           breachgazette quality-report --data-root .private-production-data --json
           breachgazette build-site-data \

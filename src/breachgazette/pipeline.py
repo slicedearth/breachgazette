@@ -22,6 +22,7 @@ from breachgazette.compare import compare_records
 from breachgazette.contracts import (
     NotificationChange,
     SourceAggregateRecord,
+    SourceAnonymizedNotificationRecord,
     SourceNotificationRecord,
     SourceRegulatoryRecord,
     UpdateCheckpoint,
@@ -159,6 +160,7 @@ def ingest_fixture(fixture: Path, *, data_root: Path) -> dict[str, Any]:
     source_id = str(payload["source_id"])
     model_by_type: dict[str, type[RecordProvenance]] = {
         "aggregate": SourceAggregateRecord,
+        "anonymized_notification": SourceAnonymizedNotificationRecord,
         "notification": SourceNotificationRecord,
         "regulatory": SourceRegulatoryRecord,
     }

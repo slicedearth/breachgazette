@@ -10,9 +10,16 @@ from pydantic import ValidationError
 from breachgazette.clients.california import _date_observations
 from breachgazette.clients.ipc_nsw import _cell_value, _parse_period
 from breachgazette.clients.washington import _parse_date
-from breachgazette.contracts import OrganizationRole, SourceRegulatoryRecord
+from breachgazette.contracts import (
+    DateObservation,
+    OrganizationRole,
+    SourceAnonymizedNotificationRecord,
+    SourceRegulatoryRecord,
+)
 from breachgazette.contracts.enums import (
     Completeness,
+    CoverageType,
+    DatePrecision,
     EntityRole,
     LegalStatus,
     ValueOrigin,
@@ -73,6 +80,50 @@ def test_safe_url_decodes_nsw_safelink_without_contact_query() -> None:
 def test_observed_value_distinguishes_null_and_zero() -> None:
     assert ObservedValue(value=None, origin=ValueOrigin.SOURCE_OBSERVED).state == "null"
     assert ObservedValue(value=0, origin=ValueOrigin.SOURCE_OBSERVED).state == "zero"
+
+
+def test_anonymized_notification_preserves_month_precision_without_an_entity() -> None:
+    observed = datetime(2026, 1, 1, tzinfo=UTC)
+    record = SourceAnonymizedNotificationRecord(
+        source_id="example_anonymized",
+        source_record_id="anonymous:2025-12:1",
+        source_url="https://example.gov/open-data",
+        source_revision="2025-12",
+        source_checksum="a" * 64,
+        source_completeness=Completeness.COMPLETE,
+        source_retrieval_time=observed,
+        local_first_observed_time=observed,
+        local_last_observed_time=observed,
+        parser_version="1.0",
+        normalization_version="1.0",
+        limitations=["The official source does not publish an organization name."],
+        regulator="Example regulator",
+        country="Example country",
+        jurisdiction="National",
+        reporting_scheme="Anonymous notification reporting",
+        coverage_type=CoverageType.COMPLETE_ANONYMIZED_DATASET,
+        dates=[
+            DateObservation(
+                meaning="regulator_submission_date",
+                raw_value="2025-12",
+                normalized_date=date(2025, 12, 1),
+                precision=DatePrecision.MONTH,
+                origin=ValueOrigin.SOURCE_OBSERVED,
+                state=ValueState.PRESENT,
+            )
+        ],
+        affected_population_band=ObservedValue(
+            value="Between 0 and 5 people",
+            origin=ValueOrigin.SOURCE_OBSERVED,
+        ),
+        individuals_informed=ObservedValue(
+            value=True,
+            origin=ValueOrigin.SOURCE_OBSERVED,
+        ),
+    )
+    assert record.publication_level == "anonymized_notification"
+    assert record.dates[0].precision == "month"
+    assert "named_entity" not in record.model_dump()
 
 
 def _regulatory_payload() -> dict[str, object]:

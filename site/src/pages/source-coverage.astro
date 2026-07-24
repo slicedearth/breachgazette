@@ -1,0 +1,160 @@
+---
+import Hero from "../components/Hero.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getAllNotifications, getPublication } from "../lib/data";
+import { date, label } from "../lib/format";
+
+const publication = getPublication();
+const notifications = getAllNotifications();
+const policies = Object.values(publication.policies).sort(
+  (left, right) =>
+    left.country.localeCompare(right.country) || left.name.localeCompare(right.name),
+);
+const healthBySource = new Map(
+  publication.source_health.sources.map((source) => [source.source_id, source]),
+);
+
+const notificationDates = (sourceId: string) =>
+  notifications
+    .filter((record) => record.source_id === sourceId)
+    .flatMap((record) => record.dates.map((item) => item.normalized_date))
+    .filter((value): value is string => Boolean(value));
+
+const coveragePeriod = (sourceId: string): string => {
+  const dates = [
+    ...notificationDates(sourceId),
+    ...publication.aggregates
+      .filter((record) => record.source_id === sourceId)
+      .flatMap((record) => [record.reporting_period_start, record.reporting_period_end]),
+    ...publication.regulatory_actions
+      .filter((record) => record.source_id === sourceId)
+      .flatMap((record) => [
+        record.source_publication_date,
+        record.source_reported_event_date,
+      ]),
+  ].sort();
+  if (!dates.length) return "Not published";
+  return dates[0] === dates.at(-1)
+    ? date(dates[0])
+    : `${date(dates[0])}–${date(dates.at(-1)!)}`;
+};
+
+const recordCount = (sourceId: string) =>
+  notifications.filter((record) => record.source_id === sourceId).length
+  + publication.aggregates.filter((record) => record.source_id === sourceId).length
+  + publication.regulatory_actions.filter((record) => record.source_id === sourceId).length;
+
+const comparisonBoundary = (publicationLevel: string): string => {
+  if (publicationLevel.includes("aggregate")) {
+    return "Compare only matching periods, dimensions, units, and population scopes.";
+  }
+  if (publicationLevel === "anonymized_notification") {
+    return "Anonymous source-report counts only; no organization or incident inference.";
+  }
+  if (publicationLevel === "regulatory_action") {
+    return "Legal-status events only; not a notification or incident count.";
+  }
+  if (
+    publicationLevel === "named_notification"
+    || publicationLevel === "regulator_register_entry"
+  ) {
+    return "Published source records only; not a count of unique incidents.";
+  }
+  return "Review the source policy before comparing this material.";
+};
+
+const implemented = policies.filter((policy) => policy.implemented);
+const countries = new Set(implemented.map((policy) => policy.country));
+---
+
+<BaseLayout
+  title="Coverage and comparability"
+  description="Source-by-source publication windows, record units, and comparison boundaries."
+>
+  <Hero
+    eyebrow="Coverage evidence"
+    title="What can—and cannot—be compared"
+    intro="Breach Gazette combines official publications without pretending that different thresholds, windows, and record units measure the same thing."
+    warning="A larger source count can reflect a broader law, a longer publication window, or repeated notifications. It does not by itself establish more breaches."
+  />
+  <section class="section shell">
+    <div class="stat-grid" aria-label="Coverage summary">
+      <article><strong>{implemented.length.toLocaleString()}</strong><span>implemented sources</span></article>
+      <article><strong>{countries.size.toLocaleString()}</strong><span>countries represented</span></article>
+      <article><strong>{notifications.length.toLocaleString()}</strong><span>named notification rows</span></article>
+      <article><strong>{publication.aggregates.length.toLocaleString()}</strong><span>aggregate source cells</span></article>
+    </div>
+    <div class="section-head">
+      <h2>Source coverage matrix</h2>
+      <p>Periods are calculated from the records in this exact publication.</p>
+    </div>
+    <div class="table-wrap" tabindex="0" aria-label="Scrollable source coverage matrix">
+      <table class="coverage-table" aria-label="Source coverage matrix">
+        <thead>
+          <tr>
+            <th scope="col">Source</th>
+            <th scope="col">Jurisdiction</th>
+            <th scope="col">Published unit</th>
+            <th scope="col">Records</th>
+            <th scope="col">Observed period</th>
+            <th scope="col">Public window</th>
+            <th scope="col">Comparison boundary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {policies.map((policy) => {
+            const health = healthBySource.get(policy.source_id);
+            return (
+              <tr>
+                <th scope="row">
+                  <a href={`${import.meta.env.BASE_URL}sources/${policy.source_id}/`}>
+                    {policy.name}
+                  </a>
+                  <small class="coverage-table__status">
+                    {policy.implemented ? label(health?.status ?? "not monitored") : "Deferred"}
+                  </small>
+                </th>
+                <td>{policy.country}<br /><small>{policy.jurisdiction}</small></td>
+                <td>{label(policy.publication_level)}<br /><small>{policy.unit_of_observation}</small></td>
+                <td>{recordCount(policy.source_id).toLocaleString()}</td>
+                <td>{coveragePeriod(policy.source_id)}</td>
+                <td>{policy.public_window}</td>
+                <td>{comparisonBoundary(policy.publication_level)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="section section--ink">
+    <div class="shell">
+      <div class="section-head">
+        <h2>Four publication lanes</h2>
+        <p>Keeping these lanes separate is the central comparability control.</p>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <span class="eyebrow">Named records</span>
+          <h3>Source-labelled notifications</h3>
+          <p>The displayed entity retains the role assigned by its source. Repeated rows are not silently merged into one incident.</p>
+        </article>
+        <article class="card">
+          <span class="eyebrow">Anonymous records</span>
+          <h3>Privacy-minimised notifications</h3>
+          <p>Countries may publish report-level facts without organization names. These records never enter entity resolution.</p>
+        </article>
+        <article class="card">
+          <span class="eyebrow">Statistics</span>
+          <h3>Aggregate reporting cells</h3>
+          <p>Dimensions remain tied to their source period, unit, scope, and denominator.</p>
+        </article>
+        <article class="card">
+          <span class="eyebrow">Legal status</span>
+          <h3>Regulatory actions</h3>
+          <p>Inquiries, allegations, findings, undertakings, judgments, and penalties remain distinct events.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

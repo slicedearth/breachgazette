@@ -2,6 +2,7 @@ export type DateObservation = {
   meaning: string;
   raw_value: string | null;
   normalized_date: string | null;
+  precision?: "day" | "month" | "quarter" | "year" | "range" | "unknown";
   origin: string;
   state: string;
 };
@@ -234,6 +235,7 @@ export type Publication = {
   };
   source_health: {
     passed: boolean;
+    collection_mode?: "manual" | "scheduled";
     schedule_utc: string;
     generated_at: string;
     sources: Array<{

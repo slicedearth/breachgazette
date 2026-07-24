@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -127,6 +128,11 @@ def build_source_health_report(
         dataset_class=dataset_class,
         passed=dataset_class == "real_source_data"
         and all(entry.status == "healthy" for entry in entries),
+        collection_mode=(
+            "scheduled"
+            if os.environ.get("BREACHGAZETTE_SCHEDULE_ENABLED", "").casefold() == "true"
+            else "manual"
+        ),
         schedule_utc=catalogue.schedule_utc,
         sources=entries,
         limitations=[
