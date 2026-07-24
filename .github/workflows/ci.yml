@@ -54,7 +54,7 @@ jobs:
       - name: Install locked site dependencies
         working-directory: site
         run: |
-          npm ci --ignore-scripts
+          npm ci --ignore-scripts --no-audit
           npm ls --depth=0
       - name: Verify test-only static site
         working-directory: site
@@ -91,7 +91,7 @@ jobs:
           cache-dependency-path: site/package-lock.json
       - name: Install locked site dependencies
         working-directory: site
-        run: npm ci --ignore-scripts
+        run: npm ci --ignore-scripts --no-audit
       - name: Build test-only static site
         working-directory: site
         run: npm run build:test

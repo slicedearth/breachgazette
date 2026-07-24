@@ -2,7 +2,9 @@
 
 Python has a 3.12 compatibility floor and fully pinned `requirements.lock`.
 The editable project install uses `--no-deps --no-build-isolation`. npm uses a committed lockfile
-and `npm ci --ignore-scripts`.
+and `npm ci --ignore-scripts --no-audit` in automation. A separate, explicit
+audit step keeps the vulnerability gate fail-closed without repeating the same
+registry request during installation.
 
 The Python lock is generated in an isolated Python 3.12 environment with pip
 26.1.2. Regenerate it with `.venv/bin/python scripts/lock_python.py`, or verify
