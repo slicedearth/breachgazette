@@ -143,6 +143,9 @@ def test_netlify_headers_enforce_static_site_security_policy() -> None:
     headers = (root / "site" / "public" / "_headers").read_text(encoding="utf-8")
     assert 'publish = "site/dist"' in config
     assert "frame-ancestors 'none'" in headers
+    assert "style-src 'self'" in headers
+    assert "'unsafe-inline'" not in headers
+    assert "form-action 'none'" in headers
     assert "Strict-Transport-Security: max-age=31536000" in headers
     assert "X-Content-Type-Options: nosniff" in headers
     assert "Referrer-Policy: no-referrer" in headers

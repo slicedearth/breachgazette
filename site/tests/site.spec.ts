@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
@@ -88,6 +89,30 @@ test("keyboard navigation exposes skip link and table alternatives", async ({ pa
       name: "Notifications",
     }),
   ).toHaveAttribute("aria-current", "page");
+});
+
+test("representative desktop and mobile pages pass automated accessibility checks", async ({
+  page,
+}) => {
+  const routes = ["/", "/latest/", "/source-health/", "/corrections/"];
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 320, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const route of routes) {
+      await page.goto(route);
+      const results = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+        .analyze();
+      expect(
+        results.violations,
+        `${route} at ${viewport.width}px: ${results.violations
+          .map((violation) => `${violation.id} (${violation.nodes.length})`)
+          .join(", ")}`,
+      ).toEqual([]);
+    }
+  }
 });
 
 test("mobile primary navigation is compact and keyboard operable", async ({ page }) => {
@@ -264,6 +289,12 @@ test("runtime requests remain same-origin and no remote font or analytics is pre
   expect(data.partition.records.every((record) => typeof record.has_detail_page === "boolean")).toBe(true);
   expect(await page.locator("[data-results] a").count()).toBeGreaterThan(0);
   await expect(page.locator("script:not([src])")).toHaveCount(0);
+  const contentSecurityPolicy = await page
+    .locator('meta[http-equiv="Content-Security-Policy"]')
+    .getAttribute("content");
+  expect(contentSecurityPolicy).toContain("style-src 'self'");
+  expect(contentSecurityPolicy).toContain("form-action 'none'");
+  expect(contentSecurityPolicy).not.toContain("'unsafe-inline'");
   expect([...origins]).toEqual(["http://127.0.0.1:41733"]);
   expect(paths).not.toContain("/data/notifications.json");
   const content = await page.content();
