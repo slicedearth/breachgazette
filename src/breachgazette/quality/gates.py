@@ -17,6 +17,7 @@ REQUIRED_SOURCES = {
     "washington",
     "california",
     "massachusetts",
+    "france_cnil",
 }
 
 

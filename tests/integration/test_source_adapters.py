@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime
+from datetime import date, datetime
 from io import BytesIO, StringIO
 from pathlib import Path
 
@@ -13,6 +13,14 @@ from openpyxl import Workbook
 
 from breachgazette.clients.base import SourceClientError
 from breachgazette.clients.california import CaliforniaAdapter
+from breachgazette.clients.france_cnil import (
+    DATASET_ID,
+    EXPECTED_DATASET_TITLE,
+    CnilAdapter,
+)
+from breachgazette.clients.france_cnil import (
+    EXPECTED_HEADERS as CNIL_HEADERS,
+)
 from breachgazette.clients.hhs import HhsAdapter
 from breachgazette.clients.ipc_nsw import NswAggregateAdapter, NswPublicNotificationsAdapter
 from breachgazette.clients.massachusetts import (
@@ -23,6 +31,7 @@ from breachgazette.clients.massachusetts import (
 from breachgazette.clients.oaic import EXPECTED_SHEETS, OaicNdbAdapter
 from breachgazette.clients.oaic_regulatory import OaicRegulatoryAdapter
 from breachgazette.clients.washington import MAIN_FIELDS, PII_FIELDS, WashingtonAdapter
+from breachgazette.privacy.audit import audit_public_value
 
 
 def _json_response(value: object) -> httpx.Response:
@@ -31,6 +40,140 @@ def _json_response(value: object) -> httpx.Response:
         headers={"Content-Type": "application/json"},
         content=json.dumps(value).encode(),
     )
+
+
+def _cnil_fixture(*, license_id: str = "lov2") -> tuple[dict[str, object], bytes]:
+    output = StringIO()
+    writer = csv.writer(output, delimiter=";", lineterminator="\n")
+    writer.writerow(["Extraction générée le 15 janvier 2026", *([""] * 8)])
+    writer.writerow(CNIL_HEADERS)
+    source_row = [
+        "2025-12",
+        "Santé humaine et action sociale",
+        "Perte de la confidentialité,Perte de la disponibilité",
+        "Entre 51 et 300 personnes",
+        "Etat civil (ex : nom, sexe, date de naissance, âge...)",
+        "Oui",
+        "Piratage, logiciel malveillant (par exemple rançongiciel) et/ou hameçonnage",
+        "Acte externe malveillant,Acte interne accidentel",
+        "Oui, les personnes ont été informées",
+    ]
+    writer.writerow(source_row)
+    writer.writerow(source_row)
+    content = output.getvalue().encode("cp1252")
+    title = "opencnil-violationsdcpnotifiees-20251231.csv"
+    resource_url = (
+        "https://static.data.gouv.fr/resources/"
+        "notifications-a-la-cnil-de-violations-de-donnees-a-caractere-personnel/"
+        f"20260115-120000/{title}"
+    )
+    metadata: dict[str, object] = {
+        "id": DATASET_ID,
+        "title": EXPECTED_DATASET_TITLE,
+        "license": license_id,
+        "private": False,
+        "frequency": "quarterly",
+        "last_update": "2026-01-15T12:00:00+00:00",
+        "organization": {"name": "CNIL"},
+        "resources": [
+            {
+                "id": "11111111-2222-3333-4444-555555555555",
+                "format": "csv",
+                "title": title,
+                "url": resource_url,
+                "filesize": len(content),
+                "last_modified": "2026-01-15T12:00:00+00:00",
+            }
+        ],
+    }
+    return metadata, content
+
+
+def test_cnil_anonymous_rows_are_counted_without_row_level_publication(
+    observed_at: datetime,
+) -> None:
+    metadata, content = _cnil_fixture()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "www.data.gouv.fr":
+            return _json_response(metadata)
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "text/csv"},
+            content=content,
+        )
+
+    adapter = CnilAdapter(transport=httpx.MockTransport(handler))
+    adapter.minimum_source_rows = 1
+    adapter.earliest_month = date(2025, 12, 1)
+    result = adapter.collect(observed_at=observed_at)
+
+    total = next(
+        record
+        for record in result.records
+        if record.dimension == "notification_rows"
+    )
+    month = next(
+        record
+        for record in result.records
+        if record.dimension == "notification_month"
+    )
+    natures = {
+        record.category: record.value.value
+        for record in result.records
+        if record.dimension == "breach_nature"
+    }
+    assert total.value.value == 2
+    assert month.category == "2025-12"
+    assert month.value.value == 2
+    assert natures == {
+        "Perte de la confidentialité": 2,
+        "Perte de la disponibilité": 2,
+    }
+    assert result.snapshot.records_discovered == 2
+    assert result.snapshot.records_accepted == 2
+    assert all(record.publication_level == "anonymized_notification" for record in result.records)
+    assert all(record.record_type == "aggregate" for record in result.records)
+    assert not [
+        finding
+        for record in result.records
+        for finding in audit_public_value(
+            record,
+            record_identity=record.source_record_id,
+        )
+    ]
+
+
+def test_cnil_metadata_and_schema_drift_fail_closed(observed_at: datetime) -> None:
+    metadata, content = _cnil_fixture(license_id="changed")
+    adapter = CnilAdapter(
+        transport=httpx.MockTransport(lambda _request: _json_response(metadata))
+    )
+    adapter.minimum_source_rows = 1
+    adapter.earliest_month = date(2025, 12, 1)
+    with pytest.raises(SourceClientError, match="licence"):
+        adapter.collect(observed_at=observed_at)
+
+    valid_metadata, _valid_content = _cnil_fixture()
+    changed = content.replace(
+        CNIL_HEADERS[0].encode("cp1252"),
+        b"Changed header",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "www.data.gouv.fr":
+            return _json_response(valid_metadata)
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "text/csv"},
+            content=changed,
+        )
+
+    schema_adapter = CnilAdapter(transport=httpx.MockTransport(handler))
+    schema_adapter.minimum_source_rows = 1
+    schema_adapter.earliest_month = date(2025, 12, 1)
+    with pytest.raises(SourceClientError, match="schema"):
+        schema_adapter.collect(observed_at=observed_at)
 
 
 def test_california_csv_handles_duplicates_multiple_dates_and_na(observed_at: datetime) -> None:

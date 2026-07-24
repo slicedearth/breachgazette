@@ -315,6 +315,13 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         for record in records
         if getattr(record, "record_type", None) == "regulatory"
     ]
+    anonymized_notification_rows = sum(
+        int(record.value.value)
+        for record in aggregates
+        if record.publication_level == "anonymized_notification"
+        and record.dimension == "notification_rows"
+        and isinstance(record.value.value, int)
+    )
     organizations = resolve_organizations(
         notifications,
         regulatory_actions,
@@ -384,6 +391,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         "stats": {
             "aggregate_metrics": len(aggregates),
             "public_notifications": len(notifications),
+            "anonymized_notification_rows": anonymized_notification_rows,
             "regulatory_actions": len(regulatory_actions),
             "organizations": len(organizations),
             "relationship_candidates": len(relationships),
@@ -436,6 +444,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         record_counts={
             "aggregate_metrics": len(aggregates),
             "notifications": len(notifications),
+            "anonymized_notification_rows": anonymized_notification_rows,
             "regulatory_actions": len(regulatory_actions),
             "organizations": len(organizations),
             "relationships": len(relationships),
@@ -450,6 +459,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         limitations=[
             "Incident relationships are candidates, not confirmed incident merges.",
             "Aggregate metrics remain separate from named notifications.",
+            "Anonymized source rows are published only as grouped metrics.",
             "Static detail pages are bounded to the latest 250 records per incident source.",
             "The public correction history is bounded to the latest 250 observed changes.",
         ],

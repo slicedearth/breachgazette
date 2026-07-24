@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -11,11 +11,18 @@ from breachgazette.clients.base import source_snapshot
 from breachgazette.contracts import (
     MonitoringCatalogue,
     NotificationChange,
+    SourceAggregateRecord,
     SourceMonitoringPolicy,
     SourceNotificationRecord,
     UpdateCheckpoint,
 )
-from breachgazette.contracts.enums import Completeness
+from breachgazette.contracts.enums import (
+    Completeness,
+    PublicationLevel,
+    ValueOrigin,
+    ValueState,
+)
+from breachgazette.contracts.models import ObservedValue
 from breachgazette.monitoring import (
     SourceDriftError,
     build_source_health_report,
@@ -48,6 +55,7 @@ def test_source_policy_catalogue_is_complete() -> None:
         "washington",
         "california",
         "massachusetts",
+        "france_cnil",
         "hhs",
     }
     assert policies["hhs"].implemented is False
@@ -404,6 +412,7 @@ def test_production_builder_emits_minimised_real_publication(
         "washington",
         "california",
         "massachusetts",
+        "france_cnil",
     )
     observed = datetime.now(UTC)
     monitoring = MonitoringCatalogue(
@@ -434,6 +443,55 @@ def test_production_builder_emits_minimised_real_publication(
         encoding="utf-8",
     )
     for index, source_id in enumerate(source_ids):
+        checksum = (f"{index + 1:x}" * 64)[:64]
+        if source_id == "france_cnil":
+            store.write_records(
+                source_id,
+                [
+                    SourceAggregateRecord(
+                        source_id=source_id,
+                        source_record_id="fr:cnil:notification_rows:fixture",
+                        source_url="https://example.gov/source",
+                        source_revision=f"revision-{source_id}",
+                        source_checksum=checksum,
+                        source_completeness=Completeness.COMPLETE,
+                        source_retrieval_time=observed,
+                        local_first_observed_time=observed,
+                        local_last_observed_time=observed,
+                        parser_version="1.0",
+                        normalization_version="1.0",
+                        limitations=["Test-only synthetic aggregate."],
+                        regulator="CNIL",
+                        reporting_scheme="Test-only anonymous notifications",
+                        publication_level=PublicationLevel.ANONYMIZED_NOTIFICATION,
+                        reporting_period_start=date(2025, 12, 1),
+                        reporting_period_end=date(2025, 12, 31),
+                        dimension="notification_rows",
+                        category="All published notification rows",
+                        value=ObservedValue(
+                            value=2,
+                            origin=ValueOrigin.CALCULATED,
+                            state=ValueState.PRESENT,
+                        ),
+                        unit="notification_rows",
+                        population_scope="Test-only anonymous rows",
+                    )
+                ],
+            )
+            store.write_snapshot(
+                source_snapshot(
+                    source_id=source_id,
+                    retrieved_at=observed,
+                    revision=f"revision-{source_id}",
+                    checksum=checksum,
+                    completeness="complete",
+                    discovered=2,
+                    accepted=2,
+                    rejected=0,
+                    bounded_limit=10,
+                )
+            )
+            continue
         normalized = notification_factory(
             source_id=source_id,
             record_id=f"{source_id}-record",
@@ -450,7 +508,7 @@ def test_production_builder_emits_minimised_real_publication(
                 source_id=source_id,
                 retrieved_at=observed,
                 revision=f"revision-{source_id}",
-                checksum=(f"{index + 1:x}" * 64)[:64],
+                checksum=checksum,
                 completeness="complete",
                 discovered=1,
                 accepted=1,
@@ -461,7 +519,8 @@ def test_production_builder_emits_minimised_real_publication(
     output = tmp_path / "publication"
     result = build_site_data(data_root=root, output=output)
     assert result["quality_passed"] is True
-    assert result["records"]["notifications"] == len(source_ids)
+    assert result["records"]["notifications"] == len(source_ids) - 1
+    assert result["records"]["anonymized_notification_rows"] == 2
     assert (output / "publication.json").is_file()
     publication = json.loads((output / "publication.json").read_text(encoding="utf-8"))
     assert "latest_notifications" not in publication
@@ -470,8 +529,8 @@ def test_production_builder_emits_minimised_real_publication(
     search_manifest = json.loads(
         (output / "search-manifest.json").read_text(encoding="utf-8")
     )
-    assert search_manifest["record_count"] == len(source_ids)
-    assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids)
+    assert search_manifest["record_count"] == len(source_ids) - 1
+    assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids) - 1
     for metadata in search_manifest["partitions"]:
         encoded = (
             output / "search-partitions" / f"{metadata['id']}.json"
