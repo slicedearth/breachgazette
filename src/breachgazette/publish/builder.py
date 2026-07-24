@@ -54,7 +54,7 @@ PUBLIC_TREE_ALLOWED_SUFFIXES = frozenset(
         ".xml",
     }
 )
-PUBLIC_TREE_ALLOWED_EXTENSIONLESS = frozenset({"_headers"})
+PUBLIC_TREE_ALLOWED_EXTENSIONLESS = frozenset({"_headers", "_redirects"})
 PUBLIC_TREE_ALLOWED_HIDDEN_PATHS = frozenset({Path(".well-known/security.txt")})
 PUBLIC_TREE_FORBIDDEN_NAMES = frozenset(
     {

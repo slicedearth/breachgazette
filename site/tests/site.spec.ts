@@ -744,6 +744,10 @@ test("feed, crawler policy, and not-found page preserve publication boundaries",
   expect(securityText).toContain(
     "Canonical: https://breachgazette.invalid/.well-known/security.txt",
   );
+  const securityFallback = await request.get("/security.txt");
+  expect(securityFallback.ok()).toBe(true);
+  expect(securityFallback.headers()["content-type"]).toContain("text/plain");
+  expect(await securityFallback.text()).toBe(securityText);
 
   await page.goto("/404.html");
   await expect(page.getByRole("heading", { name: "That record page is not available." }))

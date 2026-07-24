@@ -167,7 +167,9 @@ def test_netlify_headers_enforce_static_site_security_policy() -> None:
     root = WORKFLOW_ROOT.parents[1]
     config = (root / "netlify.toml").read_text(encoding="utf-8")
     headers = (root / "site" / "public" / "_headers").read_text(encoding="utf-8")
+    redirects = (root / "site" / "public" / "_redirects").read_text(encoding="utf-8")
     assert 'publish = "site/dist"' in config
+    assert "/.well-known/security.txt /security.txt 200!" in redirects
     assert "frame-ancestors 'none'" in headers
     assert "style-src 'self'" in headers
     assert "'unsafe-inline'" not in headers
