@@ -24,6 +24,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      data_ref: ${{ steps.private-revision.outputs.data_ref }}
     env:
       BREACHGAZETTE_SCHEDULE_ENABLED: ${{ vars.BREACHGAZETTE_SCHEDULE_ENABLED }}
     steps:
@@ -118,6 +120,19 @@ jobs:
             git commit -m "Update verified Breach Gazette source state"
             git push origin HEAD
           fi
+      - name: Resolve promoted private-state revision
+        if: >-
+          steps.update_cycle.outcome == 'success' &&
+          (github.event_name == 'schedule' || inputs.persist_private_state)
+        id: private-revision
+        working-directory: .private-production-data
+        run: |
+          data_revision="$(git rev-parse HEAD)"
+          if [[ ! "$data_revision" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "The promoted private-state revision is invalid."
+            exit 1
+          fi
+          echo "data_ref=$data_revision" >> "$GITHUB_OUTPUT"
       - name: Fail incomplete update after preserving health report
         if: steps.update_cycle.outcome != 'success'
         run: exit 1
@@ -130,7 +145,7 @@ jobs:
       (github.event_name == 'schedule' || inputs.persist_private_state)
     uses: ./.github/workflows/netlify.yml
     with:
-      data_ref: ${{ vars.BREACHGAZETTE_DATA_REF }}
+      data_ref: ${{ needs.update.outputs.data_ref }}
     secrets:
       BREACHGAZETTE_STATE_APP_PRIVATE_KEY: ${{ secrets.BREACHGAZETTE_STATE_APP_PRIVATE_KEY }}
       NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}

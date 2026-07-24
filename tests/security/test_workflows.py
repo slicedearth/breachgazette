@@ -30,6 +30,7 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     assert "default: false" in workflow
     assert "breachgazette update-cycle --data-root .private-production-data --promote" in workflow
     assert "steps.update_cycle.outcome == 'success'" in workflow
+    assert "data_ref: ${{ steps.private-revision.outputs.data_ref }}" in update_job
     assert "source-health-summary" in workflow
     assert "GITHUB_STEP_SUMMARY" in workflow
     assert workflow.index("source-health-summary") < workflow.index(
@@ -39,6 +40,11 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     assert workflow.index("Verify and promote an isolated candidate") < workflow.index(
         "git push origin HEAD"
     )
+    assert workflow.index("git push origin HEAD") < workflow.index(
+        "Resolve promoted private-state revision"
+    )
+    assert 'data_revision="$(git rev-parse HEAD)"' in update_job
+    assert '[[ ! "$data_revision" =~ ^[0-9a-f]{40}$ ]]' in update_job
     assert "actions/create-github-app-token@" in update_job
     assert "vars.BREACHGAZETTE_STATE_APP_CLIENT_ID" in update_job
     assert "secrets.BREACHGAZETTE_STATE_APP_PRIVATE_KEY" in update_job
@@ -52,6 +58,8 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     assert "needs.update.result == 'success'" in publish_job
     assert "github.event_name == 'schedule' || inputs.persist_private_state" in publish_job
     assert "uses: ./.github/workflows/netlify.yml" in publish_job
+    assert "data_ref: ${{ needs.update.outputs.data_ref }}" in publish_job
+    assert "data_ref: ${{ vars.BREACHGAZETTE_DATA_REF }}" not in publish_job
     assert "reviews" in workflow
     assert "breachgazette-update@users.noreply.github.com" in workflow
 
