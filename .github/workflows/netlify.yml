@@ -219,7 +219,16 @@ jobs:
             fi
             sleep 5
           done
-          deploy_url="$(jq -r '.ssl_url // .url // empty' \
+          published_at="$(jq -r '.published_at // empty' \
+            "$RUNNER_TEMP/netlify-deploy.json")"
+          if test -z "$published_at"; then
+            echo "Netlify marked the deploy ready without publishing it."
+            exit 1
+          fi
+          deploy_url="$(jq -r \
+            '[.deploy_ssl_url, .deploy_url, .ssl_url, .url]
+              | map(select(type == "string" and length > 0))
+              | .[0] // empty' \
             "$RUNNER_TEMP/netlify-deploy.json")"
           if [[ ! "$deploy_url" =~ ^https://[A-Za-z0-9.-]+/?$ ]]; then
             echo "Netlify returned an invalid HTTPS deployment URL."
@@ -237,15 +246,34 @@ jobs:
             echo "BREACHGAZETTE_SITE_URL is not a valid HTTPS origin."
             exit 1
           fi
-          for live_url in "$DEPLOY_URL" "${PRODUCTION_URL%/}"; do
+          live_urls=("$DEPLOY_URL")
+          if test "$DEPLOY_URL" != "${PRODUCTION_URL%/}"; then
+            live_urls+=("${PRODUCTION_URL%/}")
+          fi
+          for live_url in "${live_urls[@]}"; do
             identity_file="$RUNNER_TEMP/publication-identity-$RANDOM.json"
             manifest_file="$RUNNER_TEMP/search-manifest-$RANDOM.json"
             header_file="$RUNNER_TEMP/netlify-response-headers-$RANDOM.txt"
-            curl --fail --silent --show-error \
-              "$live_url/data/publication.json" > "$identity_file"
-            jq -e --arg checksum "$EXPECTED_CHECKSUM" \
-              '.publication_checksum == $checksum and .record_counts.notifications > 0' \
-              "$identity_file" > /dev/null
+            identity_verified=false
+            for attempt in $(seq 1 60); do
+              if curl --fail --silent \
+                -H "Cache-Control: no-cache" \
+                --output "$identity_file" \
+                "$live_url/data/publication.json?publication=$EXPECTED_CHECKSUM" \
+                && jq -e --arg checksum "$EXPECTED_CHECKSUM" \
+                  '.publication_checksum == $checksum
+                    and .record_counts.notifications > 0' \
+                  "$identity_file" > /dev/null; then
+                identity_verified=true
+                break
+              fi
+              if test "$attempt" = "60"; then
+                echo "Live publication identity did not become current within five minutes: $live_url"
+                exit 1
+              fi
+              sleep 5
+            done
+            test "$identity_verified" = "true"
             curl --fail --silent --show-error \
               "$live_url/data/notifications/manifest.json" > "$manifest_file"
             identity_records="$(jq -r '.record_counts.notifications' "$identity_file")"

@@ -120,8 +120,13 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert "Content-Type: application/zip" in workflow
     assert '--data-binary "@$RUNNER_TEMP/breachgazette-site.zip"' in workflow
     assert "/deploys?production=true" in workflow
+    assert ".published_at // empty" in workflow
+    assert "ready without publishing it" in workflow
+    assert ".deploy_ssl_url" in workflow
     assert "Netlify returned an invalid HTTPS deployment URL." in workflow
     assert "Verify live content identity and security headers" in workflow
+    assert "Live publication identity did not become current within five minutes" in workflow
+    assert 'test "$identity_verified" = "true"' in workflow
     assert "data/publication.json" in workflow
     assert "data/notifications/manifest.json" in workflow
     assert "steps.publication.outputs.checksum" in workflow
