@@ -19,17 +19,17 @@ const dimensions = [...new Set(records.map((record) => record.dimension))];
   />
   <section class="section shell">
     <div class="section-head"><h2>Reporting-period measures</h2><p>{records.length} source cells across {dimensions.length} reviewed dimensions.</p></div>
-    <div class="table-wrap" tabindex="0" aria-label="Scrollable OAIC aggregate metrics table">
+    <div class="table-wrap" tabindex="0" aria-label="OAIC aggregate metrics table">
       <table aria-label="OAIC aggregate metrics">
         <thead><tr><th>Dimension</th><th>Category</th><th>Value</th><th>Period</th><th>Population scope</th></tr></thead>
         <tbody>
           {records.slice(0, 250).map((record) => (
             <tr>
-              <td>{label(record.dimension)}</td>
-              <th scope="row">{record.parent_category ? `${record.parent_category}: ` : ""}{record.category}</th>
-              <td>{record.value.value ?? label(record.value.state)}{record.unit === "percent" ? "%" : ""}</td>
-              <td>{date(record.reporting_period_start)} to {date(record.reporting_period_end)}</td>
-              <td>{record.population_scope}</td>
+              <td data-label="Dimension">{label(record.dimension)}</td>
+              <th scope="row" data-label="Category">{record.parent_category ? `${record.parent_category}: ` : ""}{record.category}</th>
+              <td data-label="Value">{record.value.value ?? label(record.value.state)}{record.unit === "percent" ? "%" : ""}</td>
+              <td data-label="Period">{date(record.reporting_period_start)} to {date(record.reporting_period_end)}</td>
+              <td data-label="Population scope">{record.population_scope}</td>
             </tr>
           ))}
         </tbody>

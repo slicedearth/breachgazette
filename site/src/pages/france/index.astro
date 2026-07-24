@@ -80,7 +80,7 @@ const populatedDimensions = dimensions.filter(
         <h2>Monthly notification rows</h2>
         <p>Every published month is shown. Spikes can reflect repeated controller notifications from one processor event.</p>
       </div>
-      <div class="table-wrap" tabindex="0" aria-label="Scrollable CNIL monthly notification table">
+      <div class="table-wrap" tabindex="0" aria-label="CNIL monthly notification table">
         <table aria-label="CNIL monthly notification rows">
           <thead><tr><th scope="col">Month</th><th scope="col">Rows</th><th scope="col">Relative volume</th></tr></thead>
           <tbody>
@@ -88,9 +88,9 @@ const populatedDimensions = dimensions.filter(
               const count = numericValue(record.value.value);
               return (
                 <tr>
-                  <th scope="row">{record.category}</th>
-                  <td>{count.toLocaleString()}</td>
-                  <td>
+                  <th scope="row" data-label="Month">{record.category}</th>
+                  <td data-label="Rows">{count.toLocaleString()}</td>
+                  <td data-label="Relative volume">
                     <meter min="0" max={maxMonth} value={count}>
                       {count.toLocaleString()} of {maxMonth.toLocaleString()}
                     </meter>
@@ -112,14 +112,14 @@ const populatedDimensions = dimensions.filter(
       {populatedDimensions.map(([dimension, heading]) => (
         <article class="card">
           <h3>{heading}</h3>
-          <div class="table-wrap" tabindex="0" aria-label={`Scrollable ${heading.toLocaleLowerCase()} table`}>
+          <div class="table-wrap" tabindex="0" aria-label={`${heading} table`}>
             <table>
               <thead><tr><th scope="col">Source category</th><th scope="col">Count</th></tr></thead>
               <tbody>
                 {byDimension(dimension).map((record) => (
                   <tr>
-                    <th scope="row" lang="fr">{record.category}</th>
-                    <td>{numericValue(record.value.value).toLocaleString()}</td>
+                    <th scope="row" lang="fr" data-label="Source category">{record.category}</th>
+                    <td data-label="Count">{numericValue(record.value.value).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>

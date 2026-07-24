@@ -3,8 +3,8 @@
 **Public breach notifications, connected and explained.**
 
 Breach Gazette is a provenance-first public data platform for official
-Australian, French, and United States breach-notification statistics, public
-notification registers, and regulatory actions. It preserves the
+Australian, French, United Kingdom, and United States breach-notification
+statistics, public notification registers, and regulatory actions. It preserves the
 source-specific difference between aggregate statistics, anonymized
 notification rows, named notifications, investigations, determinations, court
 proceedings, and judgments.
@@ -30,9 +30,9 @@ an allegation into a finding.
   and comparison boundaries rather than presenting a cross-country ranking.
 - Candidate relationships publish their complete evidence and limitations in
   anchored pages of 50 instead of generating a redundant page for every pair.
-- Responsive tables contain horizontal scrolling within the table region;
-  page headings, navigation, and record labels retain normal word boundaries
-  on desktop and mobile.
+- Responsive tables retain their column structure on wider screens and become
+  labelled record cards on narrow screens, avoiding nested horizontal
+  scrollers without discarding table semantics.
 
 ## Source coverage
 
@@ -46,6 +46,7 @@ an allegation into a finding.
 | California Attorney General | Named notifications | Official full CSV, without notice letters |
 | Massachusetts OCABR | Named notifications | Reviewed 2024 through 2026 annual reports, without notice letters |
 | France CNIL | Anonymized notification summaries | Complete published CSV through December 2025; raw row combinations are not retained or published |
+| UK ICO | Anonymized report summaries | Unique report-reference aggregates from Q2 2019; raw rows, Q1 2019, and unresolved period conflicts are excluded |
 | HHS OCR | Deferred | No stable bounded machine-readable public-list contract verified |
 
 Aggregate and anonymized rows never become named incident records. A named

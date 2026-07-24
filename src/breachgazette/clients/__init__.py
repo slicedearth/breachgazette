@@ -7,6 +7,7 @@ from breachgazette.clients.ipc_nsw import NswAggregateAdapter, NswPublicNotifica
 from breachgazette.clients.massachusetts import MassachusettsAdapter
 from breachgazette.clients.oaic import OaicNdbAdapter
 from breachgazette.clients.oaic_regulatory import OaicRegulatoryAdapter
+from breachgazette.clients.uk_ico import UnitedKingdomIcoAdapter
 from breachgazette.clients.washington import WashingtonAdapter
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "OaicNdbAdapter",
     "OaicRegulatoryAdapter",
     "SourceClientError",
+    "UnitedKingdomIcoAdapter",
     "WashingtonAdapter",
 ]

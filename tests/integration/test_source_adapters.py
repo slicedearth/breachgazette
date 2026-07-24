@@ -30,6 +30,10 @@ from breachgazette.clients.massachusetts import (
 )
 from breachgazette.clients.oaic import EXPECTED_SHEETS, OaicNdbAdapter
 from breachgazette.clients.oaic_regulatory import OaicRegulatoryAdapter
+from breachgazette.clients.uk_ico import (
+    EXPECTED_HEADERS as ICO_HEADERS,
+)
+from breachgazette.clients.uk_ico import UnitedKingdomIcoAdapter
 from breachgazette.clients.washington import MAIN_FIELDS, PII_FIELDS, WashingtonAdapter
 from breachgazette.privacy.audit import audit_public_value
 
@@ -108,16 +112,8 @@ def test_cnil_anonymous_rows_are_counted_without_row_level_publication(
     adapter.earliest_month = date(2025, 12, 1)
     result = adapter.collect(observed_at=observed_at)
 
-    total = next(
-        record
-        for record in result.records
-        if record.dimension == "notification_rows"
-    )
-    month = next(
-        record
-        for record in result.records
-        if record.dimension == "notification_month"
-    )
+    total = next(record for record in result.records if record.dimension == "notification_rows")
+    month = next(record for record in result.records if record.dimension == "notification_month")
     natures = {
         record.category: record.value.value
         for record in result.records
@@ -146,9 +142,7 @@ def test_cnil_anonymous_rows_are_counted_without_row_level_publication(
 
 def test_cnil_metadata_and_schema_drift_fail_closed(observed_at: datetime) -> None:
     metadata, content = _cnil_fixture(license_id="changed")
-    adapter = CnilAdapter(
-        transport=httpx.MockTransport(lambda _request: _json_response(metadata))
-    )
+    adapter = CnilAdapter(transport=httpx.MockTransport(lambda _request: _json_response(metadata)))
     adapter.minimum_source_rows = 1
     adapter.earliest_month = date(2025, 12, 1)
     with pytest.raises(SourceClientError, match="licence"):
@@ -172,6 +166,203 @@ def test_cnil_metadata_and_schema_drift_fail_closed(observed_at: datetime) -> No
     schema_adapter = CnilAdapter(transport=httpx.MockTransport(handler))
     schema_adapter.minimum_source_rows = 1
     schema_adapter.earliest_month = date(2025, 12, 1)
+    with pytest.raises(SourceClientError, match="schema"):
+        schema_adapter.collect(observed_at=observed_at)
+
+
+def _ico_workbook() -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "in"
+    sheet.append(ICO_HEADERS)
+    reference = 1
+    for year in range(2019, 2026):
+        for quarter in range(1, 5):
+            sheet.append(
+                [
+                    f"BI{reference}",
+                    year,
+                    f"Qtr {quarter}",
+                    "Customers or prospective customers",
+                    "Basic personal identifiers",
+                    "No Further Action",
+                    "Non Cyber",
+                    "Data emailed to incorrect recipient",
+                    "1 to 9",
+                    "Health",
+                    "24 hours to 72 hours",
+                ]
+            )
+            if (year, quarter) == (2020, 2):
+                sheet.append(
+                    [
+                        f"BI{reference}",
+                        year,
+                        f"Qtr {quarter}",
+                        "Customers or prospective customers",
+                        "Health data",
+                        "No Further Action",
+                        "Non Cyber",
+                        "Data emailed to incorrect recipient",
+                        "1 to 9",
+                        "Health",
+                        "24 hours to 72 hours",
+                    ]
+                )
+            reference += 1
+    for year, quarter in ((2024, 4), (2025, 1)):
+        sheet.append(
+            [
+                "BI999",
+                year,
+                f"Qtr {quarter}",
+                "Unknown",
+                "Unknown",
+                "Informal Action Taken",
+                "Cyber",
+                "Phishing",
+                "Unknown",
+                "Charitable and voluntary",
+                "Less than 24 hours",
+            ]
+        )
+    buffer = BytesIO()
+    workbook.save(buffer)
+    workbook.close()
+    return buffer.getvalue()
+
+
+def _ico_page(*, include_semantics: bool = True) -> bytes:
+    semantics = (
+        "The data starts at Q2 2019. "
+        "Some reports hold multiple characteristics. "
+        "Open Government Licence v3.0."
+        if include_semantics
+        else "Download current data."
+    )
+    return (
+        f"<html><body><p>{semantics}</p>"
+        '<a href="/media2/fixture/data-security-incidents-trends-q1-2019-to-q4-2025.xlsx">'
+        "Download</a></body></html>"
+    ).encode()
+
+
+def test_ico_reports_are_deduplicated_and_published_only_as_aggregates(
+    observed_at: datetime,
+) -> None:
+    workbook = _ico_workbook()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/data-security-incident-trends/"):
+            return httpx.Response(
+                200,
+                headers={"Content-Type": "text/html; charset=utf-8"},
+                content=_ico_page(),
+            )
+        return httpx.Response(
+            200,
+            headers={
+                "Content-Type": (
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ),
+                "Last-Modified": "Wed, 11 Mar 2026 17:37:09 GMT",
+            },
+            content=workbook,
+        )
+
+    adapter = UnitedKingdomIcoAdapter(transport=httpx.MockTransport(handler))
+    adapter.minimum_source_reports = 1
+    result = adapter.collect(observed_at=observed_at)
+
+    total = next(record for record in result.records if record.dimension == "unique_reports")
+    quarters = [record for record in result.records if record.dimension == "reporting_quarter"]
+    data_types = {
+        record.category: record.value.value
+        for record in result.records
+        if record.dimension == "data_type"
+    }
+    assert total.value.value == 27
+    assert len(quarters) == 27
+    assert min(record.category for record in quarters) == "2019 Q2"
+    assert data_types == {
+        "Basic personal identifiers": 27,
+        "Health data": 1,
+    }
+    assert result.snapshot.records_discovered == 27
+    assert result.snapshot.records_accepted == 27
+    assert result.snapshot.records_rejected == 0
+    assert result.snapshot.completeness == "partial"
+    assert result.rejected == []
+    assert all(record.record_type == "aggregate" for record in result.records)
+    assert all(
+        record.denominator == 27
+        for record in result.records
+        if record.dimension
+        in {
+            "data_subject_type",
+            "data_type",
+            "decision_taken",
+            "incident_category",
+            "incident_type",
+            "affected_population_band",
+            "sector",
+            "time_to_report",
+        }
+    )
+    assert not [
+        finding
+        for record in result.records
+        for finding in audit_public_value(
+            record,
+            record_identity=record.source_record_id,
+        )
+    ]
+
+
+def test_ico_semantics_and_workbook_schema_drift_fail_closed(
+    observed_at: datetime,
+) -> None:
+    semantics_adapter = UnitedKingdomIcoAdapter(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                headers={"Content-Type": "text/html"},
+                content=_ico_page(include_semantics=False),
+            )
+        )
+    )
+    with pytest.raises(SourceClientError, match="semantics"):
+        semantics_adapter.collect(observed_at=observed_at)
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "in"
+    sheet.append(["Changed", *ICO_HEADERS[1:]])
+    sheet.append(["BI1", 2019, "Qtr 1", *(["Unknown"] * 8)])
+    buffer = BytesIO()
+    workbook.save(buffer)
+    workbook.close()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/data-security-incident-trends/"):
+            return httpx.Response(
+                200,
+                headers={"Content-Type": "text/html"},
+                content=_ico_page(),
+            )
+        return httpx.Response(
+            200,
+            headers={
+                "Content-Type": (
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ),
+                "Last-Modified": "Wed, 11 Mar 2026 17:37:09 GMT",
+            },
+            content=buffer.getvalue(),
+        )
+
+    schema_adapter = UnitedKingdomIcoAdapter(transport=httpx.MockTransport(handler))
+    schema_adapter.minimum_source_reports = 1
     with pytest.raises(SourceClientError, match="schema"):
         schema_adapter.collect(observed_at=observed_at)
 
@@ -355,12 +546,7 @@ def test_massachusetts_adapter_is_bounded_and_rejects_changed_flags(
             "MA Residents Affected": "12",
         }
     )
-    reports = iter(
-        [
-            [{**valid, "Breach Number": f"{year}-0001"}]
-            for year in (2024, 2025, 2026)
-        ]
-    )
+    reports = iter([[{**valid, "Breach Number": f"{year}-0001"}] for year in (2024, 2025, 2026)])
     monkeypatch.setattr(
         "breachgazette.clients.massachusetts._extract_rows",
         lambda _content: next(reports),
@@ -414,9 +600,7 @@ def test_massachusetts_preserves_reviewed_sparse_and_character_spaced_rows(
 
     assert records[0].affected_population.state == "source_omitted"
     assert records[0].affected_population.count is None
-    assert "omitted all reviewed information-category flags" in " ".join(
-        records[0].limitations
-    )
+    assert "omitted all reviewed information-category flags" in " ".join(records[0].limitations)
     assert records[1].industry == "Banks & Credit Unions"
     assert records[1].information_categories[0].normalized_label == "credit_debit_card"
 
@@ -442,9 +626,7 @@ def test_massachusetts_withholds_address_like_reporting_organization(
     )[0]
 
     assert record.named_entity.source_name == "Reporting organization withheld"
-    assert record.named_entity.normalized_name == (
-        "reporting-organization-withheld-ma-2024-0944"
-    )
+    assert record.named_entity.normalized_name == ("reporting-organization-withheld-ma-2024-0944")
     assert record.named_entity.role == "unknown"
     assert record.named_entity.origin == "normalized"
     assert record.named_entity.state == "source_omitted"

@@ -18,6 +18,7 @@ REQUIRED_SOURCES = {
     "california",
     "massachusetts",
     "france_cnil",
+    "united_kingdom_ico",
 }
 
 

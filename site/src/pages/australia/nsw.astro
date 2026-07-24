@@ -18,16 +18,16 @@ const policy = publication.policies.nsw_mndb_aggregate!;
     warning="These aggregate measures are not the NSW Public Notifications Register and do not name all agencies that notified the IPC."
   />
   <section class="section shell">
-    <div class="table-wrap" tabindex="0" aria-label="Scrollable NSW aggregate sector table">
+    <div class="table-wrap" tabindex="0" aria-label="NSW aggregate sector table">
       <table>
         <thead><tr><th>Measure</th><th>Sector</th><th>Value</th><th>Period</th></tr></thead>
         <tbody>
           {records.map((record) => (
             <tr>
-              <th scope="row">{record.category}</th>
-              <td>{record.parent_category}</td>
-              <td>{record.value.value ?? "Not applicable"}{record.unit === "percent" ? "%" : ""}</td>
-              <td>{date(record.reporting_period_start)} to {date(record.reporting_period_end)}</td>
+              <th scope="row" data-label="Measure">{record.category}</th>
+              <td data-label="Sector">{record.parent_category}</td>
+              <td data-label="Value">{record.value.value ?? "Not applicable"}{record.unit === "percent" ? "%" : ""}</td>
+              <td data-label="Period">{date(record.reporting_period_start)} to {date(record.reporting_period_end)}</td>
             </tr>
           ))}
         </tbody>

@@ -18,10 +18,10 @@ def test_source_policy_cli_commands_are_machine_readable() -> None:
     assert "oaic_ndb" in json.loads(inspected.stdout)
     validated = runner.invoke(app, ["validate-source-policies", "--json"])
     assert validated.exit_code == 0
-    assert json.loads(validated.stdout) == {"policies": 9, "valid": True}
+    assert json.loads(validated.stdout) == {"policies": 10, "valid": True}
     monitoring = runner.invoke(app, ["validate-monitoring", "--json"])
     assert monitoring.exit_code == 0
-    assert json.loads(monitoring.stdout)["sources"] == 8
+    assert json.loads(monitoring.stdout)["sources"] == 9
     aliases = runner.invoke(
         app,
         [

@@ -51,6 +51,13 @@
       "minimum_retained_fraction": 1.0,
       "maximum_growth_factor": 1.25
     },
+    "united_kingdom_ico": {
+      "source_id": "united_kingdom_ico",
+      "stale_after_hours": 4380,
+      "minimum_records": 100,
+      "minimum_retained_fraction": 0.85,
+      "maximum_growth_factor": 1.4
+    },
     "washington": {
       "source_id": "washington",
       "stale_after_hours": 240,

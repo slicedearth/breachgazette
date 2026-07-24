@@ -334,9 +334,10 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         (!publication.value || partition.publication_levels.includes(publication.value)) &&
         queryMayMatch(partition, normalizeSearch(query.value));
 
-      const cell = (tag: "th" | "td", value: string) => {
+      const cell = (tag: "th" | "td", value: string, dataLabel?: string) => {
         const element = document.createElement(tag);
         element.textContent = value;
+        if (dataLabel) element.dataset.label = dataLabel;
         return element;
       };
       const showRecordDetail = (record: Notification) => {
@@ -418,7 +419,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         const container = document.createElement("div");
         container.className = "table-wrap";
         container.tabIndex = 0;
-        container.setAttribute("aria-label", "Scrollable filtered public notification table");
+        container.setAttribute("aria-label", "Filtered public notification table");
         const table = document.createElement("table");
         table.className = "notification-table";
         const head = table.createTHead();
@@ -431,7 +432,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         const body = table.createTBody();
         for (const record of records) {
           const row = body.insertRow();
-          const entity = cell("th", "");
+          const entity = cell("th", "", "Named entity");
           entity.scope = "row";
           entity.className = "notification-table__entity";
           const observed = record.dates.find((item) => item.normalized_date)?.normalized_date;
@@ -451,10 +452,10 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           entity.append(details);
           row.append(
             entity,
-            cell("td", label(record.named_entity.role)),
-            cell("td", record.jurisdiction),
-            cell("td", date(observed)),
-            cell("td", label(record.publication_level)),
+            cell("td", label(record.named_entity.role), "Source role"),
+            cell("td", record.jurisdiction, "Jurisdiction"),
+            cell("td", date(observed), "Source date"),
+            cell("td", label(record.publication_level), "Publication level"),
           );
         }
         container.append(table);

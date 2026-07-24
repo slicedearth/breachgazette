@@ -25,6 +25,10 @@ without organization names. Those rows never enter organization resolution.
 For CNIL, the complete published CSV is validated transiently and only grouped
 counts are retained. Category-membership counts remain distinct from
 notification-row counts because one row can carry more than one category.
+For the UK ICO workbook, rows are grouped by their source report reference
+before counting. Q1 2019 is outside the source's stated comparable window, and
+a reference spanning conflicting quarters is excluded rather than assigned by
+inference. Only grouped counts enter durable state.
 
 ## Organization roles and identity
 
@@ -52,5 +56,5 @@ source; curated policy and alias changes require review.
 
 Comparisons are published only when period, threshold, population scope, unit,
 coverage, and source role are displayed and compatible. Breach Gazette does not
-compute a generic Australia-versus-US score or imply that higher notification
-counts mean weaker security.
+compute a generic country score or imply that higher notification counts mean
+weaker security.
