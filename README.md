@@ -81,9 +81,13 @@ python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip==26.1.2
 .venv/bin/pip install -r requirements.lock
 .venv/bin/pip install -e . --no-deps --no-build-isolation
+.venv/bin/python scripts/lock_python.py --check-installed
 cd site
 npm ci
 ```
+
+Regenerate `requirements.lock` in a fresh isolated Python 3.12 environment with
+`.venv/bin/python scripts/lock_python.py`.
 
 Run deterministic tests:
 

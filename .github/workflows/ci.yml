@@ -32,6 +32,7 @@ jobs:
           python -m pip install -r requirements.lock
           python -m pip install --no-deps --no-build-isolation -e .
           python -m pip check
+          python scripts/lock_python.py --check-installed
       - name: Verify Python
         run: |
           ruff check .

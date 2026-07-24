@@ -67,6 +67,7 @@ def test_ci_covers_private_catalogue_contracts_and_all_browser_engines() -> None
         browser_job,
     )
     assert "ruff check --select S src" in workflow
+    assert "python scripts/lock_python.py --check-installed" in workflow
     assert "tests/fixtures/reviews/organization-aliases.yml" in workflow
     assert "tests/fixtures/reviews/relationship-decisions.yml" in workflow
     assert "playwright install" not in workflow

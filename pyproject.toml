@@ -22,6 +22,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "click==8.4.2",
   "hypothesis==6.151.9",
   "mypy==2.3.0",
   "pip-audit==2.10.1",
