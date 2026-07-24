@@ -10,16 +10,12 @@ from breachgazette.contracts.enums import Completeness
 from breachgazette.contracts.models import RecordProvenance
 from breachgazette.utils import canonical_data, sha256_hex
 
-IGNORED_OBSERVATION_FIELDS = {
-    "source_retrieval_time",
-    "local_first_observed_time",
-    "local_last_observed_time",
-}
+PROVENANCE_FIELDS = frozenset(RecordProvenance.model_fields)
 
 
 def _comparable(record: RecordProvenance | dict[str, Any]) -> dict[str, Any]:
     payload = canonical_data(record)
-    return {key: value for key, value in payload.items() if key not in IGNORED_OBSERVATION_FIELDS}
+    return {key: value for key, value in payload.items() if key not in PROVENANCE_FIELDS}
 
 
 def compare_records(
@@ -40,7 +36,9 @@ def compare_records(
             before_value = None
             after_value: Any = {
                 "source_record_id": record_id,
-                "source_checksum": current_value.get("source_checksum"),
+                "source_checksum": canonical_data(current[record_id]).get(
+                    "source_checksum"
+                ),
             }
             reason = "The source record was not present in the previous comparable snapshot."
         else:

@@ -239,6 +239,10 @@ def test_compare_records_is_deterministic_and_partial_snapshots_do_not_remove(
     )
     assert [event.event_id for event in events] == [event.event_id for event in repeated]
     assert events[0].event_type == "source_record_corrected"
+    assert events[0].before_value is not None
+    assert "source_checksum" not in events[0].before_value
+    assert "source_revision" not in events[0].before_value
+    assert "limitations" not in events[0].before_value
     partial = compare_records(
         {"source:1": old},
         {},
@@ -259,6 +263,31 @@ def test_compare_records_is_deterministic_and_partial_snapshots_do_not_remove(
         completeness=Completeness.COMPLETE,
     )
     assert complete[0].event_type == "source_status_changed"
+
+
+def test_compare_records_ignores_provenance_only_changes(notification_factory) -> None:
+    old = notification_factory(record_id="source:1")
+    refreshed = old.model_copy(
+        update={
+            "source_revision": "replacement-revision",
+            "source_checksum": "b" * 64,
+            "parser_version": "2.0",
+            "normalization_version": "2.0",
+            "limitations": ["Updated coverage description."],
+            "source_retrieval_time": datetime(2026, 1, 3, tzinfo=UTC),
+            "local_last_observed_time": datetime(2026, 1, 3, tzinfo=UTC),
+        }
+    )
+
+    assert compare_records(
+        {"source:1": old},
+        {"source:1": refreshed},
+        source_id="washington",
+        current_snapshot="b" * 64,
+        previous_snapshot="a" * 64,
+        observed_at=datetime(2026, 1, 3, tzinfo=UTC),
+        completeness=Completeness.COMPLETE,
+    ) == []
 
 
 def test_first_observation_event_excludes_complete_record(notification_factory) -> None:
