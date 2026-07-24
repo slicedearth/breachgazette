@@ -23,7 +23,7 @@ def test_every_external_action_is_pinned_and_local_workflows_are_repository_rela
 def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     workflow = (WORKFLOW_ROOT / "scheduled-private-update.yml").read_text(encoding="utf-8")
     update_job, publish_job = workflow.split("\n  publish:\n", maxsplit=1)
-    assert "permissions:\n  contents: read" in workflow
+    assert "permissions:\n  actions: read\n  contents: read" in workflow
     assert "vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true'" in workflow
     assert "BREACHGAZETTE_SCHEDULE_ENABLED: ${{ vars.BREACHGAZETTE_SCHEDULE_ENABLED }}" in workflow
     assert "vars.BREACHGAZETTE_DATA_REF" in update_job
