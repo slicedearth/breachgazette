@@ -56,10 +56,19 @@ def test_opaque_identifiers_do_not_trigger_phone_detectors() -> None:
             "source_revision": "293f77604737bf7a",
             "canonical_organization_id": "org_0479028280477635",
             "query_bloom": "020478026102047802610204780261",
+            "sha256": "aaaaaaaaaa0298765432bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "snapshot_checksum": (
+                "cccccccccc0298765432dddddddddddddddddddddddddddddddddddddddddddd"
+            ),
             "organization": "Outcomes One, Inc.",
         },
         record_identity="record",
     )
+    findings = audit_public_value(
+        {"summary": "Checksum-like text 0298765432 remains source content."},
+        record_identity="record",
+    )
+    assert "australian_phone" in {finding.detector_id for finding in findings}
 
 
 @given(st.text(max_size=200))
