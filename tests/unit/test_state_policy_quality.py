@@ -554,6 +554,10 @@ def test_public_tree_audit_passes_safe_tree_and_rejects_remote_assets(tmp_path: 
     safe.mkdir()
     (safe / "index.html").write_text("<p>Safe static page</p>", encoding="utf-8")
     (safe / "_headers").write_text("/*\n  X-Frame-Options: DENY\n", encoding="utf-8")
+    (safe / "_redirects").write_text(
+        "/.well-known/security.txt /security.txt 200!\n",
+        encoding="utf-8",
+    )
     well_known = safe / ".well-known"
     well_known.mkdir()
     (well_known / "security.txt").write_text(
@@ -562,7 +566,7 @@ def test_public_tree_audit_passes_safe_tree_and_rejects_remote_assets(tmp_path: 
     )
     report = audit_public_tree(safe)
     assert report["passed"] is True
-    assert report["files"] == 3
+    assert report["files"] == 4
     assert report["html_files"] == 1
     with pytest.raises(DataQualityError, match="budget"):
         audit_public_tree(safe, max_files=0)
