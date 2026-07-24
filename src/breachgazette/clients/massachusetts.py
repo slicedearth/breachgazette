@@ -31,6 +31,7 @@ from breachgazette.contracts.enums import (
     ValueState,
 )
 from breachgazette.contracts.models import RecordProvenance
+from breachgazette.privacy.audit import audit_public_value
 from breachgazette.utils import normalize_organization_name, normalize_text, sha256_hex
 
 REPORTS_URL = "https://www.mass.gov/lists/data-breach-notification-reports"
@@ -122,6 +123,37 @@ def _excluded_row_reason(row: dict[str, str]) -> str | None:
     return None
 
 
+def _organization_role(
+    organization: str,
+    *,
+    breach_number: str,
+) -> tuple[OrganizationRole, bool]:
+    findings = audit_public_value(
+        organization,
+        record_identity=f"massachusetts:ma:{breach_number}:reporting-organization",
+    )
+    if findings:
+        return (
+            OrganizationRole(
+                source_name="Reporting organization withheld",
+                normalized_name=f"reporting-organization-withheld-ma-{breach_number}",
+                role=EntityRole.UNKNOWN,
+                origin=ValueOrigin.NORMALIZED,
+                state=ValueState.SOURCE_OMITTED,
+            ),
+            True,
+        )
+    return (
+        OrganizationRole(
+            source_name=organization,
+            normalized_name=normalize_organization_name(organization),
+            role=EntityRole.NOTIFYING_ENTITY,
+            origin=ValueOrigin.SOURCE_OBSERVED,
+        ),
+        False,
+    )
+
+
 def _parse_rows(
     rows_by_year: dict[int, list[dict[str, str]]],
     *,
@@ -157,6 +189,10 @@ def _parse_rows(
             organization = row["Reporting Organization Name"]
             if not organization:
                 raise SourceClientError("Massachusetts record omitted reporting organization")
+            organization_role, organization_withheld = _organization_role(
+                organization,
+                breach_number=breach_number,
+            )
             categories: list[InformationCategory] = []
             information_flags = [row[column] for column in INFORMATION_COLUMNS]
             if any(not value for value in information_flags) and any(
@@ -192,6 +228,11 @@ def _parse_rows(
                 limitations.append(
                     "The source row omitted all reviewed information-category flags."
                 )
+            if organization_withheld:
+                limitations.append(
+                    "The source reporting-organization cell was withheld because it "
+                    "matched a public-output privacy detector."
+                )
             affected_state = ValueState.PRESENT
             if affected is None:
                 affected_state = ValueState.SOURCE_OMITTED
@@ -217,12 +258,7 @@ def _parse_rows(
                     reporting_scheme="Massachusetts data breach notification reporting",
                     publication_level=PublicationLevel.NAMED_NOTIFICATION,
                     coverage_type=CoverageType.BOUNDED_HISTORICAL_DATASET,
-                    named_entity=OrganizationRole(
-                        source_name=organization,
-                        normalized_name=normalize_organization_name(organization),
-                        role=EntityRole.NOTIFYING_ENTITY,
-                        origin=ValueOrigin.SOURCE_OBSERVED,
-                    ),
+                    named_entity=organization_role,
                     dates=[
                         DateObservation(
                             meaning="regulator_submission_date",
@@ -304,6 +340,11 @@ class MassachusettsAdapter:
             checksum=checksum,
             observed_at=observed_at,
         )
+        withheld_entities = sum(
+            record.named_entity.state == ValueState.SOURCE_OMITTED
+            for record in records
+            if isinstance(record, SourceNotificationRecord)
+        )
         snapshot = source_snapshot(
             source_id=self.source_id,
             retrieved_at=observed_at,
@@ -322,6 +363,10 @@ class MassachusettsAdapter:
                     f"Excluded {exclusion_counts['placeholder']} source placeholder rows and "
                     f"{exclusion_counts['duplicate_marker']} duplicate-marker rows containing "
                     "no independent notification facts."
+                ),
+                (
+                    f"Withheld {withheld_entities} reporting-organization cells that matched "
+                    "public-output privacy detectors."
                 ),
             ],
         )
