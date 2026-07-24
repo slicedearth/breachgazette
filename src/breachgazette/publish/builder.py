@@ -27,10 +27,11 @@ from breachgazette.relationships import (
     load_relationship_catalogue,
 )
 from breachgazette.state import PrivateStateStore
-from breachgazette.utils import atomic_write_json, sha256_hex
+from breachgazette.utils import atomic_write_json, canonical_json_bytes, sha256_hex
 
 DETAIL_RECORDS_PER_SOURCE = 250
 SEARCH_PARTITION_SIZE = 250
+SEARCH_PARTITION_MAX_BYTES = 1_000_000
 SEARCH_BLOOM_BITS = 16_384
 SEARCH_BLOOM_HASHES = 3
 PUBLIC_TREE_MAX_FILES = 4_000
@@ -199,11 +200,18 @@ def _build_search_assets(
                 "partition_id": partition_id,
                 "records": payload_records,
             }
+            payload_bytes = len(canonical_json_bytes(payload))
+            if payload_bytes > SEARCH_PARTITION_MAX_BYTES:
+                raise DataQualityError(
+                    f"search partition {partition_id} is {payload_bytes} bytes; "
+                    f"maximum is {SEARCH_PARTITION_MAX_BYTES}"
+                )
             partitions.append((partition_id, payload))
             partition_metadata.append(
                 {
                     "id": partition_id,
                     "count": len(partition_records),
+                    "bytes": payload_bytes,
                     "query_bloom": _query_bloom(partition_records),
                     **facets,
                 }
@@ -213,6 +221,7 @@ def _build_search_assets(
         "generated_at": generated_at,
         "record_count": len(records),
         "partition_size": SEARCH_PARTITION_SIZE,
+        "partition_max_bytes": SEARCH_PARTITION_MAX_BYTES,
         "query_routing": {
             "algorithm": "normalized_trigram_bloom",
             "encoding": "hex",

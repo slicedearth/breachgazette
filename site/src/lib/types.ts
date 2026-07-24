@@ -57,6 +57,7 @@ export type SearchFacets = {
 export type SearchPartitionMetadata = SearchFacets & {
   id: string;
   count: number;
+  bytes: number;
   query_bloom: string;
 };
 
@@ -65,6 +66,7 @@ export type SearchManifest = {
   generated_at: string;
   record_count: number;
   partition_size: number;
+  partition_max_bytes: number;
   query_routing: {
     algorithm: "normalized_trigram_bloom";
     encoding: "hex";

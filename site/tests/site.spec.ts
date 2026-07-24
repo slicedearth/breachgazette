@@ -302,10 +302,23 @@ test("filtered notification pagination preserves URL state and every match", asy
       source_name: `Example Services Cooperative ${String(index + 1).padStart(2, "0")}`,
     },
   }));
+  const partitionBody = JSON.stringify({ ...fixture, records });
+  const manifest = JSON.parse(
+    await readFile("../tests/fixtures/site/search-manifest.json", "utf8"),
+  ) as {
+    record_count: number;
+    partitions: Array<{ count: number; bytes: number }>;
+  };
+  manifest.record_count = records.length;
+  manifest.partitions[0]!.count = records.length;
+  manifest.partitions[0]!.bytes = Buffer.byteLength(partitionBody);
+  await page.route("**/data/notifications/manifest.json", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(manifest) }),
+  );
   await page.route("**/data/notifications/fixture-2026-001.json", (route) =>
     route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({ ...fixture, records }),
+      body: partitionBody,
     }),
   );
 
@@ -337,11 +350,138 @@ test("filtered notification pagination preserves URL state and every match", asy
   );
 });
 
+test("complete-dataset filtering remains bounded at 10,000 records", async ({ page }) => {
+  const fixture = JSON.parse(
+    await readFile(
+      "../tests/fixtures/site/search-partitions/fixture-2026-001.json",
+      "utf8",
+    ),
+  ) as {
+    schema_version: string;
+    records: Array<Record<string, unknown> & {
+      named_entity: Record<string, unknown>;
+    }>;
+  };
+  const template = fixture.records[0]!;
+  const partitionBodies = new Map<string, string>();
+  const partitionMetadata = Array.from({ length: 40 }, (_, partitionIndex) => {
+    const id = `scale-2026-${String(partitionIndex + 1).padStart(3, "0")}`;
+    const records = Array.from({ length: 250 }, (_, recordIndex) => {
+      const sequence = partitionIndex * 250 + recordIndex + 1;
+      return {
+        ...template,
+        source_id: "scale",
+        source_record_id: `scale-${String(sequence).padStart(5, "0")}`,
+        jurisdiction: "Scale jurisdiction",
+        regulator: "Scale regulator",
+        named_entity: {
+          ...template.named_entity,
+          source_name: `Scale organization ${String(sequence).padStart(5, "0")}`,
+        },
+        has_detail_page: false,
+      };
+    });
+    const body = JSON.stringify({
+      schema_version: fixture.schema_version,
+      partition_id: id,
+      records,
+    });
+    partitionBodies.set(id, body);
+    return {
+      id,
+      count: records.length,
+      bytes: Buffer.byteLength(body),
+      query_bloom: "ff",
+      jurisdictions: ["Scale jurisdiction"],
+      regulators: ["Scale regulator"],
+      sources: ["scale"],
+      years: ["2026"],
+      causes: ["cyberattack"],
+      information_categories: ["health_information"],
+      population_bands: ["500_999"],
+      roles: ["notifying_entity"],
+      publication_levels: ["regulator_register_entry"],
+    };
+  });
+  const facets = {
+    jurisdictions: ["Scale jurisdiction"],
+    regulators: ["Scale regulator"],
+    sources: ["scale"],
+    years: ["2026"],
+    causes: ["cyberattack"],
+    information_categories: ["health_information"],
+    population_bands: ["500_999"],
+    roles: ["notifying_entity"],
+    publication_levels: ["regulator_register_entry"],
+  };
+  await page.route("**/data/notifications/manifest.json", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        schema_version: "1.0",
+        generated_at: "2026-01-01T00:00:00Z",
+        record_count: 10_000,
+        partition_size: 250,
+        partition_max_bytes: 1_000_000,
+        query_routing: {
+          algorithm: "normalized_trigram_bloom",
+          encoding: "hex",
+          bits: 8,
+          hashes: 3,
+          minimum_query_length: 3,
+        },
+        facets,
+        partitions: partitionMetadata,
+      }),
+    }),
+  );
+  const requestedPartitions: string[] = [];
+  await page.route(/\/data\/notifications\/scale-2026-\d{3}\.json$/, (route) => {
+    const id = new URL(route.request().url()).pathname.split("/").at(-1)!.replace(".json", "");
+    const body = partitionBodies.get(id);
+    expect(body).toBeDefined();
+    if (!body) throw new Error(`Missing generated partition ${id}`);
+    requestedPartitions.push(id);
+    return route.fulfill({ contentType: "application/json", body });
+  });
+
+  await page.goto("/latest/");
+  const started = Date.now();
+  await page.locator('[name="source"]').selectOption("scale");
+  await expect(page.locator("[data-result-count]")).toContainText(
+    "10,000 matching source records",
+    { timeout: 10_000 },
+  );
+  expect(Date.now() - started).toBeLessThan(8_000);
+  expect(new Set(requestedPartitions).size).toBe(40);
+  await expect(page.locator("[data-results] tbody tr")).toHaveCount(50);
+  await expect(page.locator("[data-result-count]")).toContainText(
+    "filtered page 1 of 200",
+  );
+});
+
 test("notification search preserves the complete static register when the manifest fails", async ({ page }) => {
   await page.route("**/data/notifications/manifest.json", (route) => route.abort());
   await page.goto("/latest/");
   await expect(page.locator("[data-result-count]")).toContainText("complete static register remains available");
   expect(await page.locator("[data-results] tbody tr").count()).toBeGreaterThan(0);
+});
+
+test("notification search rejects a partition above its published byte budget", async ({ page }) => {
+  const manifest = JSON.parse(
+    await readFile("../tests/fixtures/site/search-manifest.json", "utf8"),
+  ) as { partitions: Array<{ bytes: number }> };
+  manifest.partitions[0]!.bytes = 1;
+  await page.route("**/data/notifications/manifest.json", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(manifest) }),
+  );
+
+  await page.goto("/latest/");
+  await page.locator('[name="source"]').selectOption("washington");
+  await expect(page.locator("[data-result-count]")).toContainText(
+    "Search partitions could not be loaded",
+  );
+  await expect(page.locator("[data-results] tbody tr")).toHaveCount(3);
 });
 
 test("full notification filters preserve source fields and population bands", async ({ page }) => {

@@ -3,6 +3,7 @@
   "generated_at": "2026-01-01T00:00:00Z",
   "record_count": 3,
   "partition_size": 250,
+  "partition_max_bytes": 1000000,
   "query_routing": {
     "algorithm": "normalized_trigram_bloom",
     "encoding": "hex",
@@ -25,6 +26,7 @@
     {
       "id": "fixture-2026-001",
       "count": 3,
+      "bytes": 3557,
       "query_bloom": "ff",
       "jurisdictions": ["California", "New South Wales", "Washington"],
       "regulators": ["California Attorney General", "IPC NSW", "Washington Attorney General"],

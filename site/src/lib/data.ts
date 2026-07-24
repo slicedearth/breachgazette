@@ -50,7 +50,15 @@ export function getSearchManifest(): SearchManifest {
     manifest.query_routing?.encoding !== "hex" ||
     !Number.isInteger(manifest.query_routing.bits) ||
     !Number.isInteger(manifest.query_routing.hashes) ||
-    manifest.partitions.some((partition) => !partition.query_bloom)
+    !Number.isInteger(manifest.partition_max_bytes) ||
+    manifest.partition_max_bytes <= 0 ||
+    manifest.partitions.some(
+      (partition) =>
+        !partition.query_bloom ||
+        !Number.isInteger(partition.bytes) ||
+        partition.bytes <= 0 ||
+        partition.bytes > manifest.partition_max_bytes,
+    )
   ) {
     throw new Error("search-manifest.json is invalid");
   }
@@ -67,11 +75,16 @@ export function getSearchPartition(id: string): SearchPartition {
     throw new Error("search partition id is invalid");
   }
   const manifest = getSearchManifest();
-  if (!manifest.partitions.some((partition) => partition.id === id)) {
+  const metadata = manifest.partitions.find((partition) => partition.id === id);
+  if (!metadata) {
     throw new Error("search partition id is not declared");
   }
   const partition = readJson<SearchPartition>(join("search-partitions", `${id}.json`));
-  if (partition.partition_id !== id || !Array.isArray(partition.records)) {
+  if (
+    partition.partition_id !== id ||
+    !Array.isArray(partition.records) ||
+    partition.records.length !== metadata.count
+  ) {
     throw new Error("search partition payload is invalid");
   }
   searchPartitionCache.set(id, partition);

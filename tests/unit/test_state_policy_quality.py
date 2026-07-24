@@ -24,6 +24,7 @@ from breachgazette.monitoring import (
 )
 from breachgazette.policies import load_source_policies
 from breachgazette.publish.builder import (
+    SEARCH_PARTITION_MAX_BYTES,
     SEARCH_PARTITION_SIZE,
     _build_search_assets,
     _fnv1a,
@@ -318,6 +319,11 @@ def test_search_assets_are_partitioned_and_bounded(notification_factory) -> None
     assert len(partitions) == 2
     assert sum(partition["count"] for partition in manifest["partitions"]) == len(records)
     assert all(len(payload["records"]) <= SEARCH_PARTITION_SIZE for _, payload in partitions)
+    assert manifest["partition_max_bytes"] == SEARCH_PARTITION_MAX_BYTES
+    assert all(
+        0 < partition["bytes"] <= SEARCH_PARTITION_MAX_BYTES
+        for partition in manifest["partitions"]
+    )
     assert manifest["query_routing"] == {
         "algorithm": "normalized_trigram_bloom",
         "encoding": "hex",
@@ -340,6 +346,40 @@ def test_search_assets_are_partitioned_and_bounded(notification_factory) -> None
                 )
             )
             for seed in range(manifest["query_routing"]["hashes"])
+        )
+
+
+def test_search_assets_scale_to_ten_thousand_bounded_records(notification_factory) -> None:
+    records = [
+        notification_factory(record_id=f"record-{index:05d}")
+        for index in range(10_000)
+    ]
+    manifest, partitions = _build_search_assets(
+        records,
+        detail_ids=set(),
+        generated_at=datetime.now(UTC),
+    )
+
+    assert manifest["record_count"] == 10_000
+    assert len(partitions) == 40
+    assert len(manifest["partitions"]) == 40
+    assert sum(metadata["count"] for metadata in manifest["partitions"]) == 10_000
+    assert max(metadata["bytes"] for metadata in manifest["partitions"]) <= (
+        SEARCH_PARTITION_MAX_BYTES
+    )
+
+
+def test_search_assets_reject_oversized_partitions(
+    notification_factory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("breachgazette.publish.builder.SEARCH_PARTITION_MAX_BYTES", 1)
+
+    with pytest.raises(DataQualityError, match=r"search partition .* maximum is 1"):
+        _build_search_assets(
+            [notification_factory()],
+            detail_ids=set(),
+            generated_at=datetime.now(UTC),
         )
 
 

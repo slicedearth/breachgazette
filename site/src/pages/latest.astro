@@ -94,6 +94,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
     } from "../lib/types";
 
     const base = import.meta.env.BASE_URL;
+    const CLIENT_PARTITION_MAX_BYTES = 1_000_000;
     const controls = document.querySelector<HTMLElement>("[data-notification-filters]");
     const results = document.querySelector<HTMLElement>("[data-results]");
     const count = document.querySelector<HTMLElement>("[data-result-count]");
@@ -212,8 +213,20 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           { credentials: "same-origin" },
         ).then(async (partitionResponse) => {
           if (!partitionResponse.ok) throw new Error("Notification search partition is unavailable.");
-          const payload = (await partitionResponse.json()) as SearchPartition;
-          if (payload.partition_id !== partition.id || !Array.isArray(payload.records)) {
+          const encoded = new Uint8Array(await partitionResponse.arrayBuffer());
+          if (
+            encoded.byteLength > partition.bytes ||
+            encoded.byteLength > manifest.partition_max_bytes ||
+            encoded.byteLength > CLIENT_PARTITION_MAX_BYTES
+          ) {
+            throw new Error("Notification search partition exceeds its published byte budget.");
+          }
+          const payload = JSON.parse(new TextDecoder().decode(encoded)) as SearchPartition;
+          if (
+            payload.partition_id !== partition.id ||
+            !Array.isArray(payload.records) ||
+            payload.records.length !== partition.count
+          ) {
             throw new Error("Notification search partition is invalid.");
           }
           return payload.records;
