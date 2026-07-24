@@ -191,6 +191,25 @@ export type SourcePolicy = {
   limitations: string[];
 };
 
+export type SourceSnapshot = {
+  schema_version: string;
+  source_id: string;
+  retrieved_at: string;
+  completed_at: string;
+  revision: string;
+  checksum_sha256: string;
+  completeness: string;
+  records_discovered: number;
+  records_accepted: number;
+  records_rejected: number;
+  bounded_limit: number;
+  source_updated_at: string | null;
+  last_successful_complete_update: string | null;
+  latest_attempted_update: string;
+  stale: boolean;
+  notes: string[];
+};
+
 export type Publication = {
   schema_version: string;
   generated_at: string;
@@ -204,7 +223,7 @@ export type Publication = {
   relationships: Relationship[];
   corrections: CorrectionEvent[];
   policies: Record<string, SourcePolicy>;
-  snapshots: Array<Record<string, unknown>>;
+  snapshots: SourceSnapshot[];
   quality: {
     passed: boolean;
     dataset_class: string;
@@ -221,10 +240,14 @@ export type Publication = {
       source_id: string;
       status: string;
       record_count: number;
+      minimum_records: number;
+      completeness: string | null;
+      snapshot_checksum: string | null;
       snapshot_age_hours: number | null;
       stale_after_hours: number;
       latest_attempted_update: string | null;
       last_successful_update: string | null;
+      checkpoint_status: string;
       reasons: string[];
     }>;
   };
@@ -232,11 +255,12 @@ export type Publication = {
     dataset_class: string;
     generated_at: string;
     record_counts: Record<string, number>;
-    source_snapshots: Array<Record<string, unknown>>;
+    source_snapshots: SourceSnapshot[];
     publication_checksum: string;
     publication_checksum_algorithm: "sha256_canonical_json_v1";
     publication_checksum_scope: "publication_summary_and_search_partition_digests";
     max_public_records: number;
+    max_public_corrections: number;
     limitations: string[];
   };
   deferred_sources: SourcePolicy[];

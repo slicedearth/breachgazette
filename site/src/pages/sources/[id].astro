@@ -13,6 +13,7 @@ export function getStaticPaths() {
 const { policy } = Astro.props;
 const pagePublication = getPublication();
 const health = pagePublication.source_health.sources.find((source) => source.source_id === policy.source_id);
+const snapshot = pagePublication.manifest.source_snapshots.find((item) => item.source_id === policy.source_id);
 ---
 
 <BaseLayout title={policy.name} description={policy.unit_of_observation} section="Source methodology">
@@ -35,6 +36,15 @@ const health = pagePublication.source_health.sources.find((source) => source.sou
       { term: "Rights boundary reviewed", description: date(policy.rights_reviewed_on) },
       { term: "Redistribution decision", description: label(policy.redistribution_decision) },
       { term: "Automated health", description: policy.implemented ? label(health?.status ?? "not monitored") : "Deferred" },
+      { term: "Snapshot completeness", description: policy.implemented ? label(health?.completeness ?? "not published") : "Deferred" },
+      { term: "Update checkpoint", description: policy.implemented ? label(health?.checkpoint_status ?? "not monitored") : "Deferred" },
+      { term: "Reviewed record floor", description: health?.minimum_records.toLocaleString() },
+      { term: "Accepted records", description: snapshot?.records_accepted.toLocaleString() },
+      { term: "Rejected records", description: snapshot?.records_rejected.toLocaleString() },
+      { term: "Bounded retrieval limit", description: snapshot?.bounded_limit.toLocaleString() },
+      { term: "Source revision", description: snapshot?.revision },
+      { term: "Snapshot checksum", description: health?.snapshot_checksum },
+      { term: "Latest update attempt", description: date(health?.latest_attempted_update) },
       { term: "Last successful update", description: date(health?.last_successful_update) },
     ]} />
     <div class="prose">

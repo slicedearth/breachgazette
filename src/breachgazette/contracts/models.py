@@ -381,6 +381,7 @@ class PublicationManifest(ContractModel):
         "publication_summary_and_search_partition_digests"
     ]
     max_public_records: int = Field(ge=1)
+    max_public_corrections: int = Field(ge=1)
     limitations: list[str]
 
 

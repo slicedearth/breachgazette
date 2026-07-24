@@ -8,6 +8,9 @@ const publication = getPublication();
 const sources = publication.source_health.sources;
 const sourceName = (sourceId: string) =>
   publication.policies[sourceId]?.name ?? label(sourceId);
+const snapshots = new Map(
+  publication.manifest.source_snapshots.map((snapshot) => [snapshot.source_id, snapshot]),
+);
 ---
 
 <BaseLayout title="Source health" description="Freshness and update state for each implemented official source.">
@@ -42,6 +45,35 @@ const sourceName = (sourceId: string) =>
           ))}
         </tbody>
       </table>
+    </div>
+    <div class="section-head">
+      <h2>Publication evidence</h2>
+      <p>Revision, acceptance, and checkpoint values come from the complete source snapshot used by this publication.</p>
+    </div>
+    <div class="grid source-evidence-grid">
+      {sources.map((source) => {
+        const snapshot = snapshots.get(source.source_id);
+        return (
+          <article class="card source-evidence-card">
+            <h3>
+              <a href={`${import.meta.env.BASE_URL}sources/${source.source_id}/`}>
+                {sourceName(source.source_id)}
+              </a>
+            </h3>
+            <dl>
+              <div><dt>Completeness</dt><dd>{label(source.completeness ?? "not published")}</dd></div>
+              <div><dt>Checkpoint</dt><dd>{label(source.checkpoint_status)}</dd></div>
+              <div><dt>Reviewed floor</dt><dd>{source.minimum_records.toLocaleString()} records</dd></div>
+              <div><dt>Accepted</dt><dd>{snapshot?.records_accepted.toLocaleString() ?? "Not published"}</dd></div>
+              <div><dt>Rejected</dt><dd>{snapshot?.records_rejected.toLocaleString() ?? "Not published"}</dd></div>
+              <div><dt>Bounded limit</dt><dd>{snapshot?.bounded_limit.toLocaleString() ?? "Not published"}</dd></div>
+              <div><dt>Revision</dt><dd><code>{snapshot?.revision ?? "Not published"}</code></dd></div>
+              <div><dt>Snapshot checksum</dt><dd><code>{source.snapshot_checksum ?? "Not published"}</code></dd></div>
+              <div><dt>Latest attempt</dt><dd>{date(source.latest_attempted_update)}</dd></div>
+            </dl>
+          </article>
+        );
+      })}
     </div>
   </section>
 </BaseLayout>

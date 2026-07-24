@@ -25,6 +25,16 @@ test("source health exposes freshness without claiming factual completeness", as
   await expect(table).toContainText("NSW MNDB aggregate snapshot");
   await expect(table).not.toContainText("Oaic");
   await expect(table).not.toContainText("Nsw");
+  const evidence = page.locator(".source-evidence-grid");
+  await expect(evidence).toContainText("fixture-washington-revision");
+  await expect(evidence).toContainText("Accepted");
+  await expect(evidence).toContainText("Rejected");
+  await expect(evidence).toContainText("Bounded limit");
+  await page.getByRole("link", {
+    name: "Washington Attorney General breach notifications",
+  }).last().click();
+  await expect(page.getByText("fixture-washington-revision")).toBeVisible();
+  await expect(page.getByText("10,000")).toBeVisible();
 });
 
 test("OAIC allegations and orders retain distinct labels", async ({ page }) => {
@@ -602,6 +612,8 @@ test("publication identity and source corrections are readable and reproducible"
     "The normalized source record changed between comparable snapshots.",
   )).toBeVisible();
   await expect(page.getByText(/does not independently establish why/i)).toBeVisible();
+  await expect(page.getByText(/Showing the 1 most recently observed change of 1 retained event/)).toBeVisible();
+  await expect(page.getByText(/bounded to 250 events/)).toBeVisible();
 
   const correctionsFeed = await request.get("/feeds/corrections.xml");
   expect(correctionsFeed.ok()).toBe(true);
@@ -623,6 +635,8 @@ test("publication identity and source corrections are readable and reproducible"
     publication_checksum_algorithm: "sha256_canonical_json_v1",
     publication_checksum_scope: "publication_summary_and_search_partition_digests",
     record_counts: { notifications: 3, corrections: 1 },
+    published_corrections: 1,
+    max_public_corrections: 250,
   });
 });
 

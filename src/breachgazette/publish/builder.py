@@ -30,6 +30,7 @@ from breachgazette.state import PrivateStateStore
 from breachgazette.utils import atomic_write_json, canonical_json_bytes, sha256_hex
 
 DETAIL_RECORDS_PER_SOURCE = 250
+PUBLIC_CORRECTION_LIMIT = 250
 SEARCH_PARTITION_SIZE = 250
 SEARCH_PARTITION_MAX_BYTES = 1_000_000
 SEARCH_BLOOM_BITS = 16_384
@@ -397,7 +398,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
             events,
             key=lambda event: (event.first_observed_time, event.event_id),
             reverse=True,
-        )[:250],
+        )[:PUBLIC_CORRECTION_LIMIT],
         "quality": initial_quality,
         "source_health": source_health,
         "deferred_sources": [policy for policy in policies.values() if not policy.implemented],
@@ -445,10 +446,12 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         publication_checksum_algorithm="sha256_canonical_json_v1",
         publication_checksum_scope="publication_summary_and_search_partition_digests",
         max_public_records=len(notifications),
+        max_public_corrections=PUBLIC_CORRECTION_LIMIT,
         limitations=[
             "Incident relationships are candidates, not confirmed incident merges.",
             "Aggregate metrics remain separate from named notifications.",
             "Static detail pages are bounded to the latest 250 records per incident source.",
+            "The public correction history is bounded to the latest 250 observed changes.",
         ],
     )
     summary_payload["manifest"] = manifest

@@ -14,6 +14,8 @@ export const GET: APIRoute = () => {
       publication.manifest.publication_checksum_algorithm,
     publication_checksum_scope:
       publication.manifest.publication_checksum_scope,
+    published_corrections: publication.corrections.length,
+    max_public_corrections: publication.manifest.max_public_corrections,
     search_manifest: `${import.meta.env.BASE_URL}data/notifications/manifest.json`,
   };
   return new Response(JSON.stringify(identity), {
