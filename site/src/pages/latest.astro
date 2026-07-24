@@ -36,7 +36,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         <details class="advanced-filters" open data-advanced-filters>
           <summary>
             <span>Advanced filters</span>
-            <span class="advanced-filters__count" data-advanced-filter-count>6 available</span>
+            <span class="advanced-filters__count" data-advanced-filter-count>7 available</span>
           </summary>
           <div class="filters filters--advanced">
             <label>Source date<input type="date" name="date" /></label>
@@ -45,6 +45,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
             <label>Affected population<select name="population"><option value="">All population bands</option><option value="not_published">Not published</option><option value="500_999">500–999</option><option value="1000_9999">1,000–9,999</option><option value="10000_99999">10,000–99,999</option><option value="100000_plus">100,000+</option></select></label>
             <label>Entity role<select name="role"><option value="">All roles</option></select></label>
             <label>Publication level<select name="publication"><option value="">All publication levels</option></select></label>
+            <label>Sort results<select name="sort"><option value="">Newest source date</option><option value="oldest">Oldest source date</option><option value="organization">Entity name A–Z</option></select></label>
           </div>
         </details>
       </div>
@@ -78,6 +79,22 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         position="bottom"
       />
     </div>
+    <dialog class="record-dialog" data-record-dialog aria-labelledby="record-dialog-title">
+      <div class="record-dialog__header">
+        <div>
+          <span class="eyebrow">Published source record</span>
+          <h2 id="record-dialog-title" data-record-dialog-title>Record details</h2>
+        </div>
+        <button class="button-secondary" type="button" data-record-dialog-close>Close</button>
+      </div>
+      <p class="record-dialog__boundary" data-record-dialog-boundary></p>
+      <dl class="definition-grid record-dialog__definitions" data-record-dialog-definitions></dl>
+      <div class="prose">
+        <h3>Limitations</h3>
+        <ul data-record-dialog-limitations></ul>
+        <p><a data-record-dialog-source rel="external noopener noreferrer">Open official source <span aria-hidden="true">↗</span></a></p>
+      </div>
+    </dialog>
     <noscript><p class="notice">JavaScript is unavailable. Use the static page links to review the complete published register in groups of 50.</p></noscript>
   </section>
   <script>
@@ -88,6 +105,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
     } from "../lib/notifications";
     import type {
       Notification,
+      SearchFacets,
       SearchManifest,
       SearchPartition,
       SearchPartitionMetadata,
@@ -98,6 +116,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
     const controls = document.querySelector<HTMLElement>("[data-notification-filters]");
     const results = document.querySelector<HTMLElement>("[data-results]");
     const count = document.querySelector<HTMLElement>("[data-result-count]");
+    const recordDialog = document.querySelector<HTMLDialogElement>("[data-record-dialog]");
     if (controls && results && count) {
       const response = await fetch(`${base}data/notifications/manifest.json`, {
         credentials: "same-origin",
@@ -115,6 +134,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       const population = controls.querySelector<HTMLSelectElement>('[name="population"]')!;
       const role = controls.querySelector<HTMLSelectElement>('[name="role"]')!;
       const publication = controls.querySelector<HTMLSelectElement>('[name="publication"]')!;
+      const sort = controls.querySelector<HTMLSelectElement>('[name="sort"]')!;
       const query = controls.querySelector<HTMLInputElement>('[name="query"]')!;
       const exportButton = document.querySelector<HTMLButtonElement>("[data-export-results]")!;
       const exportStatus = document.querySelector<HTMLElement>("[data-export-status]")!;
@@ -125,13 +145,25 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       const advancedFilterCount = document.querySelector<HTMLElement>("[data-advanced-filter-count]")!;
       const mobileFilters = window.matchMedia("(max-width: 760px)");
       const options = (values: string[]) => [...new Set(values)].sort();
-      for (const value of options(manifest.facets.jurisdictions)) jurisdiction.add(new Option(value, value));
-      for (const value of options(manifest.facets.regulators)) regulator.add(new Option(value, value));
-      for (const value of options(manifest.facets.sources)) source.add(new Option(label(value), value));
-      for (const value of options(manifest.facets.causes)) cause.add(new Option(label(value), value));
-      for (const value of options(manifest.facets.information_categories)) information.add(new Option(label(value), value));
-      for (const value of options(manifest.facets.roles)) role.add(new Option(label(value), value));
-      for (const value of options(manifest.facets.publication_levels)) publication.add(new Option(label(value), value));
+      const addOptions = (
+        control: HTMLSelectElement,
+        values: string[],
+        facet: keyof SearchFacets,
+        format: (value: string) => string = label,
+      ) => {
+        for (const value of options(values)) {
+          const facetCount = manifest.facet_counts?.[facet]?.[value];
+          const suffix = facetCount ? ` (${facetCount.toLocaleString()})` : "";
+          control.add(new Option(`${format(value)}${suffix}`, value));
+        }
+      };
+      addOptions(jurisdiction, manifest.facets.jurisdictions, "jurisdictions", (value) => value);
+      addOptions(regulator, manifest.facets.regulators, "regulators", (value) => value);
+      addOptions(source, manifest.facets.sources, "sources");
+      addOptions(cause, manifest.facets.causes, "causes");
+      addOptions(information, manifest.facets.information_categories, "information_categories");
+      addOptions(role, manifest.facets.roles, "roles");
+      addOptions(publication, manifest.facets.publication_levels, "publication_levels");
       const filterControls = [
         ...controls.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select"),
       ];
@@ -202,43 +234,45 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
 
       const initialResults = results.cloneNode(true) as HTMLElement;
       const initialCount = results.querySelectorAll("tbody tr").length;
-      const partitionCache = new Map<string, Promise<Notification[]>>();
+      const partitionCache = new Map<string, Notification[]>();
       let filteredRecords: Notification[] = [];
       let loadedPartitionCount = 0;
-      const loadPartition = (partition: SearchPartitionMetadata) => {
+      let activeSearch: AbortController | null = null;
+      const loadPartition = async (
+        partition: SearchPartitionMetadata,
+        signal: AbortSignal,
+      ) => {
         const existing = partitionCache.get(partition.id);
         if (existing) return existing;
-        const pending = fetch(
+        const partitionResponse = await fetch(
           `${base}data/notifications/${encodeURIComponent(partition.id)}.json`,
-          { credentials: "same-origin" },
-        ).then(async (partitionResponse) => {
-          if (!partitionResponse.ok) throw new Error("Notification search partition is unavailable.");
-          const encoded = new Uint8Array(await partitionResponse.arrayBuffer());
-          if (
-            encoded.byteLength > partition.bytes ||
-            encoded.byteLength > manifest.partition_max_bytes ||
-            encoded.byteLength > CLIENT_PARTITION_MAX_BYTES
-          ) {
-            throw new Error("Notification search partition exceeds its published byte budget.");
-          }
-          const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", encoded))]
-            .map((byte) => byte.toString(16).padStart(2, "0"))
-            .join("");
-          if (digest !== partition.sha256) {
-            throw new Error("Notification search partition failed its integrity check.");
-          }
-          const payload = JSON.parse(new TextDecoder().decode(encoded)) as SearchPartition;
-          if (
-            payload.partition_id !== partition.id ||
-            !Array.isArray(payload.records) ||
-            payload.records.length !== partition.count
-          ) {
-            throw new Error("Notification search partition is invalid.");
-          }
-          return payload.records;
-        });
-        partitionCache.set(partition.id, pending);
-        return pending;
+          { credentials: "same-origin", signal },
+        );
+        if (!partitionResponse.ok) throw new Error("Notification search partition is unavailable.");
+        const encoded = new Uint8Array(await partitionResponse.arrayBuffer());
+        if (
+          encoded.byteLength > partition.bytes ||
+          encoded.byteLength > manifest.partition_max_bytes ||
+          encoded.byteLength > CLIENT_PARTITION_MAX_BYTES
+        ) {
+          throw new Error("Notification search partition exceeds its published byte budget.");
+        }
+        const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", encoded))]
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("");
+        if (digest !== partition.sha256) {
+          throw new Error("Notification search partition failed its integrity check.");
+        }
+        const payload = JSON.parse(new TextDecoder().decode(encoded)) as SearchPartition;
+        if (
+          payload.partition_id !== partition.id ||
+          !Array.isArray(payload.records) ||
+          payload.records.length !== partition.count
+        ) {
+          throw new Error("Notification search partition is invalid.");
+        }
+        partitionCache.set(partition.id, payload.records);
+        return payload.records;
       };
 
       const normalizeSearch = (value: string) =>
@@ -268,19 +302,21 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         }
         return hash;
       };
+      const queryTokens = (value: string) =>
+        normalizeSearch(value).split(" ").filter(Boolean);
       const queryMayMatch = (partition: SearchPartitionMetadata, term: string) => {
-        if (
-          term.length < manifest.query_routing.minimum_query_length ||
-          !partition.query_bloom
-        ) return true;
+        if (!partition.query_bloom) return true;
         const bloom = Uint8Array.from(
           partition.query_bloom.match(/.{2}/g) ?? [],
           (pair) => Number.parseInt(pair, 16),
         );
-        for (const gram of trigrams(term)) {
-          for (let seed = 0; seed < manifest.query_routing.hashes; seed += 1) {
-            const bit = fnv1a(`${seed}|${gram}`) % manifest.query_routing.bits;
-            if ((bloom[Math.floor(bit / 8)]! & (1 << (bit % 8))) === 0) return false;
+        for (const token of queryTokens(term)) {
+          if (token.length < manifest.query_routing.minimum_query_length) continue;
+          for (const gram of trigrams(token)) {
+            for (let seed = 0; seed < manifest.query_routing.hashes; seed += 1) {
+              const bit = fnv1a(`${seed}|${gram}`) % manifest.query_routing.bits;
+              if ((bloom[Math.floor(bit / 8)]! & (1 << (bit % 8))) === 0) return false;
+            }
           }
         }
         return true;
@@ -303,6 +339,81 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         element.textContent = value;
         return element;
       };
+      const showRecordDetail = (record: Notification) => {
+        if (!recordDialog) return;
+        const title = recordDialog.querySelector<HTMLElement>("[data-record-dialog-title]")!;
+        const boundary = recordDialog.querySelector<HTMLElement>("[data-record-dialog-boundary]")!;
+        const definitions = recordDialog.querySelector<HTMLDListElement>(
+          "[data-record-dialog-definitions]",
+        )!;
+        const limitations = recordDialog.querySelector<HTMLUListElement>(
+          "[data-record-dialog-limitations]",
+        )!;
+        const sourceLink = recordDialog.querySelector<HTMLAnchorElement>(
+          "[data-record-dialog-source]",
+        )!;
+        title.textContent = record.named_entity.source_name;
+        boundary.textContent =
+          `This is a ${label(record.named_entity.role).toLocaleLowerCase()} label ` +
+          "reported by the official source. It is not independently verified.";
+        const sourceDates = record.dates
+          .map((item) => `${label(item.meaning)}: ${date(item.normalized_date)}`)
+          .join("; ") || "Not published";
+        const affected = record.affected_population?.count;
+        const definitionsData: Array<[string, string]> = [
+          ["Source record", record.source_record_id],
+          ["Regulator or source", record.regulator],
+          ["Jurisdiction", record.jurisdiction],
+          ["Reporting scheme", record.reporting_scheme],
+          ["Publication level", label(record.publication_level)],
+          ["Coverage type", label(record.coverage_type)],
+          ["Named entity role", label(record.named_entity.role)],
+          ["Source dates", sourceDates],
+          [
+            "Affected population",
+            affected === null || affected === undefined
+              ? label(record.affected_population?.state ?? "not_published")
+              : affected.toLocaleString(),
+          ],
+          ["Breach cause", label(record.breach_cause?.normalized_label ?? "not_published")],
+          [
+            "Information categories",
+            record.information_categories.length
+              ? record.information_categories
+                  .map((item) => label(item.normalized_label))
+                  .join(", ")
+              : "Not published",
+          ],
+          ["Source revision", record.source_revision],
+          ["Source completeness", label(record.source_completeness)],
+          ["First locally observed", date(record.local_first_observed_time)],
+          ["Last locally observed", date(record.local_last_observed_time)],
+        ];
+        definitions.replaceChildren();
+        for (const [term, description] of definitionsData) {
+          const group = document.createElement("div");
+          const termElement = document.createElement("dt");
+          const descriptionElement = document.createElement("dd");
+          termElement.textContent = term;
+          descriptionElement.textContent = description;
+          group.append(termElement, descriptionElement);
+          definitions.append(group);
+        }
+        limitations.replaceChildren();
+        const recordLimitations = record.limitations.length
+          ? record.limitations
+          : ["No additional record-specific limitation was published."];
+        for (const limitation of recordLimitations) {
+          const item = document.createElement("li");
+          item.textContent = limitation;
+          limitations.append(item);
+        }
+        sourceLink.href = record.source_detail_url ?? record.source_url;
+        recordDialog.showModal();
+      };
+      recordDialog?.querySelector<HTMLElement>("[data-record-dialog-close]")
+        ?.addEventListener("click", () => recordDialog.close());
+
       const renderTable = (records: Notification[]) => {
         const container = document.createElement("div");
         container.className = "table-wrap";
@@ -332,6 +443,12 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           } else {
             entity.textContent = record.named_entity.source_name;
           }
+          const details = document.createElement("button");
+          details.type = "button";
+          details.className = "record-detail-button";
+          details.textContent = "View record details";
+          details.addEventListener("click", () => showRecordDetail(record));
+          entity.append(details);
           row.append(
             entity,
             cell("td", label(record.named_entity.role)),
@@ -539,6 +656,8 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       let debounce: number | undefined;
       const render = async () => {
         const version = ++renderVersion;
+        activeSearch?.abort();
+        activeSearch = null;
         if (!hasFilters()) {
           currentPage = 1;
           filteredRecords = [];
@@ -553,21 +672,25 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           return;
         }
         const candidatePartitions = manifest.partitions.filter(matchesPartition);
+        const controller = new AbortController();
+        activeSearch = controller;
         results.setAttribute("aria-busy", "true");
         count.textContent = `Searching ${candidatePartitions.length.toLocaleString()} relevant data partitions locally…`;
         try {
           const records: Notification[] = [];
           for (let offset = 0; offset < candidatePartitions.length; offset += 4) {
             const batch = candidatePartitions.slice(offset, offset + 4);
-            const loaded = await Promise.all(batch.map(loadPartition));
+            const loaded = await Promise.all(
+              batch.map((partition) => loadPartition(partition, controller.signal)),
+            );
             if (version !== renderVersion) return;
             records.push(...loaded.flat());
             count.textContent = `Searching ${Math.min(offset + batch.length, candidatePartitions.length).toLocaleString()} of ${candidatePartitions.length.toLocaleString()} relevant data partitions locally…`;
           }
           if (version !== renderVersion) return;
-          const term = normalizeSearch(query.value);
+          const terms = queryTokens(query.value);
           const filtered = records.filter((record) =>
-            (!term || searchText(record).includes(term)) &&
+            (terms.length === 0 || terms.every((term) => searchText(record).includes(term))) &&
             (!jurisdiction.value || record.jurisdiction === jurisdiction.value) &&
             (!regulator.value || record.regulator === regulator.value) &&
             (!source.value || record.source_id === source.value) &&
@@ -578,7 +701,26 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
             (!role.value || record.named_entity.role === role.value) &&
             (!publication.value || record.publication_level === publication.value)
           );
-          filteredRecords = filtered;
+          const latestDate = (record: Notification) =>
+            record.dates
+              .map((item) => item.normalized_date)
+              .filter((value): value is string => Boolean(value))
+              .sort()
+              .at(-1) ?? "";
+          filteredRecords = [...filtered].sort((left, right) => {
+            if (sort.value === "organization") {
+              return left.named_entity.source_name.localeCompare(
+                right.named_entity.source_name,
+              ) || left.source_record_id.localeCompare(right.source_record_id);
+            }
+            if (sort.value === "oldest") {
+              return (latestDate(left) || "9999").localeCompare(
+                latestDate(right) || "9999",
+              ) || left.source_record_id.localeCompare(right.source_record_id);
+            }
+            return latestDate(right).localeCompare(latestDate(left))
+              || right.source_record_id.localeCompare(left.source_record_id);
+          });
           loadedPartitionCount = candidatePartitions.length;
           exportButton.disabled = filtered.length === 0;
           exportStatus.textContent = filtered.length
@@ -587,8 +729,11 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           renderFilteredPage();
           syncHashState();
           results.removeAttribute("aria-busy");
-        } catch {
+          if (activeSearch === controller) activeSearch = null;
+        } catch (error) {
           if (version !== renderVersion) return;
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          if (activeSearch === controller) activeSearch = null;
           results.replaceChildren(...[...initialResults.childNodes].map((node) => node.cloneNode(true)));
           results.removeAttribute("aria-busy");
           filteredRecords = [];

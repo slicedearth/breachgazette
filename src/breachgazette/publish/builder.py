@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -124,6 +124,36 @@ def _search_facets(records: list[NormalizedNotification]) -> dict[str, list[str]
     }
 
 
+def _search_facet_counts(
+    records: list[NormalizedNotification],
+) -> dict[str, dict[str, int]]:
+    values: dict[str, list[str]] = {
+        "jurisdictions": [record.jurisdiction for record in records],
+        "regulators": [record.regulator for record in records],
+        "sources": [record.source_id for record in records],
+        "years": [_search_year(record) for record in records],
+        "causes": [
+            record.breach_cause.normalized_label
+            for record in records
+            if record.breach_cause and record.breach_cause.normalized_label
+        ],
+        "information_categories": [
+            category
+            for record in records
+            for category in {
+                item.normalized_label for item in record.information_categories
+            }
+        ],
+        "population_bands": [_population_band(record) for record in records],
+        "roles": [str(record.named_entity.role) for record in records],
+        "publication_levels": [str(record.publication_level) for record in records],
+    }
+    return {
+        facet: dict(sorted(Counter(items).items()))
+        for facet, items in values.items()
+    }
+
+
 def _normalized_search_text(record: NormalizedNotification) -> str:
     return " ".join(
         " ".join(value.casefold().split())
@@ -232,6 +262,7 @@ def _build_search_assets(
             "minimum_query_length": 3,
         },
         "facets": _search_facets(records),
+        "facet_counts": _search_facet_counts(records),
         "partitions": partition_metadata,
     }
     return manifest, partitions

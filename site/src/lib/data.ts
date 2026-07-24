@@ -42,10 +42,32 @@ let searchManifestCache: SearchManifest | undefined;
 export function getSearchManifest(): SearchManifest {
   if (searchManifestCache) return searchManifestCache;
   const manifest = readJson<SearchManifest>("search-manifest.json");
+  const facetNames = [
+    "jurisdictions",
+    "regulators",
+    "sources",
+    "years",
+    "causes",
+    "information_categories",
+    "population_bands",
+    "roles",
+    "publication_levels",
+  ] as const;
   if (
     !manifest ||
     !Array.isArray(manifest.partitions) ||
     !Number.isInteger(manifest.record_count) ||
+    !manifest.facets ||
+    !manifest.facet_counts ||
+    facetNames.some(
+      (facet) =>
+        !Array.isArray(manifest.facets[facet]) ||
+        typeof manifest.facet_counts[facet] !== "object" ||
+        manifest.facet_counts[facet] === null ||
+        Object.values(manifest.facet_counts[facet]).some(
+          (count) => !Number.isInteger(count) || count < 1,
+        ),
+    ) ||
     manifest.query_routing?.algorithm !== "normalized_trigram_bloom" ||
     manifest.query_routing?.encoding !== "hex" ||
     !Number.isInteger(manifest.query_routing.bits) ||

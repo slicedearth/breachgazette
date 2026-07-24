@@ -76,6 +76,9 @@ export type SearchManifest = {
     minimum_query_length: number;
   };
   facets: SearchFacets;
+  facet_counts: {
+    [Facet in keyof SearchFacets]: Record<string, number>;
+  };
   partitions: SearchPartitionMetadata[];
 };
 

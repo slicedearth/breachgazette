@@ -417,6 +417,17 @@ test("complete-dataset filtering remains bounded at 10,000 records", async ({ pa
     roles: ["notifying_entity"],
     publication_levels: ["regulator_register_entry"],
   };
+  const facetCounts = {
+    jurisdictions: { "Scale jurisdiction": 10_000 },
+    regulators: { "Scale regulator": 10_000 },
+    sources: { scale: 10_000 },
+    years: { "2026": 10_000 },
+    causes: { cyberattack: 10_000 },
+    information_categories: { health_information: 10_000 },
+    population_bands: { "500_999": 10_000 },
+    roles: { notifying_entity: 10_000 },
+    publication_levels: { regulator_register_entry: 10_000 },
+  };
   await page.route("**/data/notifications/manifest.json", (route) =>
     route.fulfill({
       contentType: "application/json",
@@ -434,6 +445,7 @@ test("complete-dataset filtering remains bounded at 10,000 records", async ({ pa
           minimum_query_length: 3,
         },
         facets,
+        facet_counts: facetCounts,
         partitions: partitionMetadata,
       }),
     }),
@@ -460,6 +472,10 @@ test("complete-dataset filtering remains bounded at 10,000 records", async ({ pa
   await expect(page.locator("[data-results] tbody tr")).toHaveCount(50);
   await expect(page.locator("[data-result-count]")).toContainText(
     "filtered page 1 of 200",
+  );
+  await page.getByLabel("Sort results").selectOption("organization");
+  await expect(page.locator("[data-results] tbody tr").first()).toContainText(
+    "Scale organization 00001",
   );
 });
 
@@ -509,6 +525,9 @@ test("notification search rejects same-size partition tampering", async ({ page 
 
 test("full notification filters preserve source fields and population bands", async ({ page }) => {
   await page.goto("/latest/");
+  await expect(
+    page.getByLabel("Jurisdiction").locator('option[value="Washington"]'),
+  ).toHaveText("Washington (1)");
   await page.locator('[name="source"]').selectOption("washington");
   await page.locator('[name="date"]').fill("2026-01-02");
   await page.locator('[name="cause"]').selectOption("cyberattack");
@@ -518,11 +537,22 @@ test("full notification filters preserve source fields and population bands", as
   await page.locator('[name="publication"]').selectOption("regulator_register_entry");
   await expect(page.locator("[data-result-count]")).toContainText("1 matching source records");
   await expect(page.getByRole("link", { name: "Example Services Cooperative" })).toBeVisible();
+  await page.getByRole("button", { name: "View record details" }).click();
+  const dialog = page.getByRole("dialog", { name: "Example Services Cooperative" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("fixture-wa-1");
+  await expect(dialog).toContainText("Washington Attorney General");
+  await expect(dialog.getByRole("link", { name: /Open official source/ })).toHaveAttribute(
+    "href",
+    "https://data.wa.gov/Consumer-Protection/Data-Breach-Notifications-Affecting-Washington-Resi/sb4j-ca4h",
+  );
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toBeHidden();
 });
 
 test("search includes regulator fields and exports every filtered match", async ({ page }) => {
   await page.goto("/latest/");
-  await page.locator('[name="query"]').fill("Washington Attorney General");
+  await page.locator('[name="query"]').fill("Example Washington");
   await expect(page.locator("[data-result-count]")).toContainText("1 matching source records");
   const download = await Promise.all([
     page.waitForEvent("download"),

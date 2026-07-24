@@ -22,6 +22,17 @@
     "roles": ["notifying_entity", "public_sector_agency"],
     "publication_levels": ["regulator_register_entry"]
   },
+  "facet_counts": {
+    "jurisdictions": {"California": 1, "New South Wales": 1, "Washington": 1},
+    "regulators": {"California Attorney General": 1, "IPC NSW": 1, "Washington Attorney General": 1},
+    "sources": {"california": 1, "nsw_public_notifications": 1, "washington": 1},
+    "years": {"2026": 3},
+    "causes": {"cyberattack": 1},
+    "information_categories": {"health_information": 1},
+    "population_bands": {"500_999": 1, "not_published": 2},
+    "roles": {"notifying_entity": 2, "public_sector_agency": 1},
+    "publication_levels": {"regulator_register_entry": 3}
+  },
   "partitions": [
     {
       "id": "fixture-2026-001",

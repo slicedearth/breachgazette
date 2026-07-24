@@ -328,6 +328,9 @@ def test_search_assets_are_partitioned_and_bounded(notification_factory) -> None
     assert all(
         len(partition["sha256"]) == 64 for partition in manifest["partitions"]
     )
+    assert manifest["facet_counts"]["sources"]["washington"] == len(records)
+    assert manifest["facet_counts"]["jurisdictions"]["Example"] == len(records)
+    assert manifest["facet_counts"]["roles"]["notifying_entity"] == len(records)
     assert manifest["query_routing"] == {
         "algorithm": "normalized_trigram_bloom",
         "encoding": "hex",

@@ -201,6 +201,51 @@ tbody tr:nth-child(even) { background: #f2eee3; }
 .notification-table td:not(:first-child) { white-space: nowrap; }
 .notification-table__entity,
 .notification-table__entity a { overflow-wrap: break-word; word-break: normal; white-space: normal; }
+.record-detail-button {
+  display: block;
+  min-height: 0;
+  margin-top: .4rem;
+  padding: 0;
+  color: var(--teal);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--vermilion);
+  border-radius: 0;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+}
+.record-detail-button:hover {
+  color: var(--vermilion);
+  background: transparent;
+  transform: none;
+}
+.record-dialog {
+  width: min(760px, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 1.25rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-top: 5px solid var(--teal);
+  border-radius: var(--radius-md);
+  box-shadow: 0 24px 80px rgb(0 18 32 / 35%);
+}
+.record-dialog::backdrop { background: rgb(0 18 32 / 68%); }
+.record-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.record-dialog__header h2 { margin-block: .3rem 0; }
+.record-dialog__boundary {
+  margin-block: 1rem;
+  padding: .75rem 1rem;
+  background: #dcefed;
+  border-left: 4px solid var(--teal);
+}
+.record-dialog__definitions { margin-block: 1rem 1.5rem; }
 .table-note { max-width: 70ch; color: var(--muted); font-size: .86rem; overflow-wrap: break-word; }
 .source-note { margin-block: 2rem; padding: 1.25rem; background: linear-gradient(135deg, #dcefed, #eaf7f3); border: 1px solid rgb(20 106 102 / 28%); border-top: 4px solid var(--teal); border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); }
 .source-note p { max-width: 72ch; line-height: 1.55; }
