@@ -388,6 +388,41 @@ test("search filters can be restored from a server-private URL fragment", async 
   await expect(page.getByLabel("Organization or agency")).toHaveValue("Example Services");
 });
 
+test("publication identity and source corrections are readable and reproducible", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  const stamp = page.getByLabel("Current publication");
+  await expect(stamp).toContainText("Verified 1 Jan 2026");
+  await expect(stamp.locator("code")).toHaveText("ffffffffffff");
+  await expect(stamp.getByRole("link", { name: "Review source health" })).toBeVisible();
+
+  await page.goto("/corrections/");
+  await expect(page.getByRole("heading", { name: "Observed source changes" })).toBeVisible();
+  await expect(page.locator("pre")).toHaveCount(0);
+  await expect(page.getByText("Source Record Corrected")).toBeVisible();
+  await expect(page.getByRole("heading", {
+    name: "Washington Attorney General breach notifications",
+  })).toBeVisible();
+  await expect(page.getByText(
+    "The normalized source record changed between comparable snapshots.",
+  )).toBeVisible();
+  await expect(page.getByText(/does not independently establish why/i)).toBeVisible();
+
+  const correctionsFeed = await request.get("/feeds/corrections.xml");
+  expect(correctionsFeed.ok()).toBe(true);
+  expect(correctionsFeed.headers()["content-type"]).toMatch(
+    /^(?:application\/atom\+xml|text\/xml)/,
+  );
+  const correctionsText = await correctionsFeed.text();
+  expect(correctionsText).toContain("Source Record Corrected");
+  expect(correctionsText).toContain(
+    "The normalized source record changed between comparable snapshots.",
+  );
+  expect(correctionsText).not.toContain("source_checksum");
+});
+
 test("feed, crawler policy, and not-found page preserve publication boundaries", async ({
   page,
   request,

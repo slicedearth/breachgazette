@@ -145,6 +145,23 @@ export type Relationship = {
   limitations: string[];
 };
 
+export type CorrectionEvent = {
+  event_id: string;
+  schema_version: string;
+  source_id: string;
+  record_id: string;
+  event_type: string;
+  before_value: unknown;
+  after_value: unknown;
+  reason: string;
+  previous_snapshot: string | null;
+  current_snapshot: string;
+  source_completeness: string;
+  detector_version: string;
+  first_observed_time: string;
+  limitations: string[];
+};
+
 export type SourcePolicy = {
   source_id: string;
   rights_reviewed_on: string;
@@ -179,7 +196,7 @@ export type Publication = {
   regulatory_actions: RegulatoryAction[];
   detail_organizations: Organization[];
   relationships: Relationship[];
-  corrections: Array<Record<string, unknown>>;
+  corrections: CorrectionEvent[];
   policies: Record<string, SourcePolicy>;
   snapshots: Array<Record<string, unknown>>;
   quality: {
@@ -209,6 +226,9 @@ export type Publication = {
     dataset_class: string;
     generated_at: string;
     record_counts: Record<string, number>;
+    source_snapshots: Array<Record<string, unknown>>;
+    publication_checksum: string;
+    max_public_records: number;
     limitations: string[];
   };
   deferred_sources: SourcePolicy[];

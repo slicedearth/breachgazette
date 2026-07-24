@@ -2,8 +2,13 @@
 import Hero from "../components/Hero.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { getPublication } from "../lib/data";
+import { date, label } from "../lib/format";
 
 const publication = getPublication();
+const sourceName = (sourceId: string) =>
+  publication.policies[sourceId]?.name ?? label(sourceId);
+const shortRevision = (revision: string | null) =>
+  revision ? revision.slice(0, 12) : "First retained snapshot";
 ---
 
 <BaseLayout title="Recent record corrections" description="Deterministic changes observed in official source records.">
@@ -13,10 +18,53 @@ const publication = getPublication();
     intro="These events describe changes first observed between complete official-source snapshots. They do not independently establish why a source changed."
   />
   <section class="section shell">
+    <div class="section-head correction-heading">
+      <h2>Observed source changes</h2>
+      <a href={`${import.meta.env.BASE_URL}feeds/corrections.xml`}>Subscribe to the corrections feed</a>
+    </div>
     {publication.corrections.length ? (
-      <ol class="grid">
+      <ol class="correction-list">
         {publication.corrections.map((event) => (
-          <li class="card"><pre>{JSON.stringify(event, null, 2)}</pre></li>
+          <li id={`event-${event.event_id}`}>
+            <article class="card correction-card">
+              <header>
+                <span class="pill">{label(event.event_type)}</span>
+                <h3>{sourceName(event.source_id)}</h3>
+                <p>{event.reason}</p>
+              </header>
+              <dl class="correction-card__meta">
+                <div>
+                  <dt>Source record</dt>
+                  <dd><code>{event.record_id}</code></dd>
+                </div>
+                <div>
+                  <dt>First observed</dt>
+                  <dd><time datetime={event.first_observed_time}>{date(event.first_observed_time)}</time></dd>
+                </div>
+                <div>
+                  <dt>Source completeness</dt>
+                  <dd>{label(event.source_completeness)}</dd>
+                </div>
+                <div>
+                  <dt>Snapshot transition</dt>
+                  <dd>
+                    <code>{shortRevision(event.previous_snapshot)}</code>
+                    <span aria-hidden="true"> → </span>
+                    <span class="visually-hidden"> to </span>
+                    <code>{shortRevision(event.current_snapshot)}</code>
+                  </dd>
+                </div>
+              </dl>
+              {event.limitations.length ? (
+                <div class="correction-card__limitations">
+                  <strong>Interpretation boundary</strong>
+                  <ul>
+                    {event.limitations.map((limitation) => <li>{limitation}</li>)}
+                  </ul>
+                </div>
+              ) : null}
+            </article>
+          </li>
         ))}
       </ol>
     ) : <p class="notice">No correction events have been observed in the retained complete snapshot history.</p>}

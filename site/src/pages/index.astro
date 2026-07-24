@@ -3,10 +3,11 @@ import Hero from "../components/Hero.astro";
 import NotificationTable from "../components/NotificationTable.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { getAllNotifications, getPublication } from "../lib/data";
-import { compactNumber } from "../lib/format";
+import { compactNumber, date } from "../lib/format";
 
 const publication = getPublication();
 const notifications = getAllNotifications();
+const publicationChecksum = publication.manifest.publication_checksum;
 const metrics = [
   ["Public notifications", publication.stats.public_notifications ?? 0],
   ["Aggregate metrics", publication.stats.aggregate_metrics ?? 0],
@@ -21,6 +22,17 @@ const metrics = [
     title="Public breach notifications, connected and explained."
     intro="Breach Gazette separates aggregate reporting, named public notifications, and legal-status events so each record keeps the meaning, threshold, role, and limitations of its official source."
   />
+  <aside class="publication-stamp shell" aria-label="Current publication">
+    <div>
+      <span class="eyebrow">Current publication</span>
+      <strong>Verified {date(publication.generated_at)}</strong>
+    </div>
+    <p>
+      Publication checksum
+      <code title={publicationChecksum}>{publicationChecksum.slice(0, 12)}</code>
+    </p>
+    <a href={`${import.meta.env.BASE_URL}source-health/`}>Review source health</a>
+  </aside>
   <section class="section shell" aria-labelledby="at-a-glance">
     <div class="section-head">
       <h2 id="at-a-glance">At a glance</h2>
