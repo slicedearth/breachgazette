@@ -11,6 +11,8 @@ const pageUrl = (pageNumber: number) =>
   pageNumber === 1
     ? `${import.meta.env.BASE_URL}relationships/`
     : `${import.meta.env.BASE_URL}relationships/pages/${pageNumber}/`;
+const relationshipUrl = (candidateId: string) =>
+  `${pageUrl(page.currentPage)}#${candidateId}`;
 ---
 
 {page.items.length ? (
@@ -19,20 +21,68 @@ const pageUrl = (pageNumber: number) =>
       Showing relationships {page.firstItem.toLocaleString()}–{page.lastItem.toLocaleString()} of{" "}
       {page.total.toLocaleString()}.
     </p>
-    <div class="grid" data-relationship-directory>
+    <div class="grid relationship-directory" data-relationship-directory>
       {page.items.map((relationship) => (
-        <article class="card">
+        <article
+          class="card relationship-card"
+          id={relationship.candidate_id}
+          data-relationship
+        >
           <span class="pill">
             {relationship.review_status
               ? label(relationship.review_status)
               : label(relationship.relationship_class)}
           </span>
           <h2>
-            <a href={`${import.meta.env.BASE_URL}relationships/${relationship.candidate_id}/`}>
+            <a href={relationshipUrl(relationship.candidate_id)}>
               {relationship.candidate_id}
             </a>
           </h2>
-          <p>{relationship.reasons.map((reason) => reason.explanation).join(" ")}</p>
+          <dl class="relationship-card__facts">
+            <div>
+              <dt>Source records</dt>
+              <dd>{relationship.record_ids.join(" and ")}</dd>
+            </div>
+            <div>
+              <dt>Relationship class</dt>
+              <dd>{label(relationship.relationship_class)}</dd>
+            </div>
+            <div>
+              <dt>Review state</dt>
+              <dd>
+                {relationship.review_status
+                  ? label(relationship.review_status)
+                  : "Not reviewed"}
+              </dd>
+            </div>
+            {relationship.reviewed_on && (
+              <div>
+                <dt>Reviewed on</dt>
+                <dd>{relationship.reviewed_on}</dd>
+              </div>
+            )}
+          </dl>
+          <div class="relationship-card__evidence">
+            <h3>Displayed evidence</h3>
+            <ul>
+              {relationship.reasons.map((reason) => (
+                <li>
+                  <strong>{label(reason.code)}:</strong> {reason.explanation}{" "}
+                  <span>Evidence: {reason.evidence.join("; ")}.</span>
+                </li>
+              ))}
+            </ul>
+            {relationship.limitations.length > 0 && (
+              <>
+                <h3>Limitations</h3>
+                <ul>
+                  {relationship.limitations.map((limitation) => (
+                    <li>{limitation}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
         </article>
       ))}
     </div>
