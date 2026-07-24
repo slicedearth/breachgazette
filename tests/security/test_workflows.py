@@ -146,6 +146,7 @@ def test_netlify_headers_enforce_static_site_security_policy() -> None:
     assert "style-src 'self'" in headers
     assert "'unsafe-inline'" not in headers
     assert "form-action 'none'" in headers
+    assert "upgrade-insecure-requests" in headers
     assert "Strict-Transport-Security: max-age=31536000" in headers
     assert "X-Content-Type-Options: nosniff" in headers
     assert "Referrer-Policy: no-referrer" in headers

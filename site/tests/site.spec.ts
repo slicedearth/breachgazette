@@ -295,6 +295,7 @@ test("runtime requests remain same-origin and no remote font or analytics is pre
   expect(contentSecurityPolicy).toContain("style-src 'self'");
   expect(contentSecurityPolicy).toContain("form-action 'none'");
   expect(contentSecurityPolicy).not.toContain("'unsafe-inline'");
+  expect(contentSecurityPolicy).not.toContain("upgrade-insecure-requests");
   expect([...origins]).toEqual(["http://127.0.0.1:41733"]);
   expect(paths).not.toContain("/data/notifications.json");
   const content = await page.content();
