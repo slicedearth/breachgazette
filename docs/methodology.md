@@ -13,12 +13,18 @@ the source record's own chronology. It receives a `source_conflict` state and
 no normalized date, so it cannot influence year facets, ordering, feeds, or
 candidate relationships until the official source corrects it.
 
-## Notification, incident, and aggregate
+## Notification, incident, anonymous row, and aggregate
 
 A notification is a source record, not automatically one unique incident.
 Multiple source records can describe one event, while one organization can
 have multiple unrelated events. Aggregate cells are metrics without named
 organizations and never enter incident grouping.
+
+An anonymized notification source can publish report-level characteristics
+without organization names. Those rows never enter organization resolution.
+For CNIL, the complete published CSV is validated transiently and only grouped
+counts are retained. Category-membership counts remain distinct from
+notification-row counts because one row can carry more than one category.
 
 ## Organization roles and identity
 

@@ -5,6 +5,7 @@
 | `SourcePolicy` | Reviewed semantics, dated rights assessment, limits, and correction boundary |
 | `SourceSnapshot` | One bounded retrieval attempt and completeness state |
 | `SourceAggregateRecord` | One source-published aggregate cell |
+| `SourceAnonymizedNotificationRecord` | One notification row with no organization identity and explicit source date precision |
 | `SourceNotificationRecord` | One named source notification row |
 | `SourceRegulatoryRecord` | One reviewed legal-status event |
 | `NormalizedNotification` | Notification plus publication-time organization ID |
@@ -34,3 +35,7 @@ displayed.
 All provenance-bearing records include source ID, record ID, safe official URL,
 revision, SHA-256 checksum, source completeness, retrieval time, first and last
 local observation, parser and normalization versions, and limitations.
+Date observations also retain source precision, including month-level dates.
+The implemented CNIL path validates anonymous rows transiently and stores only
+grouped `SourceAggregateRecord` metrics, reducing privacy and repository-size
+risk.

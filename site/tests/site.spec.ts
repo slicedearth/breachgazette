@@ -46,9 +46,29 @@ test("source coverage exposes record units and comparison boundaries", async ({ 
   const table = page.getByRole("table", { name: "Source coverage matrix" });
   await expect(table).toContainText("Regulator Register Entry");
   await expect(table).toContainText("State Aggregate");
+  await expect(table).toContainText("CNIL personal data breach notifications");
+  await expect(table).toContainText("2 rows / 4 cells");
   await expect(table).toContainText("Compare only matching periods");
   await expect(table).toContainText("not a count of unique incidents");
+  await expect(table).toContainText("no organization or incident inference");
   await expect(page.getByRole("heading", { name: "Four publication lanes" })).toBeVisible();
+});
+
+test("France view publishes grouped CNIL counts without organization inference", async ({ page }) => {
+  await page.goto("/france/");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "France’s CNIL notification patterns",
+  );
+  await expect(page.getByText("anonymized source rows")).toBeVisible();
+  await expect(page.getByText(/Rows are notifications, not unique breach incidents/i))
+    .toBeVisible();
+  await expect(page.getByRole("table", { name: "CNIL monthly notification rows" }))
+    .toContainText("2025-12");
+  await expect(
+    page.getByRole("navigation", { name: "Primary" }).getByRole("link", {
+      name: "Jurisdictions",
+    }),
+  ).toHaveAttribute("aria-current", "page");
 });
 
 test("OAIC allegations and orders retain distinct labels", async ({ page }) => {
@@ -107,7 +127,15 @@ test("keyboard navigation exposes skip link and table alternatives", async ({ pa
 test("representative desktop and mobile pages pass automated accessibility checks", async ({
   page,
 }) => {
-  const routes = ["/", "/latest/", "/source-health/", "/source-coverage/", "/corrections/"];
+  const routes = [
+    "/",
+    "/latest/",
+    "/jurisdictions/",
+    "/france/",
+    "/source-health/",
+    "/source-coverage/",
+    "/corrections/",
+  ];
   for (const viewport of [
     { width: 1440, height: 900 },
     { width: 320, height: 900 },
@@ -217,6 +245,8 @@ test("desktop and mobile layouts contain overflow without fragmenting text", asy
     "/",
     "/latest/",
     "/sources/",
+    "/jurisdictions/",
+    "/france/",
     "/source-health/",
     "/source-coverage/",
     "/australia/public-notifications/",

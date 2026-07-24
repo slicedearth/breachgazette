@@ -4,7 +4,9 @@ Breach Gazette is a local-first pipeline and a static publication.
 
 Fixed source adapters retrieve bounded official data through a shared hardened
 transport. Pydantic contracts preserve provenance and distinguish aggregate,
-notification, and regulatory records. Privacy auditing runs before normalized
+anonymized-notification, named-notification, and regulatory records. The CNIL
+adapter validates its complete published anonymized file but retains only
+grouped metrics in durable state. Privacy auditing runs before normalized
 state, before publication, and against the built tree.
 
 `PrivateStateStore` writes dataset-class metadata, source records, complete

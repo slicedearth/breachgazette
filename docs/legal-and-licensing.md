@@ -18,9 +18,14 @@ publications, names, logos, or third-party material.
   domain subject to third-party exclusions. Only the official CSV fields are
   normalized; sample letters are excluded.
 - **Massachusetts:** publication is limited to attributed factual fields in the
-  reviewed 2025 and 2026 official annual reports, subject to Mass.gov terms.
+  reviewed 2024 through 2026 official annual reports, subject to Mass.gov terms.
   Placeholder and duplicate-marker rows contain no independent notification
   facts and are counted but excluded. Consumer letters are not retrieved.
+- **France CNIL:** the official anonymized dataset is licensed under the
+  Licence Ouverte / Open Licence 2.0. Breach Gazette retains attributed grouped
+  metrics, not raw row combinations, and preserves the source warnings that
+  rows are notifications rather than unique incidents and that the most recent
+  three months are excluded.
 - **HHS:** the portal is linked and assessed but no source records are
   redistributed.
 
