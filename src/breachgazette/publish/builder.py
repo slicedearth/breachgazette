@@ -200,7 +200,8 @@ def _build_search_assets(
                 "partition_id": partition_id,
                 "records": payload_records,
             }
-            payload_bytes = len(canonical_json_bytes(payload))
+            served_payload = canonical_json_bytes(payload).removesuffix(b"\n")
+            payload_bytes = len(served_payload)
             if payload_bytes > SEARCH_PARTITION_MAX_BYTES:
                 raise DataQualityError(
                     f"search partition {partition_id} is {payload_bytes} bytes; "
@@ -212,6 +213,7 @@ def _build_search_assets(
                     "id": partition_id,
                     "count": len(partition_records),
                     "bytes": payload_bytes,
+                    "sha256": sha256_hex(served_payload),
                     "query_bloom": _query_bloom(partition_records),
                     **facets,
                 }
@@ -376,28 +378,6 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         generated_at=generated_at,
     )
     require_public_safe(search_manifest, record_identity="notification-search-manifest")
-    publication_checksum = sha256_hex(summary_payload)
-    manifest = PublicationManifest(
-        generated_at=generated_at,
-        dataset_class="real_source_data",
-        record_counts={
-            "aggregate_metrics": len(aggregates),
-            "notifications": len(notifications),
-            "regulatory_actions": len(regulatory_actions),
-            "organizations": len(organizations),
-            "relationships": len(relationships),
-            "corrections": len(events),
-        },
-        source_snapshots=snapshots,
-        publication_checksum=publication_checksum,
-        max_public_records=len(notifications),
-        limitations=[
-            "Incident relationships are candidates, not confirmed incident merges.",
-            "Aggregate metrics remain separate from named notifications.",
-            "Static detail pages are bounded to the latest 250 records per incident source.",
-        ],
-    )
-    summary_payload["manifest"] = manifest
     final_quality: QualityReport = build_quality_report(
         dataset_class="real_source_data",
         records_by_source=records_by_source,
@@ -412,6 +392,35 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
         source_health=health_states,
     )
     summary_payload["quality"] = final_quality
+    publication_checksum = sha256_hex(
+        {
+            "publication_summary": summary_payload,
+            "search_manifest": search_manifest,
+        }
+    )
+    manifest = PublicationManifest(
+        generated_at=generated_at,
+        dataset_class="real_source_data",
+        record_counts={
+            "aggregate_metrics": len(aggregates),
+            "notifications": len(notifications),
+            "regulatory_actions": len(regulatory_actions),
+            "organizations": len(organizations),
+            "relationships": len(relationships),
+            "corrections": len(events),
+        },
+        source_snapshots=snapshots,
+        publication_checksum=publication_checksum,
+        publication_checksum_algorithm="sha256_canonical_json_v1",
+        publication_checksum_scope="publication_summary_and_search_partition_digests",
+        max_public_records=len(notifications),
+        limitations=[
+            "Incident relationships are candidates, not confirmed incident merges.",
+            "Aggregate metrics remain separate from named notifications.",
+            "Static detail pages are bounded to the latest 250 records per incident source.",
+        ],
+    )
+    summary_payload["manifest"] = manifest
     output.mkdir(parents=True, exist_ok=True)
     (output / "notifications.json").unlink(missing_ok=True)
     search_output = output / "search-partitions"

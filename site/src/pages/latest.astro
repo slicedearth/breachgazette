@@ -221,6 +221,12 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           ) {
             throw new Error("Notification search partition exceeds its published byte budget.");
           }
+          const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", encoded))]
+            .map((byte) => byte.toString(16).padStart(2, "0"))
+            .join("");
+          if (digest !== partition.sha256) {
+            throw new Error("Notification search partition failed its integrity check.");
+          }
           const payload = JSON.parse(new TextDecoder().decode(encoded)) as SearchPartition;
           if (
             payload.partition_id !== partition.id ||

@@ -35,6 +35,7 @@ from breachgazette.publish.builder import (
 from breachgazette.quality import DataQualityError, build_quality_report
 from breachgazette.quality.temporal import exclude_temporal_conflicts
 from breachgazette.state import PrivateStateStore
+from breachgazette.utils import sha256_hex
 
 
 def test_source_policy_catalogue_is_complete() -> None:
@@ -324,6 +325,9 @@ def test_search_assets_are_partitioned_and_bounded(notification_factory) -> None
         0 < partition["bytes"] <= SEARCH_PARTITION_MAX_BYTES
         for partition in manifest["partitions"]
     )
+    assert all(
+        len(partition["sha256"]) == 64 for partition in manifest["partitions"]
+    )
     assert manifest["query_routing"] == {
         "algorithm": "normalized_trigram_bloom",
         "encoding": "hex",
@@ -465,6 +469,19 @@ def test_production_builder_emits_minimised_real_publication(
     )
     assert search_manifest["record_count"] == len(source_ids)
     assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids)
+    for metadata in search_manifest["partitions"]:
+        encoded = (
+            output / "search-partitions" / f"{metadata['id']}.json"
+        ).read_bytes().removesuffix(b"\n")
+        assert metadata["bytes"] == len(encoded)
+        assert metadata["sha256"] == sha256_hex(encoded)
+    manifest = publication.pop("manifest")
+    assert manifest["publication_checksum"] == sha256_hex(
+        {
+            "publication_summary": publication,
+            "search_manifest": search_manifest,
+        }
+    )
     assert (output / "source-health.json").is_file()
     assert audit_public_tree(output)["passed"] is True
 

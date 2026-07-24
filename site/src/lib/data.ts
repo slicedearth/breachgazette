@@ -57,7 +57,8 @@ export function getSearchManifest(): SearchManifest {
         !partition.query_bloom ||
         !Number.isInteger(partition.bytes) ||
         partition.bytes <= 0 ||
-        partition.bytes > manifest.partition_max_bytes,
+        partition.bytes > manifest.partition_max_bytes ||
+        !/^[0-9a-f]{64}$/.test(partition.sha256),
     )
   ) {
     throw new Error("search-manifest.json is invalid");

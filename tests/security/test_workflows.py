@@ -76,7 +76,12 @@ def test_ci_covers_private_catalogue_contracts_and_all_browser_engines() -> None
     assert "options: --user 1001" in browser_job
     assert "npm run test:e2e:ci" not in verify_job
     assert "npm run test:e2e:ci" in browser_job
+    assert "uses: ./.github/workflows/codeql.yml" in browser_job
     assert 'BREACHGAZETTE_SITE_URL: "https://breachgazette.example"' in workflow
+    codeql = (WORKFLOW_ROOT / "codeql.yml").read_text(encoding="utf-8")
+    assert "workflow_call:" in codeql
+    assert "pull_request:" not in codeql
+    assert "language: [python, javascript-typescript]" in codeql
 
 
 def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() -> None:
@@ -92,6 +97,9 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
         in workflow
     )
     assert "github.event.workflow_run.head_sha" in workflow
+    assert "actions: read" in workflow
+    assert "Verify source revision passed the complete CI gate" in workflow
+    assert "Manual publication requires an exact 40-character private-state commit." in workflow
     assert "vars.BREACHGAZETTE_DATA_REF" in workflow
     assert "steps.data-ref.outputs.data_ref" in workflow
     assert "actions/create-github-app-token@" in workflow
@@ -113,7 +121,11 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert '--data-binary "@$RUNNER_TEMP/breachgazette-site.zip"' in workflow
     assert "/deploys?production=true" in workflow
     assert "Netlify returned an invalid HTTPS deployment URL." in workflow
-    assert "Verify live security headers" in workflow
+    assert "Verify live content identity and security headers" in workflow
+    assert "data/publication.json" in workflow
+    assert "data/notifications/manifest.json" in workflow
+    assert "steps.publication.outputs.checksum" in workflow
+    assert "sha256sum" in workflow
     assert "strict-transport-security: max-age=31536000" in workflow
     assert "x-content-type-options: nosniff" in workflow
     assert "cross-origin-opener-policy: same-origin" in workflow
@@ -121,7 +133,7 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
         "breachgazette-site.zip"
     )
     assert workflow.index("breachgazette-site.zip") < workflow.index(
-        "Verify live security headers"
+        "Verify live content identity and security headers"
     )
 
 

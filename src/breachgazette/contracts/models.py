@@ -376,6 +376,10 @@ class PublicationManifest(ContractModel):
     record_counts: dict[str, int]
     source_snapshots: list[SourceSnapshot]
     publication_checksum: str = Field(pattern=r"^[0-9a-f]{64}$")
+    publication_checksum_algorithm: Literal["sha256_canonical_json_v1"]
+    publication_checksum_scope: Literal[
+        "publication_summary_and_search_partition_digests"
+    ]
     max_public_records: int = Field(ge=1)
     limitations: list[str]
 

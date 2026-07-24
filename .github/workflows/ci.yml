@@ -98,3 +98,10 @@ jobs:
       - name: Run browser tests
         working-directory: site
         run: npm run test:e2e:ci
+
+  codeql:
+    name: CodeQL
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/codeql.yml

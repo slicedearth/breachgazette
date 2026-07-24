@@ -58,6 +58,7 @@ export type SearchPartitionMetadata = SearchFacets & {
   id: string;
   count: number;
   bytes: number;
+  sha256: string;
   query_bloom: string;
 };
 
@@ -230,6 +231,8 @@ export type Publication = {
     record_counts: Record<string, number>;
     source_snapshots: Array<Record<string, unknown>>;
     publication_checksum: string;
+    publication_checksum_algorithm: "sha256_canonical_json_v1";
+    publication_checksum_scope: "publication_summary_and_search_partition_digests";
     max_public_records: number;
     limitations: string[];
   };

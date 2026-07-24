@@ -26,7 +26,8 @@
     {
       "id": "fixture-2026-001",
       "count": 3,
-      "bytes": 3557,
+      "bytes": 3556,
+      "sha256": "9b649946303bccbfe33607014bbc5fd3b0b9cb01790199f8faf2d4a74886d2c6",
       "query_bloom": "ff",
       "jurisdictions": ["California", "New South Wales", "Washington"],
       "regulators": ["California Attorney General", "IPC NSW", "Washington Attorney General"],

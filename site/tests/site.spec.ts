@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 test("Australian landing separates aggregate records from incidents", async ({ page }) => {
@@ -307,11 +308,12 @@ test("filtered notification pagination preserves URL state and every match", asy
     await readFile("../tests/fixtures/site/search-manifest.json", "utf8"),
   ) as {
     record_count: number;
-    partitions: Array<{ count: number; bytes: number }>;
+    partitions: Array<{ count: number; bytes: number; sha256: string }>;
   };
   manifest.record_count = records.length;
   manifest.partitions[0]!.count = records.length;
   manifest.partitions[0]!.bytes = Buffer.byteLength(partitionBody);
+  manifest.partitions[0]!.sha256 = createHash("sha256").update(partitionBody).digest("hex");
   await page.route("**/data/notifications/manifest.json", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(manifest) }),
   );
@@ -391,6 +393,7 @@ test("complete-dataset filtering remains bounded at 10,000 records", async ({ pa
       id,
       count: records.length,
       bytes: Buffer.byteLength(body),
+      sha256: createHash("sha256").update(body).digest("hex"),
       query_bloom: "ff",
       jurisdictions: ["Scale jurisdiction"],
       regulators: ["Scale regulator"],
@@ -484,6 +487,26 @@ test("notification search rejects a partition above its published byte budget", 
   await expect(page.locator("[data-results] tbody tr")).toHaveCount(3);
 });
 
+test("notification search rejects same-size partition tampering", async ({ page }) => {
+  const fixture = JSON.parse(
+    await readFile(
+      "../tests/fixtures/site/search-partitions/fixture-2026-001.json",
+      "utf8",
+    ),
+  ) as Record<string, unknown>;
+  const body = JSON.stringify(fixture).replace("Example", "Tamperx");
+  await page.route("**/data/notifications/fixture-2026-001.json", (route) =>
+    route.fulfill({ contentType: "application/json", body }),
+  );
+
+  await page.goto("/latest/");
+  await page.locator('[name="source"]').selectOption("washington");
+  await expect(page.locator("[data-result-count]")).toContainText(
+    "Search partitions could not be loaded",
+  );
+  await expect(page.locator("[data-results] tbody tr")).toHaveCount(3);
+});
+
 test("full notification filters preserve source fields and population bands", async ({ page }) => {
   await page.goto("/latest/");
   await page.locator('[name="source"]').selectOption("washington");
@@ -561,6 +584,16 @@ test("publication identity and source corrections are readable and reproducible"
     "The normalized source record changed between comparable snapshots.",
   );
   expect(correctionsText).not.toContain("source_checksum");
+
+  const identityResponse = await request.get("/data/publication.json");
+  expect(identityResponse.ok()).toBe(true);
+  expect(identityResponse.headers()["content-type"]).toContain("application/json");
+  expect(await identityResponse.json()).toMatchObject({
+    publication_checksum: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    publication_checksum_algorithm: "sha256_canonical_json_v1",
+    publication_checksum_scope: "publication_summary_and_search_partition_digests",
+    record_counts: { notifications: 3, corrections: 1 },
+  });
 });
 
 test("feed, crawler policy, and not-found page preserve publication boundaries", async ({

@@ -27,6 +27,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -53,10 +54,30 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      - name: Verify source revision passed the complete CI gate
+        if: github.event_name != 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          source_revision="$(git rev-parse HEAD)"
+          successful_runs="$(
+            gh api \
+              --method GET \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+              -f head_sha="$source_revision" \
+              -f status=success \
+              -f per_page=10 \
+              --jq '.total_count'
+          )"
+          if test "$successful_runs" -lt 1; then
+            echo "The selected source revision has not passed the complete CI gate."
+            exit 1
+          fi
       - name: Resolve private production-data revision
         id: data-ref
         env:
           CONFIGURED_DATA_REF: ${{ vars.BREACHGAZETTE_DATA_REF }}
+          EVENT_NAME: ${{ github.event_name }}
           REQUESTED_DATA_REF: ${{ inputs.data_ref }}
         run: |
           data_ref="$REQUESTED_DATA_REF"
@@ -65,6 +86,11 @@ jobs:
           fi
           if test -z "$data_ref"; then
             echo "Configure BREACHGAZETTE_DATA_REF for automatic publication."
+            exit 1
+          fi
+          if test "$EVENT_NAME" = "workflow_dispatch" \
+            && [[ ! "$data_ref" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Manual publication requires an exact 40-character private-state commit."
             exit 1
           fi
           if ! git check-ref-format --allow-onelevel "$data_ref" > /dev/null 2>&1; then
@@ -114,12 +140,22 @@ jobs:
           python -m pip install --no-deps --no-build-isolation -e .
           npm ci --ignore-scripts --prefix site
       - name: Generate privacy-minimised real publication
+        id: publication
         run: |
           breachgazette quality-report --data-root .private-production-data --json
           breachgazette build-site-data \
             --data-root .private-production-data \
             --output "$RUNNER_TEMP/publication" \
-            --json
+            --json > "$RUNNER_TEMP/publication-build.json"
+          publication_checksum="$(
+            jq -r '.publication_checksum // empty' \
+              "$RUNNER_TEMP/publication-build.json"
+          )"
+          if [[ ! "$publication_checksum" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Publication generation returned an invalid checksum."
+            exit 1
+          fi
+          echo "checksum=$publication_checksum" >> "$GITHUB_OUTPUT"
       - name: Build and audit production site
         env:
           BREACHGAZETTE_SITE_DATA_DIR: ${{ runner.temp }}/publication
@@ -145,6 +181,14 @@ jobs:
             cd site/dist
             zip -q -r -X -D "$RUNNER_TEMP/breachgazette-site.zip" .
           )
+          archive_sha256="$(
+            sha256sum "$RUNNER_TEMP/breachgazette-site.zip" | cut -d ' ' -f 1
+          )"
+          echo "archive_sha256=$archive_sha256" >> "$GITHUB_OUTPUT"
+          echo "- Publication checksum: \`${{ steps.publication.outputs.checksum }}\`" \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deployment archive SHA-256: \`$archive_sha256\`" \
+            >> "$GITHUB_STEP_SUMMARY"
           curl --fail-with-body --silent --show-error \
             -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
             -H "Content-Type: application/zip" \
@@ -183,30 +227,50 @@ jobs:
           fi
           deploy_url="${deploy_url%/}"
           echo "deploy_url=$deploy_url" >> "$GITHUB_OUTPUT"
-      - name: Verify live security headers
+      - name: Verify live content identity and security headers
         env:
           DEPLOY_URL: ${{ steps.deploy.outputs.deploy_url }}
+          EXPECTED_CHECKSUM: ${{ steps.publication.outputs.checksum }}
+          PRODUCTION_URL: ${{ vars.BREACHGAZETTE_SITE_URL }}
         run: |
-          curl --fail --silent --show-error \
-            --output /dev/null \
-            --dump-header "$RUNNER_TEMP/netlify-response-headers.txt" \
-            "$DEPLOY_URL/"
-          tr -d '\r' < "$RUNNER_TEMP/netlify-response-headers.txt" \
-            | tr '[:upper:]' '[:lower:]' \
-            > "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
-          grep -F "content-security-policy:" \
-            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
-          grep -F "frame-ancestors 'none'" \
-            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
-          grep -F "strict-transport-security: max-age=31536000" \
-            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
-          grep -F "x-content-type-options: nosniff" \
-            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
-          grep -F "x-frame-options: deny" \
-            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
-          grep -F "referrer-policy: no-referrer" \
-            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
-          grep -F "permissions-policy:" \
-            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
-          grep -F "cross-origin-opener-policy: same-origin" \
-            "$RUNNER_TEMP/netlify-response-headers-normalized.txt"
+          if [[ ! "$PRODUCTION_URL" =~ ^https://[A-Za-z0-9.-]+/?$ ]]; then
+            echo "BREACHGAZETTE_SITE_URL is not a valid HTTPS origin."
+            exit 1
+          fi
+          for live_url in "$DEPLOY_URL" "${PRODUCTION_URL%/}"; do
+            identity_file="$RUNNER_TEMP/publication-identity-$RANDOM.json"
+            manifest_file="$RUNNER_TEMP/search-manifest-$RANDOM.json"
+            header_file="$RUNNER_TEMP/netlify-response-headers-$RANDOM.txt"
+            curl --fail --silent --show-error \
+              "$live_url/data/publication.json" > "$identity_file"
+            jq -e --arg checksum "$EXPECTED_CHECKSUM" \
+              '.publication_checksum == $checksum and .record_counts.notifications > 0' \
+              "$identity_file" > /dev/null
+            curl --fail --silent --show-error \
+              "$live_url/data/notifications/manifest.json" > "$manifest_file"
+            identity_records="$(jq -r '.record_counts.notifications' "$identity_file")"
+            manifest_records="$(jq -r '.record_count' "$manifest_file")"
+            test "$identity_records" = "$manifest_records"
+            curl --fail --silent --show-error \
+              "$live_url/feeds/notifications.xml" > /dev/null
+            curl --fail --silent --show-error \
+              "$live_url/feeds/corrections.xml" > /dev/null
+            curl --fail --silent --show-error \
+              "$live_url/robots.txt" > /dev/null
+            curl --fail --silent --show-error \
+              --output /dev/null \
+              --dump-header "$header_file" \
+              "$live_url/"
+            tr -d '\r' < "$header_file" \
+              | tr '[:upper:]' '[:lower:]' \
+              > "$header_file.normalized"
+            grep -F "content-security-policy:" "$header_file.normalized"
+            grep -F "frame-ancestors 'none'" "$header_file.normalized"
+            grep -F "strict-transport-security: max-age=31536000" \
+              "$header_file.normalized"
+            grep -F "x-content-type-options: nosniff" "$header_file.normalized"
+            grep -F "x-frame-options: deny" "$header_file.normalized"
+            grep -F "referrer-policy: no-referrer" "$header_file.normalized"
+            grep -F "permissions-policy:" "$header_file.normalized"
+            grep -F "cross-origin-opener-policy: same-origin" "$header_file.normalized"
+          done

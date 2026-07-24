@@ -93,6 +93,6 @@
       {"source_id": "washington", "status": "healthy", "record_count": 1, "snapshot_age_hours": 1, "stale_after_hours": 240, "latest_attempted_update": "2026-01-01T00:00:00Z", "last_successful_update": "2026-01-01T00:00:00Z", "reasons": []}
     ]
   },
-  "manifest": {"dataset_class": "test_fixture", "generated_at": "2026-01-01T00:00:00Z", "record_counts": {"aggregate_metrics": 2, "notifications": 3, "regulatory_actions": 2, "organizations": 4, "relationships": 1, "corrections": 1}, "source_snapshots": [], "publication_checksum": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "max_public_records": 3, "limitations": ["Synthetic test-only publication."]},
+  "manifest": {"dataset_class": "test_fixture", "generated_at": "2026-01-01T00:00:00Z", "record_counts": {"aggregate_metrics": 2, "notifications": 3, "regulatory_actions": 2, "organizations": 4, "relationships": 1, "corrections": 1}, "source_snapshots": [], "publication_checksum": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "publication_checksum_algorithm": "sha256_canonical_json_v1", "publication_checksum_scope": "publication_summary_and_search_partition_digests", "max_public_records": 3, "limitations": ["Synthetic test-only publication."]},
   "deferred_sources": []
 }
