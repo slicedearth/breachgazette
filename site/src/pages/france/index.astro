@@ -1,0 +1,133 @@
+---
+import Hero from "../../components/Hero.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+import { date } from "../../lib/format";
+
+const publication = getPublication();
+const records = publication.aggregates.filter(
+  (record) => record.source_id === "france_cnil",
+);
+const policy = publication.policies.france_cnil;
+const numericValue = (value: string | number | null): number =>
+  typeof value === "number" ? value : 0;
+const byDimension = (dimension: string) =>
+  records
+    .filter((record) => record.dimension === dimension)
+    .sort(
+      (left, right) =>
+        numericValue(right.value.value) - numericValue(left.value.value)
+        || left.category.localeCompare(right.category),
+    );
+const total = records.find((record) => record.dimension === "notification_rows");
+const months = records
+  .filter((record) => record.dimension === "notification_month")
+  .sort((left, right) => right.category.localeCompare(left.category));
+const maxMonth = Math.max(
+  1,
+  ...months.map((record) => numericValue(record.value.value)),
+);
+const firstMonth = months.at(-1);
+const lastMonth = months[0];
+const dimensions = [
+  ["sector", "Sector"],
+  ["affected_population_band", "Affected-population band"],
+  ["individuals_informed", "Information of affected people"],
+  ["sensitive_data_field", "Sensitive-data field"],
+  ["breach_nature", "Breach-nature observations"],
+  ["incident_cause", "Incident-cause observations"],
+] as const;
+const populatedDimensions = dimensions.filter(
+  ([dimension]) => byDimension(dimension).length > 0,
+);
+---
+
+<BaseLayout
+  title="France"
+  description="Privacy-minimised summaries of anonymized CNIL personal data breach notification rows."
+  section="France"
+>
+  <Hero
+    eyebrow="Anonymized national reporting"
+    title="France’s CNIL notification patterns"
+    intro="CNIL publishes notification-level fields without organization names. Breach Gazette validates the complete published file, then retains and publishes only grouped counts."
+    warning="Rows are notifications, not unique breach incidents. One processor incident can generate many separate controller notifications, and the latest three months are excluded by the official source."
+  />
+  <section class="section shell">
+    <div class="stat-grid" aria-label="CNIL publication summary">
+      <article>
+        <strong>{numericValue(total?.value.value ?? 0).toLocaleString()}</strong>
+        <span>anonymized source rows</span>
+      </article>
+      <article>
+        <strong>{months.length.toLocaleString()}</strong>
+        <span>published months</span>
+      </article>
+      <article>
+        <strong>{byDimension("sector").length.toLocaleString()}</strong>
+        <span>source sectors</span>
+      </article>
+      <article>
+        <strong>{firstMonth && lastMonth ? `${date(firstMonth.reporting_period_start)}–${date(lastMonth.reporting_period_end)}` : "Not published"}</strong>
+        <span>observed window</span>
+      </article>
+    </div>
+  </section>
+  <section class="section section--ink">
+    <div class="shell">
+      <div class="section-head">
+        <h2>Monthly notification rows</h2>
+        <p>Every published month is shown. Spikes can reflect repeated controller notifications from one processor event.</p>
+      </div>
+      <div class="table-wrap" tabindex="0" aria-label="Scrollable CNIL monthly notification table">
+        <table aria-label="CNIL monthly notification rows">
+          <thead><tr><th scope="col">Month</th><th scope="col">Rows</th><th scope="col">Relative volume</th></tr></thead>
+          <tbody>
+            {months.map((record) => {
+              const count = numericValue(record.value.value);
+              return (
+                <tr>
+                  <th scope="row">{record.category}</th>
+                  <td>{count.toLocaleString()}</td>
+                  <td>
+                    <meter min="0" max={maxMonth} value={count}>
+                      {count.toLocaleString()} of {maxMonth.toLocaleString()}
+                    </meter>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  <section class="section shell">
+    <div class="section-head">
+      <h2>Source-labelled distributions</h2>
+      <p>Breach-nature and incident-cause totals are category observations and can exceed the number of notification rows.</p>
+    </div>
+    <div class="grid france-distributions">
+      {populatedDimensions.map(([dimension, heading]) => (
+        <article class="card">
+          <h3>{heading}</h3>
+          <div class="table-wrap" tabindex="0" aria-label={`Scrollable ${heading.toLocaleLowerCase()} table`}>
+            <table>
+              <thead><tr><th scope="col">Source category</th><th scope="col">Count</th></tr></thead>
+              <tbody>
+                {byDimension(dimension).map((record) => (
+                  <tr>
+                    <th scope="row" lang="fr">{record.category}</th>
+                    <td>{numericValue(record.value.value).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      ))}
+    </div>
+    {policy && <SourceNote href={policy.source_url} />}
+  </section>
+</BaseLayout>

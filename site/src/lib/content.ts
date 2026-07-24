@@ -4,9 +4,9 @@ export const informationPages = {
     intro: "How source semantics, date meanings, organization roles, candidate relationships, and corrections remain explicit.",
     sections: [
       ["Source before synthesis", "Every value retains its regulator, reporting scheme, publication level, threshold, coverage type, source role, revision, and source link. Notification counts are not assumed to equal unique incidents."],
-      ["Aggregate versus record", "Aggregate statistics are analytical measures without named organizations. Named notifications and regulatory actions use separate contracts and views."],
+      ["Aggregate versus record", "Aggregate statistics and anonymized notification summaries contain no named organizations. Named notifications and regulatory actions use separate contracts and views."],
       ["Time and change", "Occurrence, awareness, submission, publication, and observation dates retain separate meanings. New source snapshots produce deterministic change events rather than rewriting history silently."],
-      ["Cross-country comparisons", "Breach Gazette compares like-for-like measures only when thresholds, periods, population scopes, and units are displayed. It does not publish a generic Australia-versus-US ranking."],
+      ["Cross-country comparisons", "Breach Gazette compares like-for-like measures only when thresholds, periods, population scopes, and units are displayed. It does not publish a generic country ranking."],
     ],
   },
   "entity-resolution": {
@@ -41,7 +41,7 @@ export const informationPages = {
     intro: "Breach Gazette publishes organization-level official data while excluding victim, contact, credential, and narrative material.",
     sections: [
       ["No visitor profiling", "There are no accounts, cookies, analytics, remote fonts, query telemetry, or background requests. Filters execute locally against static data."],
-      ["Minimised records", "The public output excludes personal emails, phone numbers, street addresses, identifiers, credentials, complete breach notices, complete decisions, and free-text narratives."],
+      ["Minimised records", "The public output excludes personal emails, phone numbers, street addresses, identifiers, credentials, complete breach notices, complete decisions, free-text narratives, and CNIL raw row combinations."],
       ["Private state", "Raw retrievals, caches, comparison state, and complete source snapshots remain in a configured private data root outside the repository and deployed site."],
     ],
   },
@@ -58,7 +58,7 @@ export const informationPages = {
     title: "Legal and licensing",
     intro: "The project’s MIT licence does not relicense official source material.",
     sections: [
-      ["Attribution", "OAIC and NSW IPC materials retain their official attribution and source links. Washington, California, and Massachusetts material remains subject to each government source’s terms and documented conditions."],
+      ["Attribution", "OAIC and NSW IPC materials retain their official attribution and source links. Washington, California, and Massachusetts material remains subject to each government source’s terms and documented conditions. CNIL grouped metrics retain CNIL attribution and the Open Licence 2.0 boundary."],
       ["Legal status", "Investigations, allegations, enforceable undertakings, determinations, judgments, and orders are not interchangeable. Each timeline record keeps exact source-backed status."],
       ["Logos and marks", "No regulator logos or source images are reproduced. Organization and regulator names identify source records and may be trademarks of their owners."],
     ],
@@ -78,6 +78,7 @@ export const informationPages = {
     sections: [
       ["Australia", "Contact the affected organization through a verified official channel. For identity and cyber guidance, consult the Australian Cyber Security Centre and IDCARE directly."],
       ["United States", "Contact the notifying organization through its verified official site. Use the relevant state attorney general, HHS OCR, or federal identity-theft resources for authoritative next steps."],
+      ["France", "Contact the relevant organization through a verified official channel. Use CNIL and official French cyber-security guidance for authoritative rights and response information."],
       ["Immediate safety", "Do not use Breach Gazette as an emergency service, victim lookup, eligibility check, or notification channel."],
     ],
   },

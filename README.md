@@ -2,11 +2,12 @@
 
 **Public breach notifications, connected and explained.**
 
-Breach Gazette is a provenance-first public data platform for official Australian
-and United States breach-notification statistics, public notification
-registers, and regulatory actions. It preserves the source-specific difference
-between aggregate statistics, named notifications, investigations,
-determinations, court proceedings, and judgments.
+Breach Gazette is a provenance-first public data platform for official
+Australian, French, and United States breach-notification statistics, public
+notification registers, and regulatory actions. It preserves the
+source-specific difference between aggregate statistics, anonymized
+notification rows, named notifications, investigations, determinations, court
+proceedings, and judgments.
 
 Breach Gazette does not independently verify the underlying events. It does not
 score organizations, identify victims, retrieve notification letters, or turn
@@ -25,6 +26,8 @@ an allegation into a finding.
   and export every match rather than only the visible page.
 - Source-health views use the reviewed public source names and preserve
   acronyms such as NSW, MNDB, OAIC, NDB, and HHS.
+- Jurisdiction and coverage views expose source units, periods, thresholds,
+  and comparison boundaries rather than presenting a cross-country ranking.
 - Responsive tables contain horizontal scrolling within the table region;
   page headings, navigation, and record labels retain normal word boundaries
   on desktop and mobile.
@@ -40,11 +43,12 @@ an allegation into a finding.
 | Washington Attorney General | Named notifications | Fixed Socrata datasets and exact fields |
 | California Attorney General | Named notifications | Official full CSV, without notice letters |
 | Massachusetts OCABR | Named notifications | Reviewed 2024 through 2026 annual reports, without notice letters |
+| France CNIL | Anonymized notification summaries | Complete published CSV through December 2025; raw row combinations are not retained or published |
 | HHS OCR | Deferred | No stable bounded machine-readable public-list contract verified |
 
-Aggregate rows never become named incident records. A named notifier is not
-silently relabelled as the entity where an event occurred. Cross-jurisdiction
-relationships remain explainable candidates until reviewed.
+Aggregate and anonymized rows never become named incident records. A named
+notifier is not silently relabelled as the entity where an event occurred.
+Cross-jurisdiction relationships remain explainable candidates until reviewed.
 
 ## Architecture
 

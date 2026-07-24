@@ -39,10 +39,22 @@ const coveragePeriod = (sourceId: string): string => {
     : `${date(dates[0])}–${date(dates.at(-1)!)}`;
 };
 
-const recordCount = (sourceId: string) =>
-  notifications.filter((record) => record.source_id === sourceId).length
-  + publication.aggregates.filter((record) => record.source_id === sourceId).length
-  + publication.regulatory_actions.filter((record) => record.source_id === sourceId).length;
+const recordCount = (sourceId: string): string => {
+  const namedRows = notifications.filter((record) => record.source_id === sourceId).length;
+  const aggregateCells = publication.aggregates.filter(
+    (record) => record.source_id === sourceId,
+  );
+  const legalEvents = publication.regulatory_actions.filter(
+    (record) => record.source_id === sourceId,
+  ).length;
+  const anonymousRows = aggregateCells.find(
+    (record) => record.dimension === "notification_rows",
+  )?.value.value;
+  if (typeof anonymousRows === "number") {
+    return `${anonymousRows.toLocaleString()} rows / ${aggregateCells.length.toLocaleString()} cells`;
+  }
+  return (namedRows + aggregateCells.length + legalEvents).toLocaleString();
+};
 
 const comparisonBoundary = (publicationLevel: string): string => {
   if (publicationLevel.includes("aggregate")) {
@@ -116,7 +128,7 @@ const countries = new Set(implemented.map((policy) => policy.country));
                 </th>
                 <td>{policy.country}<br /><small>{policy.jurisdiction}</small></td>
                 <td>{label(policy.publication_level)}<br /><small>{policy.unit_of_observation}</small></td>
-                <td>{recordCount(policy.source_id).toLocaleString()}</td>
+                <td>{recordCount(policy.source_id)}</td>
                 <td>{coveragePeriod(policy.source_id)}</td>
                 <td>{policy.public_window}</td>
                 <td>{comparisonBoundary(policy.publication_level)}</td>

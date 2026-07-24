@@ -29,6 +29,8 @@ const contentSecurityPolicy = [
 ].join("; ");
 const isCurrent = (path: string) =>
   Astro.url.pathname.startsWith(new URL(`${base}${path}`, Astro.site).pathname);
+const isJurisdiction = ["jurisdictions/", "australia/", "united-states/", "france/"]
+  .some((path) => isCurrent(path));
 ---
 
 <!doctype html>
@@ -88,8 +90,7 @@ const isCurrent = (path: string) =>
           </span>
         </button>
         <nav id="primary-navigation" aria-label="Primary">
-          <a href={`${base}australia/`} aria-current={isCurrent("australia/") ? "page" : undefined}>Australia</a>
-          <a href={`${base}united-states/`} aria-current={isCurrent("united-states/") ? "page" : undefined}>United States</a>
+          <a href={`${base}jurisdictions/`} aria-current={isJurisdiction ? "page" : undefined}>Jurisdictions</a>
           <a href={`${base}latest/`} aria-current={isCurrent("latest/") ? "page" : undefined}>Notifications</a>
           <a href={`${base}source-coverage/`} aria-current={isCurrent("source-coverage/") ? "page" : undefined}>Coverage</a>
           <a href={`${base}sources/`} aria-current={isCurrent("sources/") ? "page" : undefined}>Sources</a>

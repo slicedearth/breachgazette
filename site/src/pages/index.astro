@@ -10,6 +10,7 @@ const notifications = getAllNotifications();
 const publicationChecksum = publication.manifest.publication_checksum;
 const metrics = [
   ["Public notifications", publication.stats.public_notifications ?? 0],
+  ["Anonymous notification rows", publication.stats.anonymized_notification_rows ?? 0],
   ["Aggregate metrics", publication.stats.aggregate_metrics ?? 0],
   ["Regulatory actions", publication.stats.regulatory_actions ?? 0],
   ["Healthy sources", publication.source_health.sources.filter((source) => source.status === "healthy").length],
@@ -20,7 +21,7 @@ const metrics = [
   <Hero
     eyebrow="Official public-source intelligence"
     title="Public breach notifications, connected and explained."
-    intro="Breach Gazette separates aggregate reporting, named public notifications, and legal-status events so each record keeps the meaning, threshold, role, and limitations of its official source."
+    intro="Breach Gazette separates aggregate reporting, anonymized notification rows, named public notifications, and legal-status events so each record keeps the meaning, threshold, role, and limitations of its official source."
   />
   <aside class="publication-stamp shell" aria-label="Current publication">
     <div>
@@ -47,9 +48,9 @@ const metrics = [
       ))}
     </div>
   </section>
-  <section class="section shell" aria-labelledby="three-views">
+  <section class="section shell" aria-labelledby="four-views">
     <div class="section-head">
-      <h2 id="three-views">Three evidence layers</h2>
+      <h2 id="four-views">Four evidence layers</h2>
       <p>Deliberately separate views prevent source statistics from becoming accusations.</p>
     </div>
     <div class="grid">
@@ -58,6 +59,12 @@ const metrics = [
         <h3>Reporting patterns</h3>
         <p>The OAIC received these numbers of notifications. The statistics name no organization and never become incident records.</p>
         <a href={`${import.meta.env.BASE_URL}australia/`}>Explore Australian statistics</a>
+      </article>
+      <article class="card">
+        <span class="pill">Anonymous</span>
+        <h3>Notification-row patterns</h3>
+        <p>CNIL publishes report-level facts without organization names. Breach Gazette exposes grouped counts only and never sends those rows into entity resolution.</p>
+        <a href={`${import.meta.env.BASE_URL}france/`}>Explore French notification patterns</a>
       </article>
       <article class="card">
         <span class="pill">Notification</span>
