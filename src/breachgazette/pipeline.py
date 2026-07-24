@@ -10,6 +10,7 @@ from typing import Any
 
 from breachgazette.clients import (
     CaliforniaAdapter,
+    CnilAdapter,
     MassachusettsAdapter,
     NswAggregateAdapter,
     NswPublicNotificationsAdapter,
@@ -42,6 +43,7 @@ ADAPTERS: dict[str, AdapterFactory] = {
     "washington": WashingtonAdapter,
     "california": CaliforniaAdapter,
     "massachusetts": MassachusettsAdapter,
+    "france_cnil": CnilAdapter,
 }
 
 

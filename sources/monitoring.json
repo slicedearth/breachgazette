@@ -16,6 +16,13 @@
       "minimum_retained_fraction": 0.85,
       "maximum_growth_factor": 1.75
     },
+    "france_cnil": {
+      "source_id": "france_cnil",
+      "stale_after_hours": 4380,
+      "minimum_records": 120,
+      "minimum_retained_fraction": 0.85,
+      "maximum_growth_factor": 1.35
+    },
     "nsw_mndb_aggregate": {
       "source_id": "nsw_mndb_aggregate",
       "stale_after_hours": 240,
