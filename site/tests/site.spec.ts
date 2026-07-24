@@ -79,6 +79,56 @@ test("keyboard navigation exposes skip link and table alternatives", async ({ pa
   ).toHaveAttribute("aria-current", "page");
 });
 
+test("mobile primary navigation is compact and keyboard operable", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.goto("/latest/");
+
+  const toggle = page.getByRole("button", { name: "Menu" });
+  const navigation = page.getByRole("navigation", { name: "Primary" });
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(navigation).toBeHidden();
+  const headerGeometry = await page.evaluate(() => {
+    const brand = document.querySelector<HTMLElement>(".brand")?.getBoundingClientRect();
+    const menu = document.querySelector<HTMLElement>(".nav-toggle")?.getBoundingClientRect();
+    return {
+      brandRight: brand?.right ?? 0,
+      menuLeft: menu?.left ?? 0,
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    };
+  });
+  expect(headerGeometry.brandRight).toBeLessThanOrEqual(headerGeometry.menuLeft);
+  expect(headerGeometry.scrollWidth).toBeLessThanOrEqual(headerGeometry.clientWidth);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(navigation).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Notifications" }))
+    .toHaveAttribute("aria-current", "page");
+
+  const geometry = await navigation.evaluate((element) => {
+    const links = [...element.querySelectorAll("a")];
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      linkHeights: links.map((link) => link.getBoundingClientRect().height),
+      linkWidths: links.map((link) => link.getBoundingClientRect().width),
+    };
+  });
+  expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
+  expect(geometry.linkHeights.every((height) => height >= 44)).toBe(true);
+  expect(geometry.linkWidths.every((width) => width <= geometry.clientWidth)).toBe(true);
+
+  await page.keyboard.press("Escape");
+  await expect(navigation).toBeHidden();
+  await expect(toggle).toBeFocused();
+
+  await page.setViewportSize({ width: 900, height: 900 });
+  await expect(toggle).toBeHidden();
+  await expect(navigation).toBeVisible();
+});
+
 test("desktop and mobile layouts contain overflow without fragmenting text", async ({ page }) => {
   const paths = [
     "/",

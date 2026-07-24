@@ -55,7 +55,21 @@ const isCurrent = (path: string) =>
             <small>Public notification and regulatory record</small>
           </span>
         </a>
-        <nav aria-label="Primary">
+        <button
+          class="nav-toggle"
+          type="button"
+          aria-controls="primary-navigation"
+          aria-expanded="false"
+          hidden
+        >
+          <span>Menu</span>
+          <span class="nav-toggle__icon" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+        </button>
+        <nav id="primary-navigation" aria-label="Primary">
           <a href={`${base}australia/`} aria-current={isCurrent("australia/") ? "page" : undefined}>Australia</a>
           <a href={`${base}united-states/`} aria-current={isCurrent("united-states/") ? "page" : undefined}>United States</a>
           <a href={`${base}latest/`} aria-current={isCurrent("latest/") ? "page" : undefined}>Notifications</a>
@@ -82,5 +96,46 @@ const isCurrent = (path: string) =>
         </nav>
       </div>
     </footer>
+    <script>
+      const toggle = document.querySelector<HTMLButtonElement>(".nav-toggle");
+      const navigation = document.querySelector<HTMLElement>("#primary-navigation");
+      const mobileNavigation = window.matchMedia("(max-width: 760px)");
+
+      if (toggle && navigation) {
+        const setOpen = (open: boolean) => {
+          toggle.setAttribute("aria-expanded", String(open));
+          navigation.hidden = mobileNavigation.matches && !open;
+        };
+
+        const syncNavigation = () => {
+          toggle.hidden = !mobileNavigation.matches;
+          setOpen(false);
+        };
+
+        toggle.addEventListener("click", () => {
+          setOpen(toggle.getAttribute("aria-expanded") !== "true");
+        });
+
+        navigation.addEventListener("click", (event) => {
+          if (event.target instanceof HTMLAnchorElement && mobileNavigation.matches) {
+            setOpen(false);
+          }
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (
+            event.key === "Escape" &&
+            mobileNavigation.matches &&
+            toggle.getAttribute("aria-expanded") === "true"
+          ) {
+            setOpen(false);
+            toggle.focus();
+          }
+        });
+
+        mobileNavigation.addEventListener("change", syncNavigation);
+        syncNavigation();
+      }
+    </script>
   </body>
 </html>
