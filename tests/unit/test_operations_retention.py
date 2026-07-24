@@ -173,9 +173,21 @@ def test_retention_keeps_53_weeks_and_backup_restore_round_trips(tmp_path: Path)
     assert backup["files"] == state_inventory(root, policy=_policy())["files"]
     with pytest.raises(ValueError, match="already exists"):
         create_state_backup(root, archive, policy=_policy())
+    repeated = create_state_backup(
+        root,
+        tmp_path / "state-backup-repeat.zip",
+        policy=_policy(),
+    )
+    assert repeated["checksum_sha256"] == backup["checksum_sha256"]
     restored = tmp_path / "restored-state"
-    result = restore_state_backup(archive, restored, policy=_policy())
+    result = restore_state_backup(
+        archive,
+        restored,
+        expected_sha256=backup["checksum_sha256"],
+        policy=_policy(),
+    )
     assert result["files"] == backup["files"]
+    assert result["archive_checksum_sha256"] == backup["checksum_sha256"]
     assert _tree_checksums(restored) == _tree_checksums(root)
 
 
@@ -185,12 +197,17 @@ def test_restore_rejects_nonempty_destination_and_summary_is_sanitized(
     root = tmp_path / "private-state"
     atomic_write_json(root / "state" / "washington.json", [{"record": "safe"}])
     archive = tmp_path / "state.zip"
-    create_state_backup(root, archive, policy=_policy())
+    backup = create_state_backup(root, archive, policy=_policy())
     destination = tmp_path / "existing"
     destination.mkdir()
     (destination / "keep.txt").write_text("keep", encoding="utf-8")
     with pytest.raises(ValueError, match="absent or empty"):
-        restore_state_backup(archive, destination, policy=_policy())
+        restore_state_backup(
+            archive,
+            destination,
+            expected_sha256=backup["checksum_sha256"],
+            policy=_policy(),
+        )
     assert (destination / "keep.txt").read_text(encoding="utf-8") == "keep"
 
     report = tmp_path / "health.json"
@@ -201,3 +218,46 @@ def test_restore_rejects_nonempty_destination_and_summary_is_sanitized(
     assert "private raw value" not in summary
     assert "2026-07-23" not in summary
     assert "a" * 64 not in summary
+
+
+def test_restore_rejects_archive_checksum_mismatch_before_extracting(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "private-state"
+    atomic_write_json(root / "state" / "washington.json", [{"record": "safe"}])
+    archive = tmp_path / "state.zip"
+    backup = create_state_backup(root, archive, policy=_policy())
+    destination = tmp_path / "restored"
+    tampered = bytearray(archive.read_bytes())
+    tampered[len(tampered) // 2] ^= 1
+    archive.write_bytes(tampered)
+
+    with pytest.raises(ValueError, match="does not match"):
+        restore_state_backup(
+            archive,
+            destination,
+            expected_sha256=backup["checksum_sha256"],
+            policy=_policy(),
+        )
+    assert not destination.exists()
+
+    with pytest.raises(ValueError, match="64 lowercase hexadecimal"):
+        restore_state_backup(
+            archive,
+            destination,
+            expected_sha256=backup["checksum_sha256"].upper(),
+            policy=_policy(),
+        )
+    assert not destination.exists()
+
+
+def test_backup_failure_leaves_no_partial_archive(tmp_path: Path) -> None:
+    root = tmp_path / "private-state"
+    atomic_write_json(root / "state" / "washington.json", [{}])
+    output = tmp_path / "state.zip"
+    policy = _policy().model_copy(update={"maximum_archive_bytes": 50})
+
+    with pytest.raises(ValueError, match="archive size bound"):
+        create_state_backup(root, output, policy=policy)
+    assert not output.exists()
+    assert not list(tmp_path.glob(".state.zip.*.tmp"))

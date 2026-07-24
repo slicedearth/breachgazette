@@ -91,12 +91,19 @@ included in managed backup, restore, and size accounting.
 .venv/bin/breachgazette backup-state /secure/path/breachgazette-state.zip \
   --data-root "$BREACHGAZETTE_DATA_ROOT" --json
 .venv/bin/breachgazette restore-state \
-  /secure/path/breachgazette-state.zip /absolute/empty/restore-root --json
+  /secure/path/breachgazette-state.zip /absolute/empty/restore-root \
+  --expected-sha256 "<checksum_sha256 from backup-state output>" --json
 ```
 
 Compaction is a dry run unless `--apply` is supplied. Restore accepts only
 managed regular files, rejects traversal and symbolic links, enforces byte
-bounds, and requires an absent or empty destination.
+bounds, and requires an absent or empty destination. It verifies the complete
+archive against the exact SHA-256 emitted by `backup-state` before creating the
+restore destination. Inventory hashing and ZIP creation stream bounded chunks,
+so the archive path does not require loading the entire private state into
+memory. Record the expected checksum separately from the archive, such as in an
+encrypted backup catalogue. A checksum detects alteration only while that
+expected value remains trusted; it is not a digital signature.
 
 ### Durable-store boundary
 

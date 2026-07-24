@@ -427,10 +427,21 @@ def backup_state_command(
 def restore_state_command(
     archive: Annotated[Path, typer.Argument(exists=True, readable=True)],
     destination: Annotated[Path, typer.Argument()],
+    expected_sha256: Annotated[
+        str,
+        typer.Option(
+            "--expected-sha256",
+            help="Exact checksum_sha256 emitted by backup-state.",
+        ),
+    ],
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     _emit(
-        restore_state_backup(archive, destination),
+        restore_state_backup(
+            archive,
+            destination,
+            expected_sha256=expected_sha256,
+        ),
         json_output=json_output,
     )
 
