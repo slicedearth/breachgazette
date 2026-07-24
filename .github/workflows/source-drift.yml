@@ -16,6 +16,7 @@ on:
           - washington
           - california
           - massachusetts
+          - france_cnil
 
 permissions:
   contents: read

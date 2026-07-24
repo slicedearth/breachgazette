@@ -3,7 +3,12 @@ import Hero from "../components/Hero.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
-<BaseLayout title="Page not found" description="The requested Breach Gazette page was not found." section="Not found">
+<BaseLayout
+  title="Page not found"
+  description="The requested Breach Gazette page was not found."
+  section="Not found"
+  robots="noindex,follow"
+>
   <Hero
     eyebrow="404"
     title="That record page is not available."

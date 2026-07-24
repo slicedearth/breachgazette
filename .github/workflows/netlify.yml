@@ -287,6 +287,14 @@ jobs:
               "$live_url/feeds/corrections.xml" > /dev/null
             curl --fail --silent --show-error \
               "$live_url/robots.txt" > /dev/null
+            for smoke_path in \
+              "/jurisdictions/" \
+              "/france/" \
+              "/source-coverage/" \
+              "/.well-known/security.txt"; do
+              curl --fail --silent --show-error \
+                "$live_url$smoke_path" > /dev/null
+            done
             curl --fail --silent --show-error \
               --output /dev/null \
               --dump-header "$header_file" \

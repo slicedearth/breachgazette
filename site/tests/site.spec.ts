@@ -734,8 +734,23 @@ test("feed, crawler policy, and not-found page preserve publication boundaries",
   const robots = await request.get("/robots.txt");
   expect(await robots.text()).toContain("Sitemap:");
 
+  const security = await request.get("/.well-known/security.txt");
+  expect(security.ok()).toBe(true);
+  expect(security.headers()["content-type"]).toContain("text/plain");
+  const securityText = await security.text();
+  expect(securityText).toContain("Contact: https://");
+  expect(securityText).toContain("Expires: 2027-07-24T00:00:00Z");
+  expect(securityText).toContain("Preferred-Languages: en");
+  expect(securityText).toContain(
+    "Canonical: https://breachgazette.invalid/.well-known/security.txt",
+  );
+
   await page.goto("/404.html");
   await expect(page.getByRole("heading", { name: "That record page is not available." }))
     .toBeVisible();
   await expect(page.getByText(/missing page does not mean/i)).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    "noindex,follow",
+  );
 });

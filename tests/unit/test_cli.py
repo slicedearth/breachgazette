@@ -138,3 +138,35 @@ def test_fixture_and_inventory_cli(tmp_path: Path, notification_factory) -> None
     assert proposals.exit_code == 0
     assert json.loads(proposals.stdout)["proposal_count"] == 0
     assert proposals_path.is_file()
+    quality = runner.invoke(
+        app,
+        ["quality-report", "--data-root", str(root), "--json"],
+    )
+    assert quality.exit_code == 2
+    assert json.loads(quality.stdout) == {
+        "error": "data_quality_error",
+        "message": (
+            "publication quality gates failed: required_sources_present, "
+            "source_snapshots_present, fixture_isolation"
+        ),
+        "passed": False,
+    }
+    assert "Traceback" not in quality.output
+    publication = runner.invoke(
+        app,
+        [
+            "build-site-data",
+            "--data-root",
+            str(root),
+            "--output",
+            str(tmp_path / "publication"),
+            "--json",
+        ],
+    )
+    assert publication.exit_code == 2
+    assert json.loads(publication.stdout) == {
+        "error": "data_quality_error",
+        "message": "production site data requires real source-derived state",
+        "passed": False,
+    }
+    assert "Traceback" not in publication.output

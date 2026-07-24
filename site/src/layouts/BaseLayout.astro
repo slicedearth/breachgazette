@@ -5,9 +5,15 @@ interface Props {
   title: string;
   description: string;
   section?: string;
+  robots?: string;
 }
 
-const { title, description, section = "Observatory" } = Astro.props;
+const {
+  title,
+  description,
+  section = "Observatory",
+  robots = "index,follow,max-image-preview:large",
+} = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const base = import.meta.env.BASE_URL;
 const contentSecurityPolicy = [
@@ -40,7 +46,7 @@ const isJurisdiction = ["jurisdictions/", "australia/", "united-states/", "franc
     <meta name="viewport" content="width=device-width" />
     <meta name="description" content={description} />
     <meta name="referrer" content="no-referrer" />
-    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta name="robots" content={robots} />
     <meta
       http-equiv="Content-Security-Policy"
       content={contentSecurityPolicy}
