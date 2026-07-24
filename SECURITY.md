@@ -5,6 +5,8 @@
 Report vulnerabilities privately through GitHub's private vulnerability
 reporting feature for this repository. Do not include victim data, credentials,
 breach letters, or other sensitive source material in a public issue.
+The deployed site publishes the same private-reporting route at
+`/.well-known/security.txt`.
 
 ## Security model
 

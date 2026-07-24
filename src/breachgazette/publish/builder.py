@@ -55,6 +55,7 @@ PUBLIC_TREE_ALLOWED_SUFFIXES = frozenset(
     }
 )
 PUBLIC_TREE_ALLOWED_EXTENSIONLESS = frozenset({"_headers"})
+PUBLIC_TREE_ALLOWED_HIDDEN_PATHS = frozenset({Path(".well-known/security.txt")})
 PUBLIC_TREE_FORBIDDEN_NAMES = frozenset(
     {
         ".env",
@@ -519,7 +520,10 @@ def audit_public_tree(
             continue
         if not file.is_file():
             continue
-        if any(part.startswith(".") for part in relative.parts):
+        if (
+            any(part.startswith(".") for part in relative.parts)
+            and relative not in PUBLIC_TREE_ALLOWED_HIDDEN_PATHS
+        ):
             violations.append(f"{relative}: hidden paths are not allowed in the public tree")
         if file.name.casefold() in PUBLIC_TREE_FORBIDDEN_NAMES:
             violations.append(f"{relative}: sensitive filename is not allowed in the public tree")

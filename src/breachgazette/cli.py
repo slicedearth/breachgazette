@@ -30,7 +30,7 @@ from breachgazette.pipeline import (
 )
 from breachgazette.policies import load_source_policies
 from breachgazette.publish.builder import audit_public_tree, build_site_data
-from breachgazette.quality import build_quality_report
+from breachgazette.quality import DataQualityError, build_quality_report
 from breachgazette.relationships import (
     generate_candidates,
     load_relationship_catalogue,
@@ -70,6 +70,21 @@ def _emit(value: Any, *, json_output: bool) -> None:
             typer.echo(f"{key}: {item}")
     else:
         typer.echo(value)
+
+
+def _fail_data_quality(error: DataQualityError, *, json_output: bool) -> None:
+    if json_output:
+        _emit(
+            {
+                "error": "data_quality_error",
+                "message": str(error),
+                "passed": False,
+            },
+            json_output=True,
+        )
+    else:
+        typer.echo(f"Data quality gate failed: {error}", err=True)
+    raise typer.Exit(code=2)
 
 
 @app.command("inspect-sources")
@@ -318,10 +333,11 @@ def build_site_data_command(
     output: Annotated[Path, typer.Option("--output")] = Path("site-data"),
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    _emit(
-        build_site_data(data_root=_data_root(data_root), output=output),
-        json_output=json_output,
-    )
+    try:
+        result = build_site_data(data_root=_data_root(data_root), output=output)
+    except DataQualityError as error:
+        _fail_data_quality(error, json_output=json_output)
+    _emit(result, json_output=json_output)
 
 
 @app.command("audit-public-tree")
@@ -329,7 +345,11 @@ def audit_public_tree_command(
     path: Annotated[Path, typer.Argument()],
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    _emit(audit_public_tree(path), json_output=json_output)
+    try:
+        result = audit_public_tree(path)
+    except DataQualityError as error:
+        _fail_data_quality(error, json_output=json_output)
+    _emit(result, json_output=json_output)
 
 
 @app.command("check-source-links")
@@ -357,11 +377,14 @@ def quality_report_command(
 ) -> None:
     store = PrivateStateStore(_data_root(data_root))
     records = {source_id: store.load_records(source_id) for source_id in store.source_ids()}
-    report = build_quality_report(
-        dataset_class=str(store.dataset_class()),
-        records_by_source=records,
-        snapshots=store.all_snapshots(),
-    )
+    try:
+        report = build_quality_report(
+            dataset_class=str(store.dataset_class()),
+            records_by_source=records,
+            snapshots=store.all_snapshots(),
+        )
+    except DataQualityError as error:
+        _fail_data_quality(error, json_output=json_output)
     _emit(report.model_dump(mode="json"), json_output=json_output)
 
 

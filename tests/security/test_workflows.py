@@ -56,6 +56,21 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     assert "breachgazette-update@users.noreply.github.com" in workflow
 
 
+def test_source_drift_can_inspect_every_implemented_adapter() -> None:
+    workflow = (WORKFLOW_ROOT / "source-drift.yml").read_text(encoding="utf-8")
+    for source_id in (
+        "oaic_ndb",
+        "nsw_public_notifications",
+        "nsw_mndb_aggregate",
+        "oaic_regulatory",
+        "washington",
+        "california",
+        "massachusetts",
+        "france_cnil",
+    ):
+        assert f"          - {source_id}" in workflow
+
+
 def test_ci_covers_private_catalogue_contracts_and_all_browser_engines() -> None:
     workflow = (WORKFLOW_ROOT / "ci.yml").read_text(encoding="utf-8")
     package = json.loads(
@@ -131,6 +146,10 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert 'test "$identity_verified" = "true"' in workflow
     assert "data/publication.json" in workflow
     assert "data/notifications/manifest.json" in workflow
+    assert '"/jurisdictions/"' in workflow
+    assert '"/france/"' in workflow
+    assert '"/source-coverage/"' in workflow
+    assert '"/.well-known/security.txt"' in workflow
     assert "steps.publication.outputs.checksum" in workflow
     assert "sha256sum" in workflow
     assert "strict-transport-security: max-age=31536000" in workflow

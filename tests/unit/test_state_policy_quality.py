@@ -554,9 +554,15 @@ def test_public_tree_audit_passes_safe_tree_and_rejects_remote_assets(tmp_path: 
     safe.mkdir()
     (safe / "index.html").write_text("<p>Safe static page</p>", encoding="utf-8")
     (safe / "_headers").write_text("/*\n  X-Frame-Options: DENY\n", encoding="utf-8")
+    well_known = safe / ".well-known"
+    well_known.mkdir()
+    (well_known / "security.txt").write_text(
+        "Contact: https://example.invalid/security\n",
+        encoding="utf-8",
+    )
     report = audit_public_tree(safe)
     assert report["passed"] is True
-    assert report["files"] == 2
+    assert report["files"] == 3
     assert report["html_files"] == 1
     with pytest.raises(DataQualityError, match="budget"):
         audit_public_tree(safe, max_files=0)
@@ -564,6 +570,9 @@ def test_public_tree_audit_passes_safe_tree_and_rejects_remote_assets(tmp_path: 
         audit_public_tree(safe, max_html_bytes=5)
     (safe / "bad.js").write_text('google-analytics("x")', encoding="utf-8")
     with pytest.raises(DataQualityError, match="forbidden marker"):
+        audit_public_tree(safe)
+    (well_known / "other.txt").write_text("not approved", encoding="utf-8")
+    with pytest.raises(DataQualityError, match="hidden paths"):
         audit_public_tree(safe)
     with pytest.raises(ValueError, match="does not exist"):
         audit_public_tree(tmp_path / "missing")
