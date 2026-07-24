@@ -212,7 +212,12 @@ def test_massachusetts_adapter_is_bounded_and_rejects_changed_flags(
             "MA Residents Affected": "12",
         }
     )
-    reports = iter([[valid], [{**valid, "Breach Number": "2026-0001"}]])
+    reports = iter(
+        [
+            [{**valid, "Breach Number": f"{year}-0001"}]
+            for year in (2024, 2025, 2026)
+        ]
+    )
     monkeypatch.setattr(
         "breachgazette.clients.massachusetts._extract_rows",
         lambda _content: next(reports),
@@ -225,13 +230,52 @@ def test_massachusetts_adapter_is_bounded_and_rejects_changed_flags(
         )
     )
     result = MassachusettsAdapter(transport=transport).collect(observed_at=observed_at)
-    assert result.snapshot.records_discovered == 2
-    assert result.snapshot.records_accepted == 2
+    assert result.snapshot.records_discovered == 3
+    assert result.snapshot.records_accepted == 3
     assert result.snapshot.bounded_limit == 10_000
+    assert result.snapshot.revision.startswith("annual-reports-2024-2026:")
 
     invalid = {**valid, "SSN Breached": "Unknown"}
     with pytest.raises(SourceClientError, match="flag"):
         _parse_rows({2025: [invalid]}, checksum="b" * 64, observed_at=observed_at)
+
+
+def test_massachusetts_preserves_reviewed_sparse_and_character_spaced_rows(
+    observed_at: datetime,
+) -> None:
+    sparse = dict.fromkeys(EXPECTED_HEADERS, "")
+    sparse.update(
+        {
+            "Breach Number": "2024-94",
+            "Date Reported To OCA": "17-Jan-24",
+            "Reporting Organization Name": "easternbank",
+        }
+    )
+    spaced = dict.fromkeys(EXPECTED_HEADERS, "N o")
+    spaced.update(
+        {
+            "Breach Number": "2024-2164",
+            "Date Reported To OCA": "09-Dec-24",
+            "Reporting Organization Name": "Webster Five Cents Savings Bank",
+            "Reporting Organization Type": "B a n k s & C r e d i t U n i o n s",
+            "MA Residents Affected": "3",
+            "Credit/Debit Numbers Breached": "Y e s",
+        }
+    )
+
+    records = _parse_rows(
+        {2024: [sparse, spaced]},
+        checksum="c" * 64,
+        observed_at=observed_at,
+    )
+
+    assert records[0].affected_population.state == "source_omitted"
+    assert records[0].affected_population.count is None
+    assert "omitted all reviewed information-category flags" in " ".join(
+        records[0].limitations
+    )
+    assert records[1].industry == "Banks & Credit Unions"
+    assert records[1].information_categories[0].normalized_label == "credit_debit_card"
 
 
 def test_nsw_register_preserves_dates_links_and_window_state(

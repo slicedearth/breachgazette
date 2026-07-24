@@ -39,7 +39,7 @@ an allegation into a finding.
 | OAIC regulatory actions | Selective legal-status timeline | Reviewed fixed official OAIC URLs |
 | Washington Attorney General | Named notifications | Fixed Socrata datasets and exact fields |
 | California Attorney General | Named notifications | Official full CSV, without notice letters |
-| Massachusetts OCABR | Named notifications | Reviewed 2025 and 2026 annual reports, without notice letters |
+| Massachusetts OCABR | Named notifications | Reviewed 2024 through 2026 annual reports, without notice letters |
 | HHS OCR | Deferred | No stable bounded machine-readable public-list contract verified |
 
 Aggregate rows never become named incident records. A named notifier is not
