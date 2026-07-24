@@ -26,21 +26,32 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         </div>
         <p>Filters run in this browser. Pagination changes only the visible results; exports retain every match.</p>
       </div>
-      <div class="filters" data-notification-filters>
-        <label>Organization or agency<input type="search" name="query" autocomplete="off" maxlength="120" /></label>
-        <label>Jurisdiction<select name="jurisdiction"><option value="">All jurisdictions</option></select></label>
-        <label>Regulator<select name="regulator"><option value="">All regulators</option></select></label>
-        <label>Source<select name="source"><option value="">All sources</option></select></label>
-        <label>Source date<input type="date" name="date" /></label>
-        <label>Breach cause<select name="cause"><option value="">All published causes</option></select></label>
-        <label>Information category<select name="information"><option value="">All published categories</option></select></label>
-        <label>Affected population<select name="population"><option value="">All population bands</option><option value="not_published">Not published</option><option value="500_999">500–999</option><option value="1000_9999">1,000–9,999</option><option value="10000_99999">10,000–99,999</option><option value="100000_plus">100,000+</option></select></label>
-        <label>Entity role<select name="role"><option value="">All roles</option></select></label>
-        <label>Publication level<select name="publication"><option value="">All publication levels</option></select></label>
+      <div data-notification-filters>
+        <div class="filters filters--primary">
+          <label>Organization or agency<input type="search" name="query" autocomplete="off" maxlength="120" /></label>
+          <label>Jurisdiction<select name="jurisdiction"><option value="">All jurisdictions</option></select></label>
+          <label>Regulator<select name="regulator"><option value="">All regulators</option></select></label>
+          <label>Source<select name="source"><option value="">All sources</option></select></label>
+        </div>
+        <details class="advanced-filters" open data-advanced-filters>
+          <summary>
+            <span>Advanced filters</span>
+            <span class="advanced-filters__count" data-advanced-filter-count>6 available</span>
+          </summary>
+          <div class="filters filters--advanced">
+            <label>Source date<input type="date" name="date" /></label>
+            <label>Breach cause<select name="cause"><option value="">All published causes</option></select></label>
+            <label>Information category<select name="information"><option value="">All published categories</option></select></label>
+            <label>Affected population<select name="population"><option value="">All population bands</option><option value="not_published">Not published</option><option value="500_999">500–999</option><option value="1000_9999">1,000–9,999</option><option value="10000_99999">10,000–99,999</option><option value="100000_plus">100,000+</option></select></label>
+            <label>Entity role<select name="role"><option value="">All roles</option></select></label>
+            <label>Publication level<select name="publication"><option value="">All publication levels</option></select></label>
+          </div>
+        </details>
       </div>
       <div class="result-actions">
         <button type="button" data-export-results disabled>Export matching CSV</button>
         <button type="button" data-copy-search disabled>Copy search link</button>
+        <button class="button-secondary" type="button" data-reset-filters disabled>Clear filters</button>
         <span class="table-note" data-export-status>Apply a filter to enable export.</span>
         <span class="table-note" data-share-status>Search-link filters stay in the URL fragment and are not sent in HTTP requests.</span>
       </div>
@@ -108,6 +119,10 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       const exportStatus = document.querySelector<HTMLElement>("[data-export-status]")!;
       const copySearchButton = document.querySelector<HTMLButtonElement>("[data-copy-search]")!;
       const shareStatus = document.querySelector<HTMLElement>("[data-share-status]")!;
+      const resetButton = document.querySelector<HTMLButtonElement>("[data-reset-filters]")!;
+      const advancedFilters = document.querySelector<HTMLDetailsElement>("[data-advanced-filters]")!;
+      const advancedFilterCount = document.querySelector<HTMLElement>("[data-advanced-filter-count]")!;
+      const mobileFilters = window.matchMedia("(max-width: 760px)");
       const options = (values: string[]) => [...new Set(values)].sort();
       for (const value of options(manifest.facets.jurisdictions)) jurisdiction.add(new Option(value, value));
       for (const value of options(manifest.facets.regulators)) regulator.add(new Option(value, value));
@@ -119,9 +134,22 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       const filterControls = [
         ...controls.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select"),
       ];
+      const advancedControls = [
+        ...advancedFilters.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
+          "input, select",
+        ),
+      ];
       let currentPage = 1;
       const hasFilters = () =>
         filterControls.some((control) => control.value.trim() !== "");
+      const syncAdvancedFilters = () => {
+        const active = advancedControls.filter((control) => control.value.trim() !== "").length;
+        advancedFilterCount.textContent = active
+          ? `${active.toLocaleString()} active`
+          : `${advancedControls.length.toLocaleString()} available`;
+        if (!mobileFilters.matches) advancedFilters.open = true;
+        else if (active) advancedFilters.open = true;
+      };
       const applyHashState = () => {
         const parameters = new URLSearchParams(
           window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "",
@@ -156,6 +184,8 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         if (mode === "push") window.history.pushState(null, "", nextUrl);
         else window.history.replaceState(null, "", nextUrl);
         copySearchButton.disabled = !hasFilters();
+        resetButton.disabled = !hasFilters();
+        syncAdvancedFilters();
         shareStatus.textContent = fragment
           ? "This search can be bookmarked without sending its filters in HTTP requests."
           : "Search-link filters stay in the URL fragment and are not sent in HTTP requests.";
@@ -469,6 +499,14 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         exportStatus.textContent = `Exported ${filteredRecords.length.toLocaleString()} matching source records.`;
       };
       exportButton.addEventListener("click", exportCsv);
+      resetButton.addEventListener("click", () => {
+        for (const control of filterControls) control.value = "";
+        currentPage = 1;
+        if (mobileFilters.matches) advancedFilters.open = false;
+        syncHashState();
+        void render();
+        query.focus();
+      });
       copySearchButton.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(window.location.href);
@@ -567,7 +605,17 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         syncHashState();
         void render();
       });
+      mobileFilters.addEventListener("change", () => {
+        if (mobileFilters.matches && !advancedControls.some((control) => control.value)) {
+          advancedFilters.open = false;
+        } else {
+          advancedFilters.open = true;
+        }
+      });
       applyHashState();
+      if (mobileFilters.matches && !advancedControls.some((control) => control.value)) {
+        advancedFilters.open = false;
+      }
       syncHashState();
       void render();
       }

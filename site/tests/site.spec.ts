@@ -129,6 +129,40 @@ test("mobile primary navigation is compact and keyboard operable", async ({ page
   await expect(navigation).toBeVisible();
 });
 
+test("mobile notification search keeps advanced controls compact and resettable", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.goto("/latest/");
+
+  const advanced = page.locator("[data-advanced-filters]");
+  const reset = page.getByRole("button", { name: "Clear filters" });
+  const query = page.getByLabel("Organization or agency");
+  await expect(advanced).not.toHaveAttribute("open");
+  await expect(page.getByLabel("Breach cause")).toBeHidden();
+  await expect(reset).toBeDisabled();
+
+  await query.fill("Example");
+  await expect(reset).toBeEnabled();
+  await expect(page).toHaveURL(/#query=Example$/);
+
+  await advanced.locator("summary").click();
+  await page.getByLabel("Affected population").selectOption("1000_9999");
+  await expect(advanced).toHaveAttribute("open");
+  await expect(advanced.locator("[data-advanced-filter-count]")).toHaveText("1 active");
+  await expect(page).toHaveURL(/population=1000_9999/);
+
+  await reset.click();
+  await expect(query).toHaveValue("");
+  await expect(page.getByLabel("Affected population")).toHaveValue("");
+  await expect(advanced).not.toHaveAttribute("open");
+  await expect(reset).toBeDisabled();
+  await expect(page).not.toHaveURL(/#/);
+  await expect(page.locator("[data-result-count]")).toContainText("no search partitions loaded");
+
+  await page.setViewportSize({ width: 900, height: 900 });
+  await expect(advanced).toHaveAttribute("open");
+  await expect(page.getByLabel("Breach cause")).toBeVisible();
+});
+
 test("desktop and mobile layouts contain overflow without fragmenting text", async ({ page }) => {
   const paths = [
     "/",
