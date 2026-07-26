@@ -12,6 +12,7 @@ const collectionMode = publication.source_health.collection_mode ?? "manual";
 const snapshots = new Map(
   publication.manifest.source_snapshots.map((snapshot) => [snapshot.source_id, snapshot]),
 );
+const healthHistory = publication.source_health_history.snapshots;
 ---
 
 <BaseLayout title="Source health" description="Freshness and update state for each implemented official source.">
@@ -51,6 +52,57 @@ const snapshots = new Map(
         </tbody>
       </table>
     </div>
+    <div class="section-head">
+      <h2>Bounded source-health history</h2>
+      <p>
+        Showing {healthHistory.length.toLocaleString()} of at most{" "}
+        {publication.source_health_history.maximum_snapshots.toLocaleString()} sanitized
+        snapshots. Private checksums and diagnostic reasons are excluded.
+      </p>
+    </div>
+    <div class="table-wrap" tabindex="0" aria-label="Bounded source health history table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Observed</th>
+            <th scope="col">Overall gate</th>
+            <th scope="col">Healthy sources</th>
+            <th scope="col">Sources needing attention</th>
+            <th scope="col">Recovered since prior snapshot</th>
+          </tr>
+        </thead>
+        <tbody>
+          {healthHistory.map((snapshot) => {
+            const healthy = snapshot.sources.filter((source) => source.status === "healthy");
+            const attention = snapshot.sources.filter((source) => source.status !== "healthy");
+            return (
+              <tr>
+                <th scope="row" data-label="Observed">{date(snapshot.generated_at)}</th>
+                <td data-label="Overall gate">
+                  <span class="pill">{snapshot.passed ? "Passed" : "Needs attention"}</span>
+                </td>
+                <td data-label="Healthy sources">{healthy.length.toLocaleString()}</td>
+                <td data-label="Sources needing attention">
+                  {attention.length
+                    ? attention.map((source) => sourceName(source.source_id)).join(", ")
+                    : "None"}
+                </td>
+                <td data-label="Recovered since prior snapshot">
+                  {snapshot.recoveries_from_previous.length
+                    ? snapshot.recoveries_from_previous.map(sourceName).join(", ")
+                    : "None observed"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+    <ul class="table-note">
+      {publication.source_health_history.limitations.map((limitation) => (
+        <li>{limitation}</li>
+      ))}
+    </ul>
     <div class="section-head">
       <h2>Publication evidence</h2>
       <p>Revision, acceptance, and checkpoint values come from the complete source snapshot used by this publication.</p>

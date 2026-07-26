@@ -15,7 +15,13 @@ export function getStaticPaths() {
   }));
 }
 const { record } = Astro.props;
-const policy = getPublication().policies[record.source_id]!;
+const publication = getPublication();
+const policy = publication.policies[record.source_id]!;
+const recordEvents = publication.corrections.filter(
+  (event) =>
+    event.source_id === record.source_id &&
+    event.record_id === record.source_record_id,
+);
 ---
 
 <BaseLayout title={record.named_entity.source_name} description={`Official ${record.jurisdiction} public notification source record.`} section="Public notification record">
@@ -48,6 +54,21 @@ const policy = getPublication().policies[record.source_id]!;
       <ul>{[...policy.limitations, ...record.limitations].map((item) => <li>{item}</li>)}</ul>
       <h2>Correction path</h2>
       <p>{policy.correction_process}</p>
+      <h2>Recent observed record history</h2>
+      {recordEvents.length ? (
+        <ul>
+          {recordEvents.map((event) => (
+            <li>
+              <a href={`${import.meta.env.BASE_URL}corrections/#event-${event.event_id}`}>
+                {label(event.event_type)}
+              </a>
+              {" — "}{date(event.first_observed_time)}. {event.reason}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No event for this record appears in the bounded recent public correction window.</p>
+      )}
     </div>
     <SourceNote href={record.source_detail_url ?? record.source_url} />
   </section>

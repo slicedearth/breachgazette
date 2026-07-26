@@ -13,6 +13,7 @@ from breachgazette.contracts import (
     QualityReport,
     RegulatoryAction,
     SourceAggregateRecord,
+    SourceHealthReport,
     SourceNotificationRecord,
 )
 from breachgazette.entities import load_alias_catalogue, resolve_organizations
@@ -27,10 +28,16 @@ from breachgazette.relationships import (
     load_relationship_catalogue,
 )
 from breachgazette.state import PrivateStateStore
-from breachgazette.utils import atomic_write_json, canonical_json_bytes, sha256_hex
+from breachgazette.utils import (
+    atomic_write_json,
+    canonical_json_bytes,
+    read_json,
+    sha256_hex,
+)
 
 DETAIL_RECORDS_PER_SOURCE = 250
 PUBLIC_CORRECTION_LIMIT = 250
+PUBLIC_SOURCE_HEALTH_HISTORY_LIMIT = 16
 SEARCH_PARTITION_SIZE = 250
 SEARCH_PARTITION_MAX_BYTES = 1_000_000
 SEARCH_BLOOM_BITS = 16_384
@@ -200,6 +207,149 @@ def _query_bloom(records: list[NormalizedNotification]) -> str:
     return bloom.hex()
 
 
+def _build_source_health_history(
+    *,
+    data_root: Path,
+    current: SourceHealthReport,
+) -> dict[str, Any]:
+    reports: dict[datetime, SourceHealthReport] = {}
+    history = data_root / "reports" / "history"
+    if history.exists():
+        if history.is_symlink() or not history.is_dir():
+            raise DataQualityError("source-health history must be a regular directory")
+        paths = sorted(history.glob("source-health-*.json"))[
+            -PUBLIC_SOURCE_HEALTH_HISTORY_LIMIT:
+        ]
+        for path in paths:
+            if path.is_symlink() or not path.is_file():
+                raise DataQualityError("source-health history may contain only regular reports")
+            try:
+                report = SourceHealthReport.model_validate(read_json(path))
+            except (TypeError, ValueError) as error:
+                raise DataQualityError(
+                    f"source-health history report is invalid: {path.name}"
+                ) from error
+            if report.dataset_class == current.dataset_class:
+                reports[report.generated_at] = report
+    reports[current.generated_at] = current
+    selected = [
+        reports[key] for key in sorted(reports)[-PUBLIC_SOURCE_HEALTH_HISTORY_LIMIT:]
+    ]
+    snapshots: list[dict[str, Any]] = []
+    previous_status: dict[str, str] = {}
+    for report in selected:
+        current_status = {
+            entry.source_id: str(entry.status) for entry in report.sources
+        }
+        recoveries = sorted(
+            source_id
+            for source_id, status in current_status.items()
+            if status == "healthy"
+            and previous_status.get(source_id) not in {None, "healthy"}
+        )
+        snapshots.append(
+            {
+                "generated_at": report.generated_at,
+                "passed": report.passed,
+                "sources": [
+                    {
+                        "source_id": entry.source_id,
+                        "status": entry.status,
+                        "record_count": entry.record_count,
+                        "completeness": entry.completeness,
+                        "checkpoint_status": entry.checkpoint_status,
+                    }
+                    for entry in sorted(report.sources, key=lambda item: item.source_id)
+                ],
+                "recoveries_from_previous": recoveries,
+            }
+        )
+        previous_status = current_status
+    return {
+        "maximum_snapshots": PUBLIC_SOURCE_HEALTH_HISTORY_LIMIT,
+        "snapshots": snapshots,
+        "limitations": [
+            "This public history is bounded and may not include an earlier comparison "
+            "point for its first displayed snapshot.",
+            "A recovery means the pipeline returned to healthy after a retained "
+            "non-healthy state; it does not validate the source's underlying facts.",
+            "Private checksums, diagnostic reasons, and raw health reports are not published.",
+        ],
+    }
+
+
+def _build_update_digest(
+    events: list[Any],
+    *,
+    recovered_sources: list[str] | None = None,
+    health_observed_at: datetime | None = None,
+) -> dict[str, Any]:
+    recoveries = sorted(set(recovered_sources or []))
+    if not events:
+        return {
+            "observed_at": None,
+            "health_observed_at": health_observed_at,
+            "scope": "latest_retained_observation_batch",
+            "event_count": 0,
+            "counts": {
+                "records_first_observed": 0,
+                "records_corrected": 0,
+                "records_absent_from_complete_snapshot": 0,
+                "sources_recovered": len(recoveries),
+            },
+            "sources": [],
+            "recovered_sources": recoveries,
+            "limitations": [
+                "No retained source-record changes were available for this publication."
+            ],
+        }
+    latest_observed = max(event.first_observed_time for event in events)
+    latest_events = [
+        event for event in events if event.first_observed_time == latest_observed
+    ]
+    event_names = {
+        "notification_first_observed": "records_first_observed",
+        "source_record_corrected": "records_corrected",
+        "source_status_changed": "records_absent_from_complete_snapshot",
+    }
+    counts = Counter(
+        event_names[event.event_type]
+        for event in latest_events
+        if event.event_type in event_names
+    )
+    source_counts: dict[str, Counter[str]] = defaultdict(Counter)
+    for event in latest_events:
+        public_name = event_names.get(event.event_type)
+        if public_name:
+            source_counts[event.source_id][public_name] += 1
+    keys = tuple(event_names.values())
+    return {
+        "observed_at": latest_observed,
+        "health_observed_at": health_observed_at,
+        "scope": "latest_retained_observation_batch",
+        "event_count": sum(counts.values()),
+        "counts": {
+            **{key: counts[key] for key in keys},
+            "sources_recovered": len(recoveries),
+        },
+        "sources": [
+            {
+                "source_id": source_id,
+                **{key: source_counts[source_id][key] for key in keys},
+            }
+            for source_id in sorted(source_counts)
+        ],
+        "recovered_sources": recoveries,
+        "limitations": [
+            "The digest covers only the most recent retained observation timestamp, "
+            "which may represent one source update rather than every source.",
+            "A record absent from a complete snapshot is a source-status change, not "
+            "evidence that an incident was remediated or withdrawn.",
+            "Absence events are emitted only after a complete current snapshot.",
+        ],
+    }
+
+
 def _build_search_assets(
     records: list[NormalizedNotification],
     *,
@@ -350,8 +500,9 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
             data_root / "reviews" / "relationship-decisions.yml"
         ),
     )
+    all_events = store.load_events()
     events = [
-        event for event in store.load_events() if event.event_type != "notification_first_observed"
+        event for event in all_events if event.event_type != "notification_first_observed"
     ]
     policies = load_source_policies()
     ordered_notifications = sorted(
@@ -382,6 +533,11 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     detail_organizations = [
         identity for identity in organizations if identity.organization_id in detail_org_ids
     ]
+    source_health_history = _build_source_health_history(
+        data_root=data_root,
+        current=source_health,
+    )
+    latest_health_snapshot = source_health_history["snapshots"][-1]
     summary_payload = {
         "schema_version": "1.0",
         "generated_at": generated_at,
@@ -411,8 +567,14 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
             key=lambda event: (event.first_observed_time, event.event_id),
             reverse=True,
         )[:PUBLIC_CORRECTION_LIMIT],
+        "update_digest": _build_update_digest(
+            all_events,
+            recovered_sources=latest_health_snapshot["recoveries_from_previous"],
+            health_observed_at=latest_health_snapshot["generated_at"],
+        ),
         "quality": initial_quality,
         "source_health": source_health,
+        "source_health_history": source_health_history,
         "deferred_sources": [policy for policy in policies.values() if not policy.implemented],
     }
     require_public_safe(summary_payload, record_identity="publication-summary")
