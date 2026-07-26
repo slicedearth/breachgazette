@@ -18,6 +18,7 @@ on:
           - massachusetts
           - france_cnil
           - united_kingdom_ico
+          - netherlands_ap
 
 permissions:
   contents: read

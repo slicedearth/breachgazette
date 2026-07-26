@@ -30,6 +30,19 @@ publications, names, logos, or third-party material.
   under the Open Government Licence v3.0. Breach Gazette publishes attributed
   grouped counts by unique report reference and retains neither raw workbook
   rows nor report-level characteristic combinations.
+- **Netherlands AP:** no explicit open-data licence was identified on the
+  reviewed publication. Breach Gazette retains only five attributed factual
+  annual values and does not reproduce the regulator's prose or documents.
+- **Ireland DPC:** the reviewed public-sector information terms permit reuse
+  subject to attribution, accuracy, and non-misleading presentation. Collection
+  remains deferred because the official HTTPS certificate chain cannot
+  currently be validated; TLS verification is never disabled.
+- **Texas:** the public listing exposes organization and address fields through
+  a stateful hosted application. No stable export or source-specific
+  redistribution licence was identified, so no records are collected.
+- **Maine:** the official database is currently unavailable. No records are
+  copied from unofficial mirrors and source unavailability is never represented
+  as zero notifications.
 - **HHS:** the portal is linked and assessed but no source records are
   redistributed.
 

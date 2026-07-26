@@ -19,6 +19,7 @@ REQUIRED_SOURCES = {
     "massachusetts",
     "france_cnil",
     "united_kingdom_ico",
+    "netherlands_ap",
 }
 
 

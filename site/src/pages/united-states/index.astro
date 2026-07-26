@@ -40,5 +40,14 @@ const sources = [
         </article>
       ))}
     </div>
+    <aside class="notice">
+      <strong>Reviewed but deferred:</strong> Texas uses a stateful listing without a
+      stable bounded export, Maine’s official database is currently unavailable,
+      and the federal portal remains stateful. Review the
+      {" "}<a href={`${import.meta.env.BASE_URL}sources/texas/`}>Texas</a>,
+      {" "}<a href={`${import.meta.env.BASE_URL}sources/maine/`}>Maine</a>, and
+      {" "}<a href={`${import.meta.env.BASE_URL}sources/hhs/`}>federal source policies</a>
+      for the exact boundaries.
+    </aside>
   </section>
 </BaseLayout>

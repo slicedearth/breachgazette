@@ -1,0 +1,100 @@
+---
+import Hero from "../../components/Hero.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+
+const publication = getPublication();
+const records = publication.aggregates
+  .filter((record) => record.source_id === "netherlands_ap")
+  .sort(
+    (left, right) =>
+      right.reporting_period_start.localeCompare(left.reporting_period_start)
+      || left.dimension.localeCompare(right.dimension),
+  );
+const policy = publication.policies.netherlands_ap;
+const numericValue = (value: string | number | null): number =>
+  typeof value === "number" ? value : 0;
+const findValue = (dimension: string, year: number) =>
+  records.find(
+    (record) =>
+      record.dimension === dimension
+      && record.reporting_period_start.startsWith(`${year}-`),
+  );
+const total2025 = findValue("breach_notifications_received", 2025);
+const cyberattacks2025 = findValue("reported_cause", 2025);
+const accountTakeovers2025 = findValue("incident_type", 2025);
+---
+
+<BaseLayout
+  title="Netherlands"
+  description="Attributed annual data breach notification aggregates from Autoriteit Persoonsgegevens."
+  section="Netherlands"
+>
+  <Hero
+    eyebrow="National aggregate reporting"
+    title="Netherlands AP data breach reports"
+    intro="Autoriteit Persoonsgegevens publishes annual national notification figures. Breach Gazette retains only the reviewed factual aggregates and their exact reporting periods."
+    warning="These are notifications received by the regulator, not independently verified or necessarily unique incidents. Cause and incident-type dimensions overlap and must not be summed."
+  />
+  <section class="section shell">
+    <div class="stat-grid" aria-label="Netherlands AP publication summary">
+      <article>
+        <strong>{numericValue(total2025?.value.value ?? 0).toLocaleString()}</strong>
+        <span>2025 notifications</span>
+      </article>
+      <article>
+        <strong>{numericValue(cyberattacks2025?.value.value ?? 0).toLocaleString()}</strong>
+        <span>2025 cyberattack cause</span>
+      </article>
+      <article>
+        <strong>{numericValue(accountTakeovers2025?.value.value ?? 0).toLocaleString()}</strong>
+        <span>2025 account takeovers</span>
+      </article>
+      <article>
+        <strong>{records.length.toLocaleString()}</strong>
+        <span>reviewed aggregate values</span>
+      </article>
+    </div>
+    {!records.length && (
+      <p class="notice">This source is not present in the current publication.</p>
+    )}
+  </section>
+  <section class="section section--ink">
+    <div class="shell">
+      <div class="section-head">
+        <h2>Published annual figures</h2>
+        <p>Each row preserves its source-defined dimension. The annual total, cause, and incident-type rows are not an additive breakdown.</p>
+      </div>
+      <div class="table-wrap" tabindex="0" aria-label="Netherlands AP annual aggregate table">
+        <table aria-label="Netherlands AP annual aggregate values">
+          <thead>
+            <tr>
+              <th scope="col">Year</th>
+              <th scope="col">Dimension</th>
+              <th scope="col">Source category</th>
+              <th scope="col">Notifications</th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((record) => (
+              <tr>
+                <th scope="row" data-label="Year">{record.reporting_period_start.slice(0, 4)}</th>
+                <td data-label="Dimension">{record.dimension.replaceAll("_", " ")}</td>
+                <td data-label="Source category">{record.category}</td>
+                <td data-label="Notifications">{numericValue(record.value.value).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  <section class="section shell">
+    <div class="section-head">
+      <h2>Reuse boundary</h2>
+      <p>No explicit open-data licence was identified on the reviewed publication. The pipeline therefore retains attributed factual values only and does not reproduce the regulator’s prose or documents.</p>
+    </div>
+    <SourceNote href={policy?.source_url ?? null} />
+  </section>
+</BaseLayout>

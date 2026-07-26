@@ -16,6 +16,13 @@
       "minimum_retained_fraction": 0.85,
       "maximum_growth_factor": 1.75
     },
+    "netherlands_ap": {
+      "source_id": "netherlands_ap",
+      "stale_after_hours": 4380,
+      "minimum_records": 5,
+      "minimum_retained_fraction": 1.0,
+      "maximum_growth_factor": 1.5
+    },
     "france_cnil": {
       "source_id": "france_cnil",
       "stale_after_hours": 4380,

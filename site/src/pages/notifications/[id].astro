@@ -62,7 +62,7 @@ const recordEvents = publication.corrections.filter(
               <a href={`${import.meta.env.BASE_URL}corrections/#event-${event.event_id}`}>
                 {label(event.event_type)}
               </a>
-              {" — "}{date(event.first_observed_time)}. {event.reason}
+              {": "}{date(event.first_observed_time)}. {event.reason}
             </li>
           ))}
         </ul>

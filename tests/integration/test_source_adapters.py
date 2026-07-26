@@ -28,6 +28,7 @@ from breachgazette.clients.massachusetts import (
     MassachusettsAdapter,
     _parse_rows,
 )
+from breachgazette.clients.netherlands_ap import NetherlandsApAdapter
 from breachgazette.clients.oaic import EXPECTED_SHEETS, OaicNdbAdapter
 from breachgazette.clients.oaic_regulatory import OaicRegulatoryAdapter
 from breachgazette.clients.uk_ico import (
@@ -44,6 +45,82 @@ def _json_response(value: object) -> httpx.Response:
         headers={"Content-Type": "application/json"},
         content=json.dumps(value).encode(),
     )
+
+
+def _netherlands_ap_page(*, changed_marker: bool = False) -> bytes:
+    total_sentence = (
+        "In totaal zijn in 2025 bij de AP 39.407 datalekken gemeld, "
+        "tegenover 37.839 in 2024. Cyberaanvallen waren de oorzaak van "
+        "2.428 van de gemelde datalekken."
+    )
+    if changed_marker:
+        total_sentence = total_sentence.replace("39.407", "onbekend")
+    return (
+        "<!doctype html><html lang=\"nl\"><head>"
+        "<title>AP vergroot gevaren van cyberaanvallen</title>"
+        "<style>39.407 should not be parsed from styling</style></head><body>"
+        "<h1>AP vergroot gevaren van cyberaanvallen</h1>"
+        f"<p>{total_sentence}</p>"
+        "<p>Het aantal meldingen na accountovernames steeg explosief: "
+        "van 607 in 2024 naar 1.742 in 2025.</p>"
+        "<script>const misleading = '99.999';</script>"
+        "</body></html>"
+    ).encode()
+
+
+def test_netherlands_ap_publishes_only_reviewed_annual_aggregates(
+    observed_at: datetime,
+) -> None:
+    adapter = NetherlandsApAdapter(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                headers={"Content-Type": "text/html; charset=UTF-8"},
+                content=_netherlands_ap_page(),
+            )
+        )
+    )
+    result = adapter.collect(observed_at=observed_at)
+
+    values = {
+        (record.dimension, record.reporting_period_start.year): record.value.value
+        for record in result.records
+    }
+    assert values == {
+        ("breach_notifications_received", 2025): 39_407,
+        ("breach_notifications_received", 2024): 37_839,
+        ("reported_cause", 2025): 2_428,
+        ("incident_type", 2025): 1_742,
+        ("incident_type", 2024): 607,
+    }
+    assert result.snapshot.completeness == "complete"
+    assert result.snapshot.records_discovered == 5
+    assert result.snapshot.records_accepted == 5
+    assert all(record.publication_level == "national_aggregate" for record in result.records)
+    assert all(record.unit == "notifications" for record in result.records)
+    assert all(record.parent_category is None for record in result.records)
+    assert not [
+        finding
+        for record in result.records
+        for finding in audit_public_value(
+            record,
+            record_identity=record.source_record_id,
+        )
+    ]
+
+
+def test_netherlands_ap_marker_drift_fails_closed(observed_at: datetime) -> None:
+    adapter = NetherlandsApAdapter(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                headers={"Content-Type": "text/html"},
+                content=_netherlands_ap_page(changed_marker=True),
+            )
+        )
+    )
+    with pytest.raises(SourceClientError, match="markers changed"):
+        adapter.collect(observed_at=observed_at)
 
 
 def _cnil_fixture(*, license_id: str = "lov2") -> tuple[dict[str, object], bytes]:

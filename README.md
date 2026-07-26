@@ -3,7 +3,7 @@
 **Public breach notifications, connected and explained.**
 
 Breach Gazette is a provenance-first public data platform for official
-Australian, French, United Kingdom, and United States breach-notification
+Australian, French, Netherlands, United Kingdom, and United States breach-notification
 statistics, public notification registers, and regulatory actions. It preserves the
 source-specific difference between aggregate statistics, anonymized
 notification rows, named notifications, investigations, determinations, court
@@ -47,7 +47,11 @@ an allegation into a finding.
 | Massachusetts OCABR | Named notifications | Reviewed 2024 through 2026 annual reports, without notice letters |
 | France CNIL | Anonymized notification summaries | Complete published CSV through December 2025; raw row combinations are not retained or published |
 | UK ICO | Anonymized report summaries | Unique report-reference aggregates from Q2 2019; raw rows, Q1 2019, and unresolved period conflicts are excluded |
+| Netherlands AP | National aggregate | Five attributed annual values for 2024 and 2025; source prose and documents are not redistributed |
 | HHS OCR | Deferred | No stable bounded machine-readable public-list contract verified |
+| Ireland DPC | Deferred | Reuse conditions are compatible, but the official HTTPS certificate chain cannot currently be validated |
+| Texas Attorney General | Deferred | Stateful listing with transient request tokens, address fields, and no reviewed stable export or redistribution licence |
+| Maine Attorney General | Deferred | Official database currently unavailable; no unofficial mirror is substituted |
 
 Aggregate and anonymized rows never become named incident records. A named
 notifier is not silently relabelled as the entity where an event occurred.

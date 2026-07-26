@@ -25,7 +25,7 @@ export const GET: APIRoute = ({ site }) => {
     return [
       "<entry>",
       `<id>${xml(`urn:breachgazette:correction:${event.event_id}`)}</id>`,
-      `<title>${xml(`${label(event.event_type)} — ${sourceName}`)}</title>`,
+      `<title>${xml(`${label(event.event_type)}: ${sourceName}`)}</title>`,
       `<link href="${xml(entryUrl)}" />`,
       `<updated>${xml(event.first_observed_time)}</updated>`,
       `<summary>${xml(summary)}</summary>`,
