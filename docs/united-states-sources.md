@@ -48,3 +48,20 @@ machine-readable public export contract was verified. The source is deferred
 rather than automated through brittle stateful JSF browser behavior. The
 current ingestion contract requires partial-result detection and preservation
 of covered-entity, business-associate, addendum, and rolling-window semantics.
+
+## Texas
+
+The Texas Attorney General describes a public reporting threshold of at least
+250 affected Texas residents. The linked register renders rows through a
+stateful hosted application with transient request tokens rather than a stable
+session-independent export. It also exposes street-address fields and provides
+no reviewed source-specific redistribution licence. Browser automation and
+transient application endpoints are therefore not used.
+
+## Maine
+
+The Maine Attorney General's official page states that its public database is
+currently unavailable because of abusive automated traffic. Breach Gazette
+does not substitute an unofficial mirror, interpret unavailability as zero
+reports, or publish records until a stable official retrieval and reuse
+contract can be reviewed.

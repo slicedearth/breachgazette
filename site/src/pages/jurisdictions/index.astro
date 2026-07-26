@@ -29,6 +29,12 @@ const jurisdictions = [
     model: "Deduplicated anonymized report summaries",
     description: "ICO report-reference counts and source-labelled characteristics, with raw row combinations excluded from publication.",
   },
+  {
+    href: "netherlands/",
+    country: "Netherlands",
+    model: "Annual national notification aggregates",
+    description: "AP annual notification, cyberattack-cause, and account-takeover figures preserved as separate, non-additive dimensions.",
+  },
 ];
 ---
 
@@ -37,7 +43,7 @@ const jurisdictions = [
     eyebrow="Jurisdictions"
     title="Different laws, different evidence"
     intro="Each country view keeps its source threshold, publication unit, time window, and naming practice visible. Counts are not converted into a cross-country ranking."
-    warning="A larger count can reflect more notification rows, a different legal threshold, or repeated reports—not necessarily more unique incidents."
+    warning="A larger count can reflect more notification rows, a different legal threshold, or repeated reports. It does not necessarily mean more unique incidents."
   />
   <section class="section shell">
     <div class="grid">

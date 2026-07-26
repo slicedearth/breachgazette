@@ -32,7 +32,7 @@ export const GET: APIRoute = ({ site }) => {
           site,
         ).toString();
     const observed = sourceDate(record) ?? record.local_last_observed_time.slice(0, 10);
-    const title = `${record.named_entity.source_name} — ${record.jurisdiction} notification`;
+    const title = `${record.named_entity.source_name}: ${record.jurisdiction} notification`;
     const summary = [
       `Source role: ${record.named_entity.role}.`,
       `Regulator: ${record.regulator}.`,

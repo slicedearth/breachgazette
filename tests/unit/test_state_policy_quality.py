@@ -62,12 +62,17 @@ def test_source_policy_catalogue_is_complete() -> None:
         "massachusetts",
         "france_cnil",
         "united_kingdom_ico",
+        "netherlands_ap",
+        "ireland_dpc",
+        "texas",
+        "maine",
         "hhs",
     }
-    assert policies["hhs"].implemented is False
+    deferred = {"hhs", "ireland_dpc", "texas", "maine"}
+    assert all(policies[source_id].implemented is False for source_id in deferred)
     assert all(str(policy.source_url).startswith("https://") for policy in policies.values())
     monitoring = load_monitoring_catalogue()
-    assert set(monitoring.sources) == set(policies) - {"hhs"}
+    assert set(monitoring.sources) == set(policies) - deferred
 
 
 def test_source_policy_catalogue_rejects_stale_or_future_rights_reviews(
@@ -524,6 +529,7 @@ def test_production_builder_emits_minimised_real_publication(
         "massachusetts",
         "france_cnil",
         "united_kingdom_ico",
+        "netherlands_ap",
     )
     observed = datetime.now(UTC)
     monitoring = MonitoringCatalogue(
@@ -555,8 +561,9 @@ def test_production_builder_emits_minimised_real_publication(
     )
     for index, source_id in enumerate(source_ids):
         checksum = (f"{index + 1:x}" * 64)[:64]
-        if source_id in {"france_cnil", "united_kingdom_ico"}:
+        if source_id in {"france_cnil", "united_kingdom_ico", "netherlands_ap"}:
             is_uk = source_id == "united_kingdom_ico"
+            is_netherlands = source_id == "netherlands_ap"
             store.write_records(
                 source_id,
                 [
@@ -565,7 +572,11 @@ def test_production_builder_emits_minimised_real_publication(
                         source_record_id=(
                             "uk:ico:unique_reports:fixture"
                             if is_uk
-                            else "fr:cnil:notification_rows:fixture"
+                            else (
+                                "nl:ap:breach_notifications_received:2025"
+                                if is_netherlands
+                                else "fr:cnil:notification_rows:fixture"
+                            )
                         ),
                         source_url="https://example.gov/source",
                         source_revision=f"revision-{source_id}",
@@ -579,16 +590,36 @@ def test_production_builder_emits_minimised_real_publication(
                         parser_version="1.0",
                         normalization_version="1.0",
                         limitations=["Test-only synthetic aggregate."],
-                        regulator="ICO" if is_uk else "CNIL",
+                        regulator=(
+                            "ICO"
+                            if is_uk
+                            else ("Autoriteit Persoonsgegevens" if is_netherlands else "CNIL")
+                        ),
                         reporting_scheme="Test-only anonymous notifications",
-                        publication_level=PublicationLevel.ANONYMIZED_NOTIFICATION,
+                        publication_level=(
+                            PublicationLevel.NATIONAL_AGGREGATE
+                            if is_netherlands
+                            else PublicationLevel.ANONYMIZED_NOTIFICATION
+                        ),
                         reporting_period_start=date(2025, 12, 1),
                         reporting_period_end=date(2025, 12, 31),
-                        dimension="unique_reports" if is_uk else "notification_rows",
+                        dimension=(
+                            "unique_reports"
+                            if is_uk
+                            else (
+                                "breach_notifications_received"
+                                if is_netherlands
+                                else "notification_rows"
+                            )
+                        ),
                         category=(
                             "All unambiguous in-scope report references"
                             if is_uk
-                            else "All published notification rows"
+                            else (
+                                "All data breach notifications received"
+                                if is_netherlands
+                                else "All published notification rows"
+                            )
                         ),
                         value=ObservedValue(
                             value=2,
@@ -598,9 +629,13 @@ def test_production_builder_emits_minimised_real_publication(
                         unit=(
                             "unique_source_report_references"
                             if is_uk
-                            else "notification_rows"
+                            else ("notifications" if is_netherlands else "notification_rows")
                         ),
-                        population_scope="Test-only anonymous rows",
+                        population_scope=(
+                            "Notifications received by Autoriteit Persoonsgegevens"
+                            if is_netherlands
+                            else "Test-only anonymous rows"
+                        ),
                     )
                 ],
             )
@@ -645,7 +680,7 @@ def test_production_builder_emits_minimised_real_publication(
     output = tmp_path / "publication"
     result = build_site_data(data_root=root, output=output)
     assert result["quality_passed"] is True
-    assert result["records"]["notifications"] == len(source_ids) - 2
+    assert result["records"]["notifications"] == len(source_ids) - 3
     assert result["records"]["anonymized_notification_rows"] == 2
     assert (output / "publication.json").is_file()
     publication = json.loads((output / "publication.json").read_text(encoding="utf-8"))
@@ -658,8 +693,8 @@ def test_production_builder_emits_minimised_real_publication(
     search_manifest = json.loads(
         (output / "search-manifest.json").read_text(encoding="utf-8")
     )
-    assert search_manifest["record_count"] == len(source_ids) - 2
-    assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids) - 2
+    assert search_manifest["record_count"] == len(source_ids) - 3
+    assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids) - 3
     for metadata in search_manifest["partitions"]:
         encoded = (
             output / "search-partitions" / f"{metadata['asset']}.json"

@@ -20,7 +20,7 @@ test("source health exposes freshness without claiming factual completeness", as
   await page.goto("/source-health/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Source health");
   await expect(page.getByText(/does not establish that an official source is factually complete/i)).toBeVisible();
-  const table = page.getByRole("table");
+  const table = page.locator('.table-wrap[aria-label="Source health table"] table');
   await expect(table).toContainText("Healthy");
   await expect(table).toContainText("OAIC NDB statistics");
   await expect(table).toContainText("NSW MNDB aggregate snapshot");
@@ -31,9 +31,9 @@ test("source health exposes freshness without claiming factual completeness", as
   await expect(evidence).toContainText("Accepted");
   await expect(evidence).toContainText("Rejected");
   await expect(evidence).toContainText("Bounded limit");
-  const history = page.getByRole("table", {
-    name: "Bounded source health history table",
-  });
+  const history = page.locator(
+    '.table-wrap[aria-label="Bounded source health history table"] table',
+  );
   await expect(history).toContainText("29 Dec 2025");
   await expect(history).toContainText("Needs attention");
   await expect(history).toContainText("Washington Attorney General breach notifications");
@@ -49,7 +49,7 @@ test("source health exposes freshness without claiming factual completeness", as
 test("source coverage exposes record units and comparison boundaries", async ({ page }) => {
   await page.goto("/source-coverage/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "What can—and cannot—be compared",
+    "What can and cannot be compared",
   );
   const table = page.getByRole("table", { name: "Source coverage matrix" });
   await expect(table).toContainText("Regulator Register Entry");
@@ -94,6 +94,25 @@ test("United Kingdom view preserves unique-report and category boundaries", asyn
   ).toHaveAttribute("aria-current", "page");
 });
 
+test("Netherlands view keeps annual dimensions separate", async ({ page }) => {
+  await page.goto("/netherlands/");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Netherlands AP data breach reports",
+  );
+  await expect(page.getByText(/dimensions overlap and must not be summed/i)).toBeVisible();
+  const table = page.getByRole("table", {
+    name: "Netherlands AP annual aggregate values",
+  });
+  await expect(table).toContainText("39,407");
+  await expect(table).toContainText("Cyberattack");
+  await expect(table).toContainText("Account takeover");
+  await expect(
+    page.getByRole("navigation", { name: "Primary" }).getByRole("link", {
+      name: "Jurisdictions",
+    }),
+  ).toHaveAttribute("aria-current", "page");
+});
+
 test("OAIC allegations and orders retain distinct labels", async ({ page }) => {
   await page.goto("/australia/regulatory-actions/");
   const timeline = page.getByLabel("OAIC regulatory timeline");
@@ -111,6 +130,16 @@ test("United States pages preserve source role warnings", async ({ page }) => {
   await expect(page.getByText(/not necessarily the entity where the breach occurred/i)).toBeVisible();
   await page.goto("/united-states/california/");
   await expect(page.getByText(/does not retrieve or reproduce sample notification letters/i)).toBeVisible();
+  await page.goto("/united-states/");
+  await expect(page.getByText("Reviewed but deferred:")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Texas" })).toHaveAttribute(
+    "href",
+    "/sources/texas/",
+  );
+  await expect(page.getByRole("link", { name: "Maine" })).toHaveAttribute(
+    "href",
+    "/sources/maine/",
+  );
 });
 
 test("organization profiles and paginated relationships explain evidence", async ({
@@ -172,6 +201,7 @@ test("representative desktop and mobile pages pass automated accessibility check
     "/latest/",
     "/jurisdictions/",
     "/france/",
+    "/netherlands/",
     "/united-kingdom/",
     "/source-health/",
     "/source-coverage/",
@@ -293,6 +323,7 @@ test("desktop and mobile layouts contain content without horizontal scrollers", 
     "/australia/nsw/",
     "/australia/public-notifications/",
     "/france/",
+    "/netherlands/",
     "/united-kingdom/",
     "/united-states/california/",
     "/united-states/massachusetts/",
@@ -310,6 +341,7 @@ test("desktop and mobile layouts contain content without horizontal scrollers", 
     "/australia/nsw/",
     "/australia/public-notifications/",
     "/france/",
+    "/netherlands/",
     "/united-kingdom/",
     "/united-states/california/",
     "/united-states/massachusetts/",
@@ -358,7 +390,7 @@ test("desktop and mobile layouts contain content without horizontal scrollers", 
   expect(geometry.tableHeaderWhiteSpace).toBe("nowrap");
   expect(geometry.unlabeledCells).toBe(0);
 
-  for (const width of [320, 390, 768]) {
+  for (const width of [320, 390, 768, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     for (const path of tablePaths) {
       await page.goto(path);
@@ -418,6 +450,15 @@ test("desktop and mobile layouts contain content without horizontal scrollers", 
   }
 
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/source-coverage/");
+  const coverageTableGeometry = await page.locator(".table-wrap").evaluate((wrapper) => ({
+    clientWidth: wrapper.clientWidth,
+    scrollWidth: wrapper.scrollWidth,
+  }));
+  expect(coverageTableGeometry.scrollWidth).toBeLessThanOrEqual(
+    coverageTableGeometry.clientWidth,
+  );
+
   await page.goto("/sources/");
   const sourceHeadingGeometry = await page.locator(".source-card h2").evaluateAll(
     (headings) => headings.map((heading) => {
@@ -861,13 +902,13 @@ test("search filters can be restored from a server-private URL fragment", async 
   const requests: string[] = [];
   page.on("request", (request) => requests.push(request.url()));
   await page.goto("/latest/#jurisdiction=Washington&query=Example+Services");
-  await expect(page.getByLabel("Jurisdiction")).toHaveValue("Washington");
+  await expect(page.locator('select[name="jurisdiction"]')).toHaveValue("Washington");
   await expect(page.getByLabel("Organization or agency")).toHaveValue("Example Services");
   await expect(page.getByText(/1 matching source records/i)).toBeVisible();
   await expect(page.getByRole("button", { name: "Copy search link" })).toBeEnabled();
   expect(requests.every((url) => !url.includes("#"))).toBe(true);
   await page.reload();
-  await expect(page.getByLabel("Jurisdiction")).toHaveValue("Washington");
+  await expect(page.locator('select[name="jurisdiction"]')).toHaveValue("Washington");
   await expect(page.getByLabel("Organization or agency")).toHaveValue("Example Services");
 });
 

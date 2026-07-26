@@ -40,3 +40,8 @@ The implemented CNIL and UK ICO paths validate anonymous rows transiently and
 store only grouped `SourceAggregateRecord` metrics. The UK path first groups
 rows by source report reference and excludes unresolved reporting-period
 conflicts, reducing privacy and repository-size risk.
+
+The Netherlands AP path publishes five attributed annual aggregate values.
+The annual notification total, cyberattack-cause count, and account-takeover
+count remain distinct source-defined dimensions. They are not an additive
+breakdown, and their records contain no organization identities.

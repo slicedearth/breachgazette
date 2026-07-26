@@ -12,6 +12,7 @@ from breachgazette.clients import (
     CaliforniaAdapter,
     CnilAdapter,
     MassachusettsAdapter,
+    NetherlandsApAdapter,
     NswAggregateAdapter,
     NswPublicNotificationsAdapter,
     OaicNdbAdapter,
@@ -46,6 +47,7 @@ ADAPTERS: dict[str, AdapterFactory] = {
     "massachusetts": MassachusettsAdapter,
     "france_cnil": CnilAdapter,
     "united_kingdom_ico": UnitedKingdomIcoAdapter,
+    "netherlands_ap": NetherlandsApAdapter,
 }
 
 
