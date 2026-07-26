@@ -4,6 +4,7 @@ import json
 import shutil
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -12,6 +13,8 @@ from breachgazette.contracts import (
     MonitoringCatalogue,
     NotificationChange,
     SourceAggregateRecord,
+    SourceHealthEntry,
+    SourceHealthReport,
     SourceMonitoringPolicy,
     SourceNotificationRecord,
     UpdateCheckpoint,
@@ -34,6 +37,8 @@ from breachgazette.publish.builder import (
     SEARCH_PARTITION_MAX_BYTES,
     SEARCH_PARTITION_SIZE,
     _build_search_assets,
+    _build_source_health_history,
+    _build_update_digest,
     _fnv1a,
     _search_trigrams,
     audit_public_tree,
@@ -42,7 +47,7 @@ from breachgazette.publish.builder import (
 from breachgazette.quality import DataQualityError, build_quality_report
 from breachgazette.quality.temporal import exclude_temporal_conflicts
 from breachgazette.state import PrivateStateStore
-from breachgazette.utils import sha256_hex
+from breachgazette.utils import atomic_write_json, sha256_hex
 
 
 def test_source_policy_catalogue_is_complete() -> None:
@@ -369,6 +374,106 @@ def test_search_assets_are_partitioned_and_bounded(notification_factory) -> None
         )
 
 
+def test_publication_update_digest_uses_latest_complete_observation_batch() -> None:
+    earlier = datetime(2026, 1, 1, tzinfo=UTC)
+    latest = datetime(2026, 1, 2, tzinfo=UTC)
+    events = [
+        NotificationChange(
+            event_id=event_id * 64,
+            source_id="washington",
+            record_id=f"record-{index}",
+            event_type=event_type,
+            before_value=(
+                {"state": "previous"}
+                if event_type != "notification_first_observed"
+                else None
+            ),
+            after_value=None if event_type == "source_status_changed" else {"state": "current"},
+            current_snapshot="a" * 64,
+            source_completeness=Completeness.COMPLETE,
+            detector_version="1.0",
+            first_observed_time=observed,
+            reason="Observed source change.",
+        )
+        for index, (event_id, event_type, observed) in enumerate(
+            [
+                ("b", "source_record_corrected", earlier),
+                ("c", "notification_first_observed", latest),
+                ("d", "source_record_corrected", latest),
+                ("e", "source_status_changed", latest),
+            ]
+        )
+    ]
+
+    digest = _build_update_digest(events)
+
+    assert digest["observed_at"] == latest
+    assert digest["event_count"] == 3
+    assert digest["counts"] == {
+        "records_first_observed": 1,
+        "records_corrected": 1,
+        "records_absent_from_complete_snapshot": 1,
+        "sources_recovered": 0,
+    }
+    assert digest["sources"][0]["source_id"] == "washington"
+    assert any("complete current snapshot" in item for item in digest["limitations"])
+
+
+def test_public_source_health_history_is_bounded_sanitized_and_marks_recovery(
+    tmp_path: Path,
+) -> None:
+    earlier = datetime(2026, 1, 1, tzinfo=UTC)
+    latest = datetime(2026, 1, 2, tzinfo=UTC)
+
+    def report(
+        observed: datetime,
+        status: Literal["healthy", "failed_update"],
+    ) -> SourceHealthReport:
+        return SourceHealthReport(
+            generated_at=observed,
+            dataset_class="real_source_data",
+            passed=status == "healthy",
+            schedule_utc="23 17 * * 1",
+            sources=[
+                SourceHealthEntry(
+                    source_id="washington",
+                    status=status,
+                    record_count=10,
+                    minimum_records=1,
+                    completeness=Completeness.COMPLETE,
+                    snapshot_checksum="a" * 64,
+                    snapshot_age_hours=1,
+                    stale_after_hours=240,
+                    latest_attempted_update=observed,
+                    last_successful_update=observed if status == "healthy" else None,
+                    checkpoint_status="complete" if status == "healthy" else "failed",
+                    reasons=["Private diagnostic detail."],
+                )
+            ],
+            limitations=["Health does not establish source factual completeness."],
+        )
+
+    previous = report(earlier, "failed_update")
+    current = report(latest, "healthy")
+    atomic_write_json(
+        tmp_path / "reports" / "history" / "source-health-20260101.json",
+        previous,
+    )
+
+    public_history = _build_source_health_history(
+        data_root=tmp_path,
+        current=current,
+    )
+
+    assert public_history["maximum_snapshots"] == 16
+    assert len(public_history["snapshots"]) == 2
+    assert public_history["snapshots"][-1]["recoveries_from_previous"] == [
+        "washington"
+    ]
+    assert "snapshot_checksum" not in public_history["snapshots"][-1]["sources"][0]
+    assert "reasons" not in public_history["snapshots"][-1]["sources"][0]
+
+
 def test_search_assets_scale_to_ten_thousand_bounded_records(notification_factory) -> None:
     records = [
         notification_factory(record_id=f"record-{index:05d}")
@@ -545,6 +650,9 @@ def test_production_builder_emits_minimised_real_publication(
     assert (output / "publication.json").is_file()
     publication = json.loads((output / "publication.json").read_text(encoding="utf-8"))
     assert "latest_notifications" not in publication
+    assert publication["update_digest"]["event_count"] == 0
+    assert publication["source_health_history"]["maximum_snapshots"] == 16
+    assert len(publication["source_health_history"]["snapshots"]) == 1
     assert not (output / "notifications.json").exists()
     assert (output / "search-manifest.json").is_file()
     search_manifest = json.loads(

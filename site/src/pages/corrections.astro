@@ -1,7 +1,7 @@
 ---
 import Hero from "../components/Hero.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { getPublication } from "../lib/data";
+import { getAllNotifications, getPublication } from "../lib/data";
 import { date, label } from "../lib/format";
 
 const publication = getPublication();
@@ -11,6 +11,21 @@ const shortRevision = (revision: string | null) =>
   revision ? revision.slice(0, 12) : "First retained snapshot";
 const totalCorrections = publication.manifest.record_counts.corrections
   ?? publication.corrections.length;
+const currentRecords = new Map(
+  getAllNotifications().map((record) => [
+    `${record.source_id}|${record.source_record_id}`,
+    record,
+  ]),
+);
+const recordHref = (sourceId: string, recordId: string) => {
+  const record = currentRecords.get(`${sourceId}|${recordId}`);
+  if (!record) return null;
+  if (record.has_detail_page) {
+    return `${import.meta.env.BASE_URL}notifications/${encodeURIComponent(recordId)}/`;
+  }
+  const encodedId = encodeURIComponent(recordId);
+  return `${import.meta.env.BASE_URL}latest/#query=${encodedId}&record=${encodedId}`;
+};
 ---
 
 <BaseLayout title="Recent record corrections" description="Deterministic changes observed in official source records.">
@@ -32,8 +47,9 @@ const totalCorrections = publication.manifest.record_counts.corrections
     </p>
     {publication.corrections.length ? (
       <ol class="correction-list">
-        {publication.corrections.map((event) => (
-          <li id={`event-${event.event_id}`}>
+        {publication.corrections.map((event) => {
+          const currentRecordHref = recordHref(event.source_id, event.record_id);
+          return <li id={`event-${event.event_id}`}>
             <article class="card correction-card">
               <header>
                 <span class="pill">{label(event.event_type)}</span>
@@ -43,7 +59,11 @@ const totalCorrections = publication.manifest.record_counts.corrections
               <dl class="correction-card__meta">
                 <div>
                   <dt>Source record</dt>
-                  <dd><code>{event.record_id}</code></dd>
+                  <dd>
+                    {currentRecordHref
+                      ? <a href={currentRecordHref}><code>{event.record_id}</code></a>
+                      : <code>{event.record_id}</code>}
+                  </dd>
                 </div>
                 <div>
                   <dt>First observed</dt>
@@ -72,8 +92,8 @@ const totalCorrections = publication.manifest.record_counts.corrections
                 </div>
               ) : null}
             </article>
-          </li>
-        ))}
+          </li>;
+        })}
       </ol>
     ) : <p class="notice">No correction events have been observed in the retained complete snapshot history.</p>}
   </section>

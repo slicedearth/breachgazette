@@ -34,6 +34,43 @@ const metrics = [
     </p>
     <a href={`${import.meta.env.BASE_URL}source-health/`}>Review source health</a>
   </aside>
+  <section class="section shell" aria-labelledby="latest-update">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Latest retained observation batch</span>
+        <h2 id="latest-update">What changed in the published source records</h2>
+      </div>
+      <p>
+        {publication.update_digest.observed_at
+          ? <>Observed {date(publication.update_digest.observed_at)}. </>
+          : null}
+        Counts describe source-record changes, not newly confirmed incidents.
+      </p>
+    </div>
+    <div class="grid">
+      <article class="card">
+        <div class="metric">{compactNumber(publication.update_digest.counts.records_first_observed)}</div>
+        <h3>First observed</h3>
+        <p>Records not present in the previous comparable retained snapshot.</p>
+      </article>
+      <article class="card">
+        <div class="metric">{compactNumber(publication.update_digest.counts.records_corrected)}</div>
+        <h3>Corrected</h3>
+        <p>Normalized records whose source-backed fields changed.</p>
+      </article>
+      <article class="card">
+        <div class="metric">{compactNumber(publication.update_digest.counts.records_absent_from_complete_snapshot)}</div>
+        <h3>Absent from a complete snapshot</h3>
+        <p>Source-status changes only; absence is not evidence of remediation.</p>
+      </article>
+      <article class="card">
+        <div class="metric">{compactNumber(publication.update_digest.counts.sources_recovered)}</div>
+        <h3>Sources recovered</h3>
+        <p>Retrievals that returned to healthy after a retained non-healthy state.</p>
+      </article>
+    </div>
+    <p><a href={`${import.meta.env.BASE_URL}corrections/`}>Review recent record-linked corrections and interpretation boundaries</a></p>
+  </section>
   <section class="section shell" aria-labelledby="at-a-glance">
     <div class="section-head">
       <h2 id="at-a-glance">At a glance</h2>

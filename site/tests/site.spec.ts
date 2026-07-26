@@ -31,6 +31,14 @@ test("source health exposes freshness without claiming factual completeness", as
   await expect(evidence).toContainText("Accepted");
   await expect(evidence).toContainText("Rejected");
   await expect(evidence).toContainText("Bounded limit");
+  const history = page.getByRole("table", {
+    name: "Bounded source health history table",
+  });
+  await expect(history).toContainText("29 Dec 2025");
+  await expect(history).toContainText("Needs attention");
+  await expect(history).toContainText("Washington Attorney General breach notifications");
+  await expect(page.getByText(/Private checksums and diagnostic reasons are excluded/))
+    .toBeVisible();
   await page.getByRole("link", {
     name: "Washington Attorney General breach notifications",
   }).last().click();
@@ -861,6 +869,15 @@ test("publication identity and source corrections are readable and reproducible"
   await expect(stamp).toContainText("Verified 1 Jan 2026");
   await expect(stamp.locator("code")).toHaveText("ffffffffffff");
   await expect(stamp.getByRole("link", { name: "Review source health" })).toBeVisible();
+  await expect(page.getByRole("heading", {
+    name: "What changed in the published source records",
+  })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "First observed" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Corrected" })).toBeVisible();
+  await expect(page.getByRole("heading", {
+    name: "Absent from a complete snapshot",
+  })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sources recovered" })).toBeVisible();
 
   await page.goto("/corrections/");
   await expect(page.getByRole("heading", { name: "Observed source changes" })).toBeVisible();
@@ -872,9 +889,23 @@ test("publication identity and source corrections are readable and reproducible"
   await expect(page.getByText(
     "The normalized source record changed between comparable snapshots.",
   )).toBeVisible();
+  await expect(page.getByRole("link", { name: "fixture-wa-1" })).toHaveAttribute(
+    "href",
+    "/notifications/fixture-wa-1/",
+  );
   await expect(page.getByText(/does not independently establish why/i)).toBeVisible();
   await expect(page.getByText(/Showing the 1 most recently observed change of 1 retained event/)).toBeVisible();
   await expect(page.getByText(/bounded to 250 events/)).toBeVisible();
+
+  await page.goto("/notifications/fixture-wa-1/");
+  await expect(page.getByRole("heading", {
+    name: "Recent observed record history",
+  })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Source Record Corrected" }))
+    .toHaveAttribute(
+      "href",
+      `/corrections/#event-${"c".repeat(64)}`,
+    );
 
   const correctionsFeed = await request.get("/feeds/corrections.xml");
   expect(correctionsFeed.ok()).toBe(true);
@@ -898,6 +929,15 @@ test("publication identity and source corrections are readable and reproducible"
     record_counts: { notifications: 3, corrections: 1 },
     published_corrections: 1,
     max_public_corrections: 250,
+    update_digest: {
+      event_count: 3,
+      counts: {
+        records_first_observed: 1,
+        records_corrected: 1,
+        records_absent_from_complete_snapshot: 1,
+        sources_recovered: 1,
+      },
+    },
   });
 });
 

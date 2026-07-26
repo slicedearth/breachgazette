@@ -170,6 +170,27 @@ export type CorrectionEvent = {
   limitations: string[];
 };
 
+export type PublicationUpdateDigest = {
+  observed_at: string | null;
+  health_observed_at: string | null;
+  scope: "latest_retained_observation_batch";
+  event_count: number;
+  counts: {
+    records_first_observed: number;
+    records_corrected: number;
+    records_absent_from_complete_snapshot: number;
+    sources_recovered: number;
+  };
+  sources: Array<{
+    source_id: string;
+    records_first_observed: number;
+    records_corrected: number;
+    records_absent_from_complete_snapshot: number;
+  }>;
+  recovered_sources: string[];
+  limitations: string[];
+};
+
 export type SourcePolicy = {
   source_id: string;
   rights_reviewed_on: string;
@@ -224,6 +245,7 @@ export type Publication = {
   detail_organizations: Organization[];
   relationships: Relationship[];
   corrections: CorrectionEvent[];
+  update_digest: PublicationUpdateDigest;
   policies: Record<string, SourcePolicy>;
   snapshots: SourceSnapshot[];
   quality: {
@@ -253,6 +275,22 @@ export type Publication = {
       checkpoint_status: string;
       reasons: string[];
     }>;
+  };
+  source_health_history: {
+    maximum_snapshots: number;
+    snapshots: Array<{
+      generated_at: string;
+      passed: boolean;
+      sources: Array<{
+        source_id: string;
+        status: string;
+        record_count: number;
+        completeness: string | null;
+        checkpoint_status: string;
+      }>;
+      recoveries_from_previous: string[];
+    }>;
+    limitations: string[];
   };
   manifest: {
     dataset_class: string;
