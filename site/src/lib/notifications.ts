@@ -34,13 +34,30 @@ export function getNotificationPage(
 export function getNotificationPaginationItems(
   currentPage: number,
   pageCount: number,
+  siblingCount = 2,
 ): Array<number | null> {
-  if (pageCount <= 7) {
+  if (!Number.isInteger(siblingCount) || siblingCount < 0) {
+    throw new Error("Pagination sibling count must be a non-negative integer");
+  }
+
+  const fullRangeLimit = siblingCount * 2 + 5;
+  if (pageCount <= fullRangeLimit) {
     return Array.from({ length: pageCount }, (_, index) => index + 1);
   }
 
+  const interiorWindowSize = siblingCount * 2 + 1;
+  let windowStart = currentPage - siblingCount;
+  let windowEnd = currentPage + siblingCount;
+  if (windowStart <= 2) {
+    windowStart = 2;
+    windowEnd = windowStart + interiorWindowSize - 1;
+  } else if (windowEnd >= pageCount - 1) {
+    windowEnd = pageCount - 1;
+    windowStart = windowEnd - interiorWindowSize + 1;
+  }
+
   const includedPages = new Set([1, pageCount]);
-  for (let page = currentPage - 2; page <= currentPage + 2; page += 1) {
+  for (let page = windowStart; page <= windowEnd; page += 1) {
     if (page > 1 && page < pageCount) includedPages.add(page);
   }
 

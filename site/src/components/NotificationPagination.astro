@@ -10,6 +10,7 @@ interface Props {
 const { currentPage, pageCount, position } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const pages = getNotificationPaginationItems(currentPage, pageCount);
+const mobilePages = getNotificationPaginationItems(currentPage, pageCount, 1);
 const pageHref = (page: number) => page === 1
   ? `${base}latest/#notification-results`
   : `${base}latest/pages/${page}/#notification-results`;
@@ -37,8 +38,30 @@ const label = position === "top"
       </span>
     )}
 
-  <ol class="pagination__pages">
+  <span class="pagination__status">Page {currentPage} of {pageCount}</span>
+
+  <ol class="pagination__pages pagination__pages--desktop">
     {pages.map((page) => page === null
+      ? <li class="pagination__ellipsis" aria-hidden="true">…</li>
+      : (
+        <li class:list={{ "is-current": page === currentPage }}>
+          {page === currentPage
+            ? (
+              <span aria-current="page">
+                <span class="visually-hidden">Page </span>{page}
+              </span>
+            )
+            : (
+              <a href={pageHref(page)} aria-label={`Go to notification page ${page}`}>
+                {page}
+              </a>
+            )}
+        </li>
+      ))}
+  </ol>
+
+  <ol class="pagination__pages pagination__pages--mobile">
+    {mobilePages.map((page) => page === null
       ? <li class="pagination__ellipsis" aria-hidden="true">…</li>
       : (
         <li class:list={{ "is-current": page === currentPage }}>

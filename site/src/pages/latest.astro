@@ -494,26 +494,13 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         else step.append(text, arrow);
         return step;
       };
-      const renderPagination = (
-        position: "top" | "bottom",
-        pageCount: number,
+      const createPaginationPages = (
+        items: Array<number | null>,
+        variant: "desktop" | "mobile",
       ) => {
-        const navigation = document.createElement("nav");
-        navigation.className = `pagination pagination--${position}`;
-        navigation.setAttribute(
-          "aria-label",
-          position === "top"
-            ? "Filtered notification pages above results"
-            : "Filtered notification pages below results",
-        );
-        if (position === "top") navigation.id = "notification-results";
-        const previous = createPaginationStep(
-          currentPage > 1 ? currentPage - 1 : null,
-          "Previous",
-        );
         const pages = document.createElement("ol");
-        pages.className = "pagination__pages";
-        for (const page of getNotificationPaginationItems(currentPage, pageCount)) {
+        pages.className = `pagination__pages pagination__pages--${variant}`;
+        for (const page of items) {
           const item = document.createElement("li");
           if (page === null) {
             item.className = "pagination__ellipsis";
@@ -538,11 +525,41 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           }
           pages.append(item);
         }
+        return pages;
+      };
+      const renderPagination = (
+        position: "top" | "bottom",
+        pageCount: number,
+      ) => {
+        const navigation = document.createElement("nav");
+        navigation.className = `pagination pagination--${position}`;
+        navigation.setAttribute(
+          "aria-label",
+          position === "top"
+            ? "Filtered notification pages above results"
+            : "Filtered notification pages below results",
+        );
+        if (position === "top") navigation.id = "notification-results";
+        const previous = createPaginationStep(
+          currentPage > 1 ? currentPage - 1 : null,
+          "Previous",
+        );
+        const status = document.createElement("span");
+        status.className = "pagination__status";
+        status.textContent = `Page ${currentPage.toLocaleString()} of ${pageCount.toLocaleString()}`;
+        const desktopPages = createPaginationPages(
+          getNotificationPaginationItems(currentPage, pageCount),
+          "desktop",
+        );
+        const mobilePages = createPaginationPages(
+          getNotificationPaginationItems(currentPage, pageCount, 1),
+          "mobile",
+        );
         const next = createPaginationStep(
           currentPage < pageCount ? currentPage + 1 : null,
           "Next",
         );
-        navigation.append(previous, pages, next);
+        navigation.append(previous, status, desktopPages, mobilePages, next);
         return navigation;
       };
       const renderFilteredPage = () => {
