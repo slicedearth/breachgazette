@@ -36,10 +36,11 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         <details class="advanced-filters" open data-advanced-filters>
           <summary>
             <span>Advanced filters</span>
-            <span class="advanced-filters__count" data-advanced-filter-count>7 available</span>
+            <span class="advanced-filters__count" data-advanced-filter-count>8 available</span>
           </summary>
           <div class="filters filters--advanced">
-            <label>Source date<input type="date" name="date" /></label>
+            <label>Source date from<input type="date" name="date_from" /></label>
+            <label>Source date to<input type="date" name="date_to" /></label>
             <label>Breach cause<select name="cause"><option value="">All published causes</option></select></label>
             <label>Information category<select name="information"><option value="">All published categories</option></select></label>
             <label>Affected population<select name="population"><option value="">All population bands</option><option value="not_published">Not published</option><option value="500_999">500–999</option><option value="1000_9999">1,000–9,999</option><option value="10000_99999">10,000–99,999</option><option value="100000_plus">100,000+</option></select></label>
@@ -48,6 +49,10 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
             <label>Sort results<select name="sort"><option value="">Newest source date</option><option value="oldest">Oldest source date</option><option value="organization">Entity name A–Z</option></select></label>
           </div>
         </details>
+      </div>
+      <div class="active-filters" data-active-filters hidden>
+        <strong>Active filters</strong>
+        <ul data-active-filter-list></ul>
       </div>
       <div class="result-actions">
         <button type="button" data-export-results disabled>Export matching CSV</button>
@@ -58,6 +63,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       </div>
     </div>
     <p aria-live="polite" data-result-count>Loading bounded dataset…</p>
+    <div class="filtered-facets" data-filtered-facets hidden aria-live="polite"></div>
     <div data-results>
       <p class="directory-summary">
         Showing records {staticPage.firstItem.toLocaleString()}–{staticPage.lastItem.toLocaleString()} of{" "}
@@ -129,7 +135,8 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       const jurisdiction = controls.querySelector<HTMLSelectElement>('[name="jurisdiction"]')!;
       const regulator = controls.querySelector<HTMLSelectElement>('[name="regulator"]')!;
       const source = controls.querySelector<HTMLSelectElement>('[name="source"]')!;
-      const sourceDate = controls.querySelector<HTMLInputElement>('[name="date"]')!;
+      const sourceDateFrom = controls.querySelector<HTMLInputElement>('[name="date_from"]')!;
+      const sourceDateTo = controls.querySelector<HTMLInputElement>('[name="date_to"]')!;
       const cause = controls.querySelector<HTMLSelectElement>('[name="cause"]')!;
       const information = controls.querySelector<HTMLSelectElement>('[name="information"]')!;
       const population = controls.querySelector<HTMLSelectElement>('[name="population"]')!;
@@ -144,6 +151,11 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       const resetButton = document.querySelector<HTMLButtonElement>("[data-reset-filters]")!;
       const advancedFilters = document.querySelector<HTMLDetailsElement>("[data-advanced-filters]")!;
       const advancedFilterCount = document.querySelector<HTMLElement>("[data-advanced-filter-count]")!;
+      const activeFilters = document.querySelector<HTMLElement>("[data-active-filters]")!;
+      const activeFilterList = activeFilters.querySelector<HTMLUListElement>(
+        "[data-active-filter-list]",
+      )!;
+      const filteredFacets = document.querySelector<HTMLElement>("[data-filtered-facets]")!;
       const mobileFilters = window.matchMedia("(max-width: 760px)");
       const options = (values: string[]) => [...new Set(values)].sort();
       const addOptions = (
@@ -175,8 +187,43 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       ];
       let currentPage = 1;
       let requestedRecordId: string | null = null;
+      const filterLabels: Record<string, string> = {
+        query: "Search",
+        jurisdiction: "Jurisdiction",
+        regulator: "Regulator",
+        source: "Source",
+        date_from: "Date from",
+        date_to: "Date to",
+        cause: "Cause",
+        information: "Information",
+        population: "Population",
+        role: "Role",
+        publication: "Publication",
+        sort: "Sort",
+      };
       const hasFilters = () =>
         filterControls.some((control) => control.value.trim() !== "");
+      const syncActiveFilterChips = () => {
+        activeFilterList.replaceChildren();
+        for (const control of filterControls) {
+          const value = control.value.trim();
+          if (!value) continue;
+          const item = document.createElement("li");
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.dataset.clearFilter = control.name;
+          const displayValue = control instanceof HTMLSelectElement
+            ? (control.selectedOptions[0]?.textContent ?? value)
+                .replace(/\s+\([\d,]+\)$/, "")
+            : value;
+          const filterName = filterLabels[control.name] ?? control.name;
+          remove.textContent = `${filterName}: ${displayValue} ×`;
+          remove.setAttribute("aria-label", `Remove ${filterName} filter`);
+          item.append(remove);
+          activeFilterList.append(item);
+        }
+        activeFilters.hidden = activeFilterList.childElementCount === 0;
+      };
       const syncAdvancedFilters = () => {
         const active = advancedControls.filter((control) => control.value.trim() !== "").length;
         advancedFilterCount.textContent = active
@@ -223,6 +270,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         copySearchButton.disabled = !hasFilters();
         resetButton.disabled = !hasFilters();
         syncAdvancedFilters();
+        syncActiveFilterChips();
         shareStatus.textContent = fragment
           ? "This search can be bookmarked without sending its filters in HTTP requests."
           : "Search-link filters stay in the URL fragment and are not sent in HTTP requests.";
@@ -326,11 +374,16 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         return true;
       };
 
+      const partitionIntersectsDateRange = (partition: SearchPartitionMetadata) =>
+        partition.years.some((year) =>
+          (!sourceDateFrom.value || year >= sourceDateFrom.value.slice(0, 4)) &&
+          (!sourceDateTo.value || year <= sourceDateTo.value.slice(0, 4))
+        );
       const matchesPartition = (partition: SearchPartitionMetadata) =>
         (!jurisdiction.value || partition.jurisdictions.includes(jurisdiction.value)) &&
         (!regulator.value || partition.regulators.includes(regulator.value)) &&
         (!source.value || partition.sources.includes(source.value)) &&
-        (!sourceDate.value || partition.years.includes(sourceDate.value.slice(0, 4))) &&
+        partitionIntersectsDateRange(partition) &&
         (!cause.value || partition.causes.includes(cause.value)) &&
         (!information.value || partition.information_categories.includes(information.value)) &&
         (!population.value || partition.population_bands.includes(population.value)) &&
@@ -580,6 +633,54 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         navigation.append(previous, status, desktopPages, mobilePages, next);
         return navigation;
       };
+      const renderFilteredFacets = (records: Notification[]) => {
+        filteredFacets.replaceChildren();
+        if (!hasFilters()) {
+          filteredFacets.hidden = true;
+          return;
+        }
+        const groups: Array<[string, string[]]> = [
+          ["Jurisdiction", records.map((record) => record.jurisdiction)],
+          ["Source", records.map((record) => label(record.source_id))],
+          ["Publication level", records.map((record) => label(record.publication_level))],
+          [
+            "Breach cause",
+            records
+              .map((record) => record.breach_cause?.normalized_label)
+              .filter((value): value is string => Boolean(value))
+              .map(label),
+          ],
+        ];
+        const list = document.createElement("dl");
+        for (const [name, values] of groups) {
+          const counts = new Map<string, number>();
+          for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+          const group = document.createElement("div");
+          const term = document.createElement("dt");
+          const description = document.createElement("dd");
+          const valuesList = document.createElement("ul");
+          term.textContent = name;
+          const ordered = [...counts.entries()]
+            .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+            .slice(0, 6);
+          if (ordered.length) {
+            for (const [value, facetCount] of ordered) {
+              const item = document.createElement("li");
+              item.textContent = `${value} (${facetCount.toLocaleString()})`;
+              valuesList.append(item);
+            }
+          } else {
+            const item = document.createElement("li");
+            item.textContent = "No published values";
+            valuesList.append(item);
+          }
+          description.append(valuesList);
+          group.append(term, description);
+          list.append(group);
+        }
+        filteredFacets.append(list);
+        filteredFacets.hidden = false;
+      };
       const renderFilteredPage = () => {
         const pageCount = Math.max(
           1,
@@ -698,6 +799,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           currentPage = 1;
           filteredRecords = [];
           loadedPartitionCount = 0;
+          renderFilteredFacets([]);
           exportButton.disabled = true;
           exportStatus.textContent = "Apply a filter to enable export.";
           results.replaceChildren(...[...initialResults.childNodes].map((node) => node.cloneNode(true)));
@@ -705,6 +807,22 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           count.textContent =
             `${manifest.record_count.toLocaleString()} published source records. ` +
             `Showing ${initialCount.toLocaleString()} on this static page; no search partitions loaded.`;
+          return;
+        }
+        if (
+          sourceDateFrom.value &&
+          sourceDateTo.value &&
+          sourceDateFrom.value > sourceDateTo.value
+        ) {
+          filteredRecords = [];
+          loadedPartitionCount = 0;
+          exportButton.disabled = true;
+          exportStatus.textContent = "Correct the source date range to enable export.";
+          renderFilteredFacets([]);
+          results.replaceChildren(
+            ...[...initialResults.childNodes].map((node) => node.cloneNode(true)),
+          );
+          count.textContent = "Source date from must be on or before source date to.";
           return;
         }
         const candidatePartitions = manifest.partitions.filter(matchesPartition);
@@ -730,7 +848,12 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
             (!jurisdiction.value || record.jurisdiction === jurisdiction.value) &&
             (!regulator.value || record.regulator === regulator.value) &&
             (!source.value || record.source_id === source.value) &&
-            (!sourceDate.value || record.dates.some((item) => item.normalized_date === sourceDate.value)) &&
+            ((!sourceDateFrom.value && !sourceDateTo.value) ||
+              record.dates.some((item) =>
+                Boolean(item.normalized_date) &&
+                (!sourceDateFrom.value || item.normalized_date! >= sourceDateFrom.value) &&
+                (!sourceDateTo.value || item.normalized_date! <= sourceDateTo.value)
+              )) &&
             (!cause.value || record.breach_cause?.normalized_label === cause.value) &&
             (!information.value || record.information_categories.some((item) => item.normalized_label === information.value)) &&
             (!population.value || populationBand(record) === population.value) &&
@@ -762,6 +885,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           exportStatus.textContent = filtered.length
             ? `Ready to export all ${filtered.length.toLocaleString()} matches.`
             : "No matching records to export.";
+          renderFilteredFacets(filteredRecords);
           renderFilteredPage();
           syncHashState();
           if (requestedRecordId) {
@@ -783,6 +907,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           results.removeAttribute("aria-busy");
           filteredRecords = [];
           loadedPartitionCount = 0;
+          renderFilteredFacets([]);
           exportButton.disabled = true;
           exportStatus.textContent = "Export is unavailable while search data is unavailable.";
           count.textContent = "Search partitions could not be loaded. The complete static register remains available.";
@@ -795,6 +920,19 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         syncHashState();
         window.clearTimeout(debounce);
         debounce = window.setTimeout(() => void render(), query.value ? 180 : 0);
+      });
+      activeFilters.addEventListener("click", (event) => {
+        if (!(event.target instanceof HTMLButtonElement)) return;
+        const name = event.target.dataset.clearFilter;
+        if (!name) return;
+        const control = filterControls.find((item) => item.name === name);
+        if (!control) return;
+        control.value = "";
+        requestedRecordId = null;
+        currentPage = 1;
+        syncHashState();
+        void render();
+        control.focus();
       });
       results.addEventListener("click", (event) => {
         if (!(event.target instanceof Element)) return;
