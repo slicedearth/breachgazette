@@ -18,7 +18,7 @@ test("NSW register displays its rolling-window warning", async ({ page }) => {
 
 test("source health exposes freshness without claiming factual completeness", async ({ page }) => {
   await page.goto("/source-health/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Source health");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Update status");
   await expect(page.getByText(/does not establish that an official source is factually complete/i)).toBeVisible();
   const table = page.locator('.table-wrap[aria-label="Source health table"] table');
   await expect(table).toContainText("Healthy");
@@ -49,7 +49,7 @@ test("source health exposes freshness without claiming factual completeness", as
 test("source coverage exposes record units and comparison boundaries", async ({ page }) => {
   await page.goto("/source-coverage/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "What can and cannot be compared",
+    "Compare sources",
   );
   const table = page.getByRole("table", { name: "Source coverage matrix" });
   await expect(table).toContainText("Regulator Register Entry");
@@ -60,6 +60,27 @@ test("source coverage exposes record units and comparison boundaries", async ({ 
   await expect(table).toContainText("not a count of unique incidents");
   await expect(table).toContainText("no organization or incident inference");
   await expect(page.getByRole("heading", { name: "Four publication lanes" })).toBeVisible();
+});
+
+test("source information pages share clear local navigation", async ({ page }) => {
+  const pages = [
+    ["/source-coverage/", "Compare sources", "Compare sources"],
+    ["/sources/", "Source policies", "Source policies"],
+    ["/source-health/", "Update status", "Update status"],
+  ] as const;
+
+  for (const [path, heading, currentLink] of pages) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(heading);
+    const navigation = page.getByRole("navigation", { name: "Source information" });
+    await expect(navigation.getByRole("link", { name: "Compare sources" })).toBeVisible();
+    await expect(navigation.getByRole("link", { name: "Source policies" })).toBeVisible();
+    await expect(navigation.getByRole("link", { name: "Update status" })).toBeVisible();
+    await expect(navigation.getByRole("link", { name: currentLink })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  }
 });
 
 test("France view publishes grouped CNIL counts without organization inference", async ({ page }) => {
@@ -921,7 +942,7 @@ test("publication identity and source corrections are readable and reproducible"
   await expect(stamp).toContainText("Verified 1 Jan 2026");
   await expect(stamp.locator("code").first()).toHaveText("ffffffffffff");
   await expect(stamp.locator("code").nth(1)).toHaveText("000000000000");
-  await expect(stamp.getByRole("link", { name: "Review source health" })).toBeVisible();
+  await expect(stamp.getByRole("link", { name: "Review update status" })).toBeVisible();
   await expect(page.getByRole("heading", {
     name: "What changed in the published source records",
   })).toBeVisible();

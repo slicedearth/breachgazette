@@ -1,0 +1,42 @@
+---
+const base = import.meta.env.BASE_URL;
+const items = [
+  {
+    href: "source-coverage/",
+    label: "Compare sources",
+    description: "Meaning and comparability",
+  },
+  {
+    href: "sources/",
+    label: "Source policies",
+    description: "Thresholds, rights, and limits",
+  },
+  {
+    href: "source-health/",
+    label: "Update status",
+    description: "Freshness and collection",
+  },
+];
+const isCurrent = (path: string) =>
+  Astro.url.pathname.startsWith(new URL(`${base}${path}`, Astro.site).pathname);
+---
+
+<div class="source-information-nav shell">
+  <span class="source-information-nav__label">Source information</span>
+  <nav aria-label="Source information">
+    <ul>
+      {items.map((item) => (
+        <li>
+          <a
+            href={`${base}${item.href}`}
+            aria-label={item.label}
+            aria-current={isCurrent(item.href) ? "page" : undefined}
+          >
+            <strong>{item.label}</strong>
+            <small>{item.description}</small>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</div>
