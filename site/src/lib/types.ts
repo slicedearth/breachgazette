@@ -57,6 +57,7 @@ export type SearchFacets = {
 
 export type SearchPartitionMetadata = SearchFacets & {
   id: string;
+  asset: string;
   count: number;
   bytes: number;
   sha256: string;

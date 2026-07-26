@@ -9,3 +9,12 @@
 
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
+
+/data/notifications/manifest.json
+  Cache-Control: public, max-age=0, must-revalidate
+
+/data/publication.json
+  Cache-Control: public, max-age=0, must-revalidate
+
+/data/notifications/*
+  Cache-Control: public, max-age=31536000, immutable

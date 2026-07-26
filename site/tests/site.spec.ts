@@ -440,10 +440,10 @@ test("runtime requests remain same-origin and no remote font or analytics is pre
     const manifestResponse = await fetch("/data/notifications/manifest.json");
     const manifest = await manifestResponse.json() as {
       record_count: number;
-      partitions: Array<{ id: string }>;
+      partitions: Array<{ asset: string }>;
     };
     const partitionResponse = await fetch(
-      `/data/notifications/${encodeURIComponent(manifest.partitions[0]!.id)}.json`,
+      `/data/notifications/${encodeURIComponent(manifest.partitions[0]!.asset)}.json`,
     );
     const partition = await partitionResponse.json() as {
       records: Array<{ has_detail_page?: boolean }>;
@@ -488,7 +488,7 @@ test("filtered notification pagination preserves URL state and every match", asy
 }) => {
   const fixture = JSON.parse(
     await readFile(
-      "../tests/fixtures/site/search-partitions/fixture-2026-001.json",
+      "../tests/fixtures/site/search-partitions/fixture-2026-001-9b649946303bccbf.json",
       "utf8",
     ),
   ) as {
@@ -515,16 +515,19 @@ test("filtered notification pagination preserves URL state and every match", asy
     await readFile("../tests/fixtures/site/search-manifest.json", "utf8"),
   ) as {
     record_count: number;
-    partitions: Array<{ count: number; bytes: number; sha256: string }>;
+    partitions: Array<{ asset: string; count: number; bytes: number; sha256: string }>;
   };
   manifest.record_count = records.length;
   manifest.partitions[0]!.count = records.length;
   manifest.partitions[0]!.bytes = Buffer.byteLength(partitionBody);
   manifest.partitions[0]!.sha256 = createHash("sha256").update(partitionBody).digest("hex");
+  manifest.partitions[0]!.asset =
+    `${manifest.partitions[0]!.asset.slice(0, -"9b649946303bccbf".length)}` +
+    manifest.partitions[0]!.sha256.slice(0, 16);
   await page.route("**/data/notifications/manifest.json", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(manifest) }),
   );
-  await page.route("**/data/notifications/fixture-2026-001.json", (route) =>
+  await page.route(`**/data/notifications/${manifest.partitions[0]!.asset}.json`, (route) =>
     route.fulfill({
       contentType: "application/json",
       body: partitionBody,
@@ -562,7 +565,7 @@ test("filtered notification pagination preserves URL state and every match", asy
 test("complete-dataset filtering remains bounded at 10,000 records", async ({ page }) => {
   const fixture = JSON.parse(
     await readFile(
-      "../tests/fixtures/site/search-partitions/fixture-2026-001.json",
+      "../tests/fixtures/site/search-partitions/fixture-2026-001-9b649946303bccbf.json",
       "utf8",
     ),
   ) as {
@@ -595,12 +598,15 @@ test("complete-dataset filtering remains bounded at 10,000 records", async ({ pa
       partition_id: id,
       records,
     });
-    partitionBodies.set(id, body);
+    const sha256 = createHash("sha256").update(body).digest("hex");
+    const asset = `${id}-${sha256.slice(0, 16)}`;
+    partitionBodies.set(asset, body);
     return {
       id,
+      asset,
       count: records.length,
       bytes: Buffer.byteLength(body),
-      sha256: createHash("sha256").update(body).digest("hex"),
+      sha256,
       query_bloom: "ff",
       jurisdictions: ["Scale jurisdiction"],
       regulators: ["Scale regulator"],
@@ -658,12 +664,12 @@ test("complete-dataset filtering remains bounded at 10,000 records", async ({ pa
     }),
   );
   const requestedPartitions: string[] = [];
-  await page.route(/\/data\/notifications\/scale-2026-\d{3}\.json$/, (route) => {
-    const id = new URL(route.request().url()).pathname.split("/").at(-1)!.replace(".json", "");
-    const body = partitionBodies.get(id);
+  await page.route(/\/data\/notifications\/scale-2026-\d{3}-[0-9a-f]{16}\.json$/, (route) => {
+    const asset = new URL(route.request().url()).pathname.split("/").at(-1)!.replace(".json", "");
+    const body = partitionBodies.get(asset);
     expect(body).toBeDefined();
-    if (!body) throw new Error(`Missing generated partition ${id}`);
-    requestedPartitions.push(id);
+    if (!body) throw new Error(`Missing generated partition ${asset}`);
+    requestedPartitions.push(asset);
     return route.fulfill({ contentType: "application/json", body });
   });
 
@@ -729,6 +735,19 @@ test("complete-dataset filtering remains bounded at 10,000 records", async ({ pa
       }),
     ).toBeVisible();
   }
+  const boundedRecordLink = page.locator("[data-results] tbody th a").first();
+  await expect(boundedRecordLink).toHaveAttribute(
+    "href",
+    /\/latest\/#query=scale-\d{5}&record=scale-\d{5}$/,
+  );
+  await boundedRecordLink.click();
+  const boundedRecordDialog = page.getByRole("dialog", {
+    name: /Scale organization/,
+  });
+  await expect(boundedRecordDialog).toBeVisible();
+  await expect(
+    boundedRecordDialog.getByRole("link", { name: "Open this record link" }),
+  ).toHaveAttribute("href", /\/latest\/#query=scale-\d{5}&record=scale-\d{5}$/);
 });
 
 test("notification search preserves the complete static register when the manifest fails", async ({ page }) => {
@@ -758,12 +777,12 @@ test("notification search rejects a partition above its published byte budget", 
 test("notification search rejects same-size partition tampering", async ({ page }) => {
   const fixture = JSON.parse(
     await readFile(
-      "../tests/fixtures/site/search-partitions/fixture-2026-001.json",
+      "../tests/fixtures/site/search-partitions/fixture-2026-001-9b649946303bccbf.json",
       "utf8",
     ),
   ) as Record<string, unknown>;
   const body = JSON.stringify(fixture).replace("Example", "Tamperx");
-  await page.route("**/data/notifications/fixture-2026-001.json", (route) =>
+  await page.route("**/data/notifications/fixture-2026-001-9b649946303bccbf.json", (route) =>
     route.fulfill({ contentType: "application/json", body }),
   );
 

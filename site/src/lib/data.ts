@@ -76,6 +76,8 @@ export function getSearchManifest(): SearchManifest {
     manifest.partition_max_bytes <= 0 ||
     manifest.partitions.some(
       (partition) =>
+        partition.asset !== `${partition.id}-${partition.sha256.slice(0, 16)}` ||
+        !/^[a-z0-9_-]+-[0-9a-f]{16}$/.test(partition.asset) ||
         !partition.query_bloom ||
         !Number.isInteger(partition.bytes) ||
         partition.bytes <= 0 ||
@@ -102,7 +104,9 @@ export function getSearchPartition(id: string): SearchPartition {
   if (!metadata) {
     throw new Error("search partition id is not declared");
   }
-  const partition = readJson<SearchPartition>(join("search-partitions", `${id}.json`));
+  const partition = readJson<SearchPartition>(
+    join("search-partitions", `${metadata.asset}.json`),
+  );
   if (
     partition.partition_id !== id ||
     !Array.isArray(partition.records) ||

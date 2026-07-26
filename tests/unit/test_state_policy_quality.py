@@ -337,6 +337,10 @@ def test_search_assets_are_partitioned_and_bounded(notification_factory) -> None
     assert all(
         len(partition["sha256"]) == 64 for partition in manifest["partitions"]
     )
+    assert all(
+        partition["asset"] == f"{partition['id']}-{partition['sha256'][:16]}"
+        for partition in manifest["partitions"]
+    )
     assert manifest["facet_counts"]["sources"]["washington"] == len(records)
     assert manifest["facet_counts"]["jurisdictions"]["Example"] == len(records)
     assert manifest["facet_counts"]["roles"]["notifying_entity"] == len(records)
@@ -550,7 +554,7 @@ def test_production_builder_emits_minimised_real_publication(
     assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids) - 2
     for metadata in search_manifest["partitions"]:
         encoded = (
-            output / "search-partitions" / f"{metadata['id']}.json"
+            output / "search-partitions" / f"{metadata['asset']}.json"
         ).read_bytes().removesuffix(b"\n")
         assert metadata["bytes"] == len(encoded)
         assert metadata["sha256"] == sha256_hex(encoded)

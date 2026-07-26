@@ -12,6 +12,10 @@ const visible = records.slice(0, limit);
 function observation(record: Notification): string | null {
   return record.dates.find((item) => item.normalized_date)?.normalized_date ?? null;
 }
+function viewerHref(record: Notification): string {
+  const recordId = encodeURIComponent(record.source_record_id);
+  return `${import.meta.env.BASE_URL}latest/#query=${recordId}&record=${recordId}`;
+}
 ---
 
 <div class="table-wrap" tabindex="0" aria-label="Public notification table">
@@ -30,7 +34,11 @@ function observation(record: Notification): string | null {
         <tr>
           <th class="notification-table__entity" scope="row" data-label="Named entity">
             {record.has_detail_page === false
-              ? record.named_entity.source_name
+              ? (
+                <a href={viewerHref(record)}>
+                  {record.named_entity.source_name}
+                </a>
+              )
               : (
                 <a href={`${import.meta.env.BASE_URL}notifications/${record.source_record_id}/`}>
                   {record.named_entity.source_name}

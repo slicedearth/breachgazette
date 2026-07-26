@@ -187,3 +187,8 @@ def test_netlify_headers_enforce_static_site_security_policy() -> None:
     assert "Strict-Transport-Security: max-age=31536000" in headers
     assert "X-Content-Type-Options: nosniff" in headers
     assert "Referrer-Policy: no-referrer" in headers
+    assert "/data/notifications/manifest.json" in headers
+    assert "/data/publication.json" in headers
+    assert "Cache-Control: public, max-age=0, must-revalidate" in headers
+    assert "/data/notifications/*" in headers
+    assert "Cache-Control: public, max-age=31536000, immutable" in headers

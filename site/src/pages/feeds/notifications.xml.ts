@@ -27,7 +27,10 @@ export const GET: APIRoute = ({ site }) => {
           `${import.meta.env.BASE_URL}notifications/${encodeURIComponent(record.source_record_id)}/`,
           site,
         ).toString()
-      : record.source_url;
+      : new URL(
+          `${import.meta.env.BASE_URL}latest/#query=${encodeURIComponent(record.source_record_id)}&record=${encodeURIComponent(record.source_record_id)}`,
+          site,
+        ).toString();
     const observed = sourceDate(record) ?? record.local_last_observed_time.slice(0, 10);
     const title = `${record.named_entity.source_name} — ${record.jurisdiction} notification`;
     const summary = [
