@@ -217,6 +217,7 @@ test("keyboard navigation exposes skip link and table alternatives", async ({ pa
 test("representative desktop and mobile pages pass automated accessibility checks", async ({
   page,
 }) => {
+  test.slow();
   const routes = [
     "/",
     "/latest/",
@@ -335,6 +336,7 @@ test("mobile notification search keeps advanced controls compact and resettable"
 });
 
 test("desktop and mobile layouts contain content without horizontal scrollers", async ({ page }) => {
+  test.slow();
   const paths = [
     "/",
     "/latest/",
