@@ -116,9 +116,11 @@ jobs:
           path: .private-production-data
           persist-credentials: false
       - name: Record resolved revisions
+        id: revisions
         run: |
           source_revision="$(git rev-parse HEAD)"
           data_revision="$(git -C .private-production-data rev-parse HEAD)"
+          echo "source_revision=$source_revision" >> "$GITHUB_OUTPUT"
           echo "## Breach Gazette production inputs" >> "$GITHUB_STEP_SUMMARY"
           echo "- Source revision: \`$source_revision\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Private data revision: \`$data_revision\`" >> "$GITHUB_STEP_SUMMARY"
@@ -162,11 +164,31 @@ jobs:
         env:
           BREACHGAZETTE_SITE_DATA_DIR: ${{ runner.temp }}/publication
           BREACHGAZETTE_SITE_URL: ${{ vars.BREACHGAZETTE_SITE_URL }}
+          BREACHGAZETTE_SOURCE_REVISION: ${{ steps.revisions.outputs.source_revision }}
         working-directory: site
         run: |
           npm run check
           npm run build:budget
           breachgazette audit-public-tree dist --json
+      - name: Package audited static tree
+        id: package
+        run: |
+          (
+            cd site/dist
+            zip -q -r -X -D "$RUNNER_TEMP/breachgazette-site.zip" .
+          )
+          archive_sha256="$(
+            sha256sum "$RUNNER_TEMP/breachgazette-site.zip" | cut -d ' ' -f 1
+          )"
+          if [[ ! "$archive_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Deployment archive returned an invalid SHA-256 digest."
+            exit 1
+          fi
+          echo "archive_sha256=$archive_sha256" >> "$GITHUB_OUTPUT"
+          echo "- Publication checksum: \`${{ steps.publication.outputs.checksum }}\`" \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deployment archive SHA-256: \`$archive_sha256\`" \
+            >> "$GITHUB_STEP_SUMMARY"
       - name: Deploy audited static tree
         id: deploy
         env:
@@ -179,18 +201,6 @@ jobs:
             echo "NETLIFY_SITE_ID contains unsupported characters."
             exit 1
           fi
-          (
-            cd site/dist
-            zip -q -r -X -D "$RUNNER_TEMP/breachgazette-site.zip" .
-          )
-          archive_sha256="$(
-            sha256sum "$RUNNER_TEMP/breachgazette-site.zip" | cut -d ' ' -f 1
-          )"
-          echo "archive_sha256=$archive_sha256" >> "$GITHUB_OUTPUT"
-          echo "- Publication checksum: \`${{ steps.publication.outputs.checksum }}\`" \
-            >> "$GITHUB_STEP_SUMMARY"
-          echo "- Deployment archive SHA-256: \`$archive_sha256\`" \
-            >> "$GITHUB_STEP_SUMMARY"
           curl --fail-with-body --silent --show-error \
             -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
             -H "Content-Type: application/zip" \
@@ -237,11 +247,59 @@ jobs:
             exit 1
           fi
           deploy_url="${deploy_url%/}"
+          echo "deploy_id=$deploy_id" >> "$GITHUB_OUTPUT"
           echo "deploy_url=$deploy_url" >> "$GITHUB_OUTPUT"
+          echo "published_at=$published_at" >> "$GITHUB_OUTPUT"
+      - name: Create deployment provenance record
+        run: |
+          jq -n \
+            --arg source_revision "${{ steps.revisions.outputs.source_revision }}" \
+            --arg publication_checksum "${{ steps.publication.outputs.checksum }}" \
+            --arg archive_sha256 "${{ steps.package.outputs.archive_sha256 }}" \
+            --arg deploy_id "${{ steps.deploy.outputs.deploy_id }}" \
+            --arg deploy_url "${{ steps.deploy.outputs.deploy_url }}" \
+            --arg published_at "${{ steps.deploy.outputs.published_at }}" \
+            --arg workflow_ref "$GITHUB_WORKFLOW_REF" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '{
+              schema_version: "1.0",
+              subject: {
+                name: "breachgazette-site.zip",
+                sha256: $archive_sha256
+              },
+              source_revision: $source_revision,
+              publication_checksum: $publication_checksum,
+              deployment: {
+                id: $deploy_id,
+                url: $deploy_url,
+                published_at: $published_at
+              },
+              workflow: {
+                ref: $workflow_ref,
+                run_id: $run_id,
+                run_attempt: $run_attempt
+              },
+              assurance: {
+                signed: false,
+                statement: "Checksummed workflow provenance; not a cryptographic signature."
+              }
+            }' > "$RUNNER_TEMP/deployment-provenance.json"
+      - name: Preserve deployment archive and provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deployment-${{ steps.revisions.outputs.source_revision }}
+          path: |
+            ${{ runner.temp }}/breachgazette-site.zip
+            ${{ runner.temp }}/deployment-provenance.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
       - name: Verify live content identity and security headers
         env:
           DEPLOY_URL: ${{ steps.deploy.outputs.deploy_url }}
           EXPECTED_CHECKSUM: ${{ steps.publication.outputs.checksum }}
+          EXPECTED_SOURCE_REVISION: ${{ steps.revisions.outputs.source_revision }}
           PRODUCTION_URL: ${{ vars.BREACHGAZETTE_SITE_URL }}
         run: |
           if [[ ! "$PRODUCTION_URL" =~ ^https://[A-Za-z0-9.-]+/?$ ]]; then
@@ -262,8 +320,11 @@ jobs:
                 -H "Cache-Control: no-cache" \
                 --output "$identity_file" \
                 "$live_url/data/publication.json?publication=$EXPECTED_CHECKSUM" \
-                && jq -e --arg checksum "$EXPECTED_CHECKSUM" \
+                && jq -e \
+                  --arg checksum "$EXPECTED_CHECKSUM" \
+                  --arg source_revision "$EXPECTED_SOURCE_REVISION" \
                   '.publication_checksum == $checksum
+                    and .source_revision == $source_revision
                     and .record_counts.notifications > 0' \
                   "$identity_file" > /dev/null; then
                 identity_verified=true

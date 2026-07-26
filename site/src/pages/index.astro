@@ -2,12 +2,14 @@
 import Hero from "../components/Hero.astro";
 import NotificationTable from "../components/NotificationTable.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { getSourceRevision } from "../lib/build";
 import { getAllNotifications, getPublication } from "../lib/data";
 import { compactNumber, date } from "../lib/format";
 
 const publication = getPublication();
 const notifications = getAllNotifications();
 const publicationChecksum = publication.manifest.publication_checksum;
+const sourceRevision = getSourceRevision();
 const metrics = [
   ["Public notifications", publication.stats.public_notifications ?? 0],
   ["Anonymous notification rows", publication.stats.anonymized_notification_rows ?? 0],
@@ -31,6 +33,10 @@ const metrics = [
     <p>
       Publication checksum
       <code title={publicationChecksum}>{publicationChecksum.slice(0, 12)}</code>
+    </p>
+    <p>
+      Source revision
+      <code title={sourceRevision}>{sourceRevision.slice(0, 12)}</code>
     </p>
     <a href={`${import.meta.env.BASE_URL}source-health/`}>Review source health</a>
   </aside>

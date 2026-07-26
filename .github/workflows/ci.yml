@@ -67,6 +67,7 @@ jobs:
         working-directory: site
         env:
           BREACHGAZETTE_SITE_URL: "https://breachgazette.example"
+          BREACHGAZETTE_SOURCE_REVISION: ${{ github.sha }}
         run: |
           npm run build:test
           breachgazette audit-public-tree dist --json

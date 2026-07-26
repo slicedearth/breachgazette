@@ -878,7 +878,8 @@ test("publication identity and source corrections are readable and reproducible"
   await page.goto("/");
   const stamp = page.getByLabel("Current publication");
   await expect(stamp).toContainText("Verified 1 Jan 2026");
-  await expect(stamp.locator("code")).toHaveText("ffffffffffff");
+  await expect(stamp.locator("code").first()).toHaveText("ffffffffffff");
+  await expect(stamp.locator("code").nth(1)).toHaveText("000000000000");
   await expect(stamp.getByRole("link", { name: "Review source health" })).toBeVisible();
   await expect(page.getByRole("heading", {
     name: "What changed in the published source records",
@@ -934,6 +935,7 @@ test("publication identity and source corrections are readable and reproducible"
   expect(identityResponse.ok()).toBe(true);
   expect(identityResponse.headers()["content-type"]).toContain("application/json");
   expect(await identityResponse.json()).toMatchObject({
+    source_revision: "0000000000000000000000000000000000000000",
     publication_checksum: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     publication_checksum_algorithm: "sha256_canonical_json_v1",
     publication_checksum_scope: "publication_summary_and_search_partition_digests",
@@ -950,6 +952,10 @@ test("publication identity and source corrections are readable and reproducible"
       },
     },
   });
+  await expect(page.getByRole("link", { name: "Publication identity" })).toHaveAttribute(
+    "href",
+    "/data/publication.json",
+  );
 });
 
 test("feed, crawler policy, and not-found page preserve publication boundaries", async ({
