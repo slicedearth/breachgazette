@@ -36,6 +36,7 @@
   "partitions": [
     {
       "id": "fixture-2026-001",
+      "asset": "fixture-2026-001-9b649946303bccbf",
       "count": 3,
       "bytes": 3556,
       "sha256": "9b649946303bccbfe33607014bbc5fd3b0b9cb01790199f8faf2d4a74886d2c6",

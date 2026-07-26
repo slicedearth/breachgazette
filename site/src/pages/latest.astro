@@ -28,7 +28,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       </div>
       <div data-notification-filters>
         <div class="filters filters--primary">
-          <label>Organization or agency<input type="search" name="query" autocomplete="off" maxlength="120" /></label>
+          <label>Organization, agency, or source record<input type="search" name="query" autocomplete="off" maxlength="300" /></label>
           <label>Jurisdiction<select name="jurisdiction"><option value="">All jurisdictions</option></select></label>
           <label>Regulator<select name="regulator"><option value="">All regulators</option></select></label>
           <label>Source<select name="source"><option value="">All sources</option></select></label>
@@ -92,6 +92,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       <div class="prose">
         <h3>Limitations</h3>
         <ul data-record-dialog-limitations></ul>
+        <p><a data-record-dialog-permalink>Open this record link</a></p>
         <p><a data-record-dialog-source rel="external noopener noreferrer">Open official source <span aria-hidden="true">↗</span></a></p>
       </div>
     </dialog>
@@ -173,6 +174,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         ),
       ];
       let currentPage = 1;
+      let requestedRecordId: string | null = null;
       const hasFilters = () =>
         filterControls.some((control) => control.value.trim() !== "");
       const syncAdvancedFilters = () => {
@@ -188,7 +190,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "",
         );
         for (const control of filterControls) {
-          const value = (parameters.get(control.name) ?? "").slice(0, 120);
+          const value = (parameters.get(control.name) ?? "").slice(0, 300);
           if (
             control instanceof HTMLSelectElement &&
             value &&
@@ -203,6 +205,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         currentPage = Number.isFinite(requestedPage) && requestedPage > 0
           ? requestedPage
           : 1;
+        requestedRecordId = (parameters.get("record") ?? "").slice(0, 300) || null;
       };
       const syncHashState = (mode: "push" | "replace" = "replace") => {
         const parameters = new URLSearchParams();
@@ -211,6 +214,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           if (value) parameters.set(control.name, value);
         }
         if (hasFilters() && currentPage > 1) parameters.set("page", String(currentPage));
+        if (requestedRecordId) parameters.set("record", requestedRecordId);
         const fragment = parameters.toString();
         const nextUrl =
           `${window.location.pathname}${window.location.search}${fragment ? `#${fragment}` : ""}`;
@@ -245,7 +249,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         const existing = partitionCache.get(partition.id);
         if (existing) return existing;
         const partitionResponse = await fetch(
-          `${base}data/notifications/${encodeURIComponent(partition.id)}.json`,
+          `${base}data/notifications/${encodeURIComponent(partition.asset)}.json`,
           { credentials: "same-origin", signal },
         );
         if (!partitionResponse.ok) throw new Error("Notification search partition is unavailable.");
@@ -340,6 +344,13 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         if (dataLabel) element.dataset.label = dataLabel;
         return element;
       };
+      const recordViewerHref = (recordId: string) => {
+        const parameters = new URLSearchParams({
+          query: recordId,
+          record: recordId,
+        });
+        return `${base}latest/#${parameters.toString()}`;
+      };
       const showRecordDetail = (record: Notification) => {
         if (!recordDialog) return;
         const title = recordDialog.querySelector<HTMLElement>("[data-record-dialog-title]")!;
@@ -352,6 +363,9 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         )!;
         const sourceLink = recordDialog.querySelector<HTMLAnchorElement>(
           "[data-record-dialog-source]",
+        )!;
+        const permalink = recordDialog.querySelector<HTMLAnchorElement>(
+          "[data-record-dialog-permalink]",
         )!;
         title.textContent = record.named_entity.source_name;
         boundary.textContent =
@@ -409,6 +423,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           item.textContent = limitation;
           limitations.append(item);
         }
+        permalink.href = recordViewerHref(record.source_record_id);
         sourceLink.href = record.source_detail_url ?? record.source_url;
         recordDialog.showModal();
       };
@@ -442,7 +457,10 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
             link.textContent = record.named_entity.source_name;
             entity.append(link);
           } else {
-            entity.textContent = record.named_entity.source_name;
+            const link = document.createElement("a");
+            link.href = recordViewerHref(record.source_record_id);
+            link.textContent = record.named_entity.source_name;
+            entity.append(link);
           }
           const details = document.createElement("button");
           details.type = "button";
@@ -746,6 +764,15 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
             : "No matching records to export.";
           renderFilteredPage();
           syncHashState();
+          if (requestedRecordId) {
+            const requestedRecord = filteredRecords.find(
+              (record) => record.source_record_id === requestedRecordId,
+            );
+            if (requestedRecord) {
+              showRecordDetail(requestedRecord);
+              requestedRecordId = null;
+            }
+          }
           results.removeAttribute("aria-busy");
           if (activeSearch === controller) activeSearch = null;
         } catch (error) {
@@ -763,6 +790,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       };
 
       controls.addEventListener("input", () => {
+        requestedRecordId = null;
         currentPage = 1;
         syncHashState();
         window.clearTimeout(debounce);

@@ -239,13 +239,16 @@ def _build_search_assets(
                     f"search partition {partition_id} is {payload_bytes} bytes; "
                     f"maximum is {SEARCH_PARTITION_MAX_BYTES}"
                 )
-            partitions.append((partition_id, payload))
+            payload_sha256 = sha256_hex(served_payload)
+            asset = f"{partition_id}-{payload_sha256[:16]}"
+            partitions.append((asset, payload))
             partition_metadata.append(
                 {
                     "id": partition_id,
+                    "asset": asset,
                     "count": len(partition_records),
                     "bytes": payload_bytes,
-                    "sha256": sha256_hex(served_payload),
+                    "sha256": payload_sha256,
                     "query_bloom": _query_bloom(partition_records),
                     **facets,
                 }
@@ -472,8 +475,8 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     search_output.mkdir(parents=True, exist_ok=True)
     for existing in search_output.glob("*.json"):
         existing.unlink()
-    for partition_id, payload in search_partitions:
-        atomic_write_json(search_output / f"{partition_id}.json", payload)
+    for asset, payload in search_partitions:
+        atomic_write_json(search_output / f"{asset}.json", payload)
     atomic_write_json(output / "publication.json", summary_payload)
     atomic_write_json(output / "search-manifest.json", search_manifest)
     atomic_write_json(output / "source-health.json", source_health)
