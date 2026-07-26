@@ -262,6 +262,7 @@ test("mobile notification search keeps advanced controls compact and resettable"
   await query.fill("Example");
   await expect(reset).toBeEnabled();
   await expect(page).toHaveURL(/#query=Example$/);
+  await expect(page.getByRole("button", { name: "Remove Search filter" })).toBeVisible();
 
   await advanced.locator("summary").click();
   await page.getByLabel("Affected population").selectOption("1000_9999");
@@ -808,13 +809,23 @@ test("full notification filters preserve source fields and population bands", as
     page.getByLabel("Jurisdiction").locator('option[value="Washington"]'),
   ).toHaveText("Washington (1)");
   await page.locator('[name="source"]').selectOption("washington");
-  await page.locator('[name="date"]').fill("2026-01-02");
+  await page.locator('[name="date_from"]').fill("2026-01-03");
+  await page.locator('[name="date_to"]').fill("2026-01-02");
+  await expect(page.locator("[data-result-count]")).toContainText(
+    "Source date from must be on or before source date to",
+  );
+  await page.locator('[name="date_from"]').fill("2026-01-02");
   await page.locator('[name="cause"]').selectOption("cyberattack");
   await page.locator('[name="information"]').selectOption("health_information");
   await page.locator('[name="population"]').selectOption("500_999");
   await page.locator('[name="role"]').selectOption("notifying_entity");
   await page.locator('[name="publication"]').selectOption("regulator_register_entry");
   await expect(page.locator("[data-result-count]")).toContainText("1 matching source records");
+  const filteredFacets = page.locator("[data-filtered-facets]");
+  await expect(filteredFacets).toContainText("Washington (1)");
+  await expect(filteredFacets).toContainText("Regulator Register Entry (1)");
+  await expect(page.getByRole("button", { name: "Remove Date from filter" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove Date to filter" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Example Services Cooperative" })).toBeVisible();
   await page.getByRole("button", { name: "View record details" }).click();
   const dialog = page.getByRole("dialog", { name: "Example Services Cooperative" });
