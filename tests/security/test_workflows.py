@@ -139,6 +139,11 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert "ssh-key:" not in workflow
     assert "persist-credentials: false" in workflow
     assert "vars.BREACHGAZETTE_SITE_URL" in workflow
+    assert (
+        "BREACHGAZETTE_SOURCE_REVISION: "
+        "${{ steps.revisions.outputs.source_revision }}"
+    ) in workflow
+    assert 'echo "source_revision=$source_revision" >> "$GITHUB_OUTPUT"' in workflow
     assert "npm run build:budget" in workflow
     assert "breachgazette audit-public-tree dist --json" in workflow
     assert "netlify-cli" not in workflow
@@ -160,7 +165,15 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert '"/source-coverage/"' in workflow
     assert '"/.well-known/security.txt"' in workflow
     assert "steps.publication.outputs.checksum" in workflow
+    assert "steps.package.outputs.archive_sha256" in workflow
     assert "sha256sum" in workflow
+    assert "deployment-provenance.json" in workflow
+    assert "Checksummed workflow provenance; not a cryptographic signature." in workflow
+    assert "signed: false" in workflow
+    assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
+    assert "retention-days: 30" in workflow
+    assert "EXPECTED_SOURCE_REVISION" in workflow
+    assert ".source_revision == $source_revision" in workflow
     assert "strict-transport-security: max-age=31536000" in workflow
     assert "x-content-type-options: nosniff" in workflow
     assert "cross-origin-opener-policy: same-origin" in workflow
@@ -168,6 +181,12 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
         "breachgazette-site.zip"
     )
     assert workflow.index("breachgazette-site.zip") < workflow.index(
+        "Verify live content identity and security headers"
+    )
+    assert workflow.index("Deploy audited static tree") < workflow.index(
+        "Create deployment provenance record"
+    )
+    assert workflow.index("Create deployment provenance record") < workflow.index(
         "Verify live content identity and security headers"
     )
 

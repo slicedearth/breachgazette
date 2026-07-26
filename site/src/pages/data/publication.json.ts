@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { getSourceRevision } from "../../lib/build";
 import { getPublication } from "../../lib/data";
 
 export const prerender = true;
@@ -7,6 +8,7 @@ export const GET: APIRoute = () => {
   const publication = getPublication();
   const identity = {
     schema_version: publication.schema_version,
+    source_revision: getSourceRevision(),
     generated_at: publication.generated_at,
     record_counts: publication.manifest.record_counts,
     publication_checksum: publication.manifest.publication_checksum,

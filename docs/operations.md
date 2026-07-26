@@ -168,11 +168,13 @@ failed-run notification is the default operator alert.
 
 ```bash
 publication_dir="$(mktemp -d /tmp/breachgazette-publication.XXXXXX)"
+source_revision="$(git rev-parse HEAD)"
 .venv/bin/breachgazette build-site-data \
   --data-root "$BREACHGAZETTE_DATA_ROOT" --output "$publication_dir"
 cd site
 BREACHGAZETTE_SITE_DATA_DIR="$publication_dir" \
   BREACHGAZETTE_SITE_URL="https://breachgazette.example" \
+  BREACHGAZETTE_SOURCE_REVISION="$source_revision" \
   npm run build:budget
 ../.venv/bin/breachgazette audit-public-tree dist
 ```
@@ -196,7 +198,12 @@ Publication runs automatically after successful `main` CI and after a
 successful scheduled or explicitly persisted private-state update. A manual
 dispatch remains available for an exact private-state commit or tag. The
 workflow records the resolved source and private-state commit IDs, audits the
-result, and atomically deploys only `site/dist`. Do not enable Netlify's
+result, publishes the source revision and publication checksum, and atomically
+deploys only `site/dist`. It retains the deployment archive and a provenance
+JSON record for 30 days. The JSON binds the archive digest, source revision,
+publication checksum, workflow run, and deployment response, but is explicitly
+marked unsigned and must not be represented as a cryptographic attestation.
+Do not enable Netlify's
 connected repository build because it has no reason to receive the private
 state repository or its credentials.
 

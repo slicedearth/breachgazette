@@ -207,12 +207,14 @@ Generate temporary real publication data, then point Astro at it:
 
 ```bash
 publication_dir="$(mktemp -d /tmp/breachgazette-publication.XXXXXX)"
+source_revision="$(git rev-parse HEAD)"
 .venv/bin/breachgazette build-site-data \
   --data-root "$BREACHGAZETTE_DATA_ROOT" \
   --output "$publication_dir"
 cd site
 BREACHGAZETTE_SITE_DATA_DIR="$publication_dir" \
   BREACHGAZETTE_SITE_URL="https://breachgazette.example" \
+  BREACHGAZETTE_SOURCE_REVISION="$source_revision" \
   npm run build:budget
 ../.venv/bin/breachgazette audit-public-tree dist
 ```
@@ -223,7 +225,11 @@ production HTTPS origin so canonical links, feeds, social metadata, robots
 guidance, and sitemaps cannot ship with a placeholder URL. The build and
 public-tree audits enforce time, file-count, HTML-size, and total-size budgets.
 Generated production records, search indexes, and publication data are not
-committed. Netlify receives only the audited `site/dist` tree.
+committed. Netlify receives only the audited `site/dist` tree. The public
+publication identity exposes the exact source revision and publication
+checksum. Each successful deployment also retains the exact deployment archive
+and a checksummed provenance statement for 30 days; that statement is
+reproducibility evidence, not a cryptographic signature.
 
 ## Privacy and safety
 
