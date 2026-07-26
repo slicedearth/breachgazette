@@ -291,9 +291,25 @@ test("desktop and mobile layouts contain content without horizontal scrollers", 
     "/source-health/",
     "/source-coverage/",
     "/relationships/",
+    "/organizations/org_1111111111111111/",
     "/sources/oaic_ndb/",
   ];
-  for (const width of [320, 768, 1440]) {
+  const tablePaths = [
+    "/",
+    "/latest/",
+    "/australia/",
+    "/australia/nsw/",
+    "/australia/public-notifications/",
+    "/france/",
+    "/united-kingdom/",
+    "/united-states/california/",
+    "/united-states/massachusetts/",
+    "/united-states/washington/",
+    "/source-health/",
+    "/source-coverage/",
+    "/organizations/org_1111111111111111/",
+  ];
+  for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     for (const path of paths) {
       await page.goto(path);
@@ -333,9 +349,9 @@ test("desktop and mobile layouts contain content without horizontal scrollers", 
   expect(geometry.tableHeaderWhiteSpace).toBe("nowrap");
   expect(geometry.unlabeledCells).toBe(0);
 
-  for (const width of [320, 768]) {
+  for (const width of [320, 390, 768]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const path of paths) {
+    for (const path of tablePaths) {
       await page.goto(path);
       const tableRegions = await page.locator(".table-wrap").evaluateAll((wrappers) =>
         wrappers.map((wrapper) => ({
@@ -344,8 +360,22 @@ test("desktop and mobile layouts contain content without horizontal scrollers", 
           unlabeledCells: [
             ...wrapper.querySelectorAll<HTMLElement>("tbody tr > th, tbody tr > td"),
           ].filter((cell) => !cell.dataset.label).length,
+          cellStyles: [
+            ...wrapper.querySelectorAll<HTMLElement>("tbody tr > th, tbody tr > td"),
+          ].map((cell) => {
+            const style = getComputedStyle(cell);
+            return {
+              cellWidth: cell.getBoundingClientRect().width,
+              gridColumnCount: style.gridTemplateColumns.trim().split(/\s+/).length,
+              overflowWrap: style.overflowWrap,
+              rowWidth: cell.parentElement?.getBoundingClientRect().width ?? 0,
+              wordBreak: style.wordBreak,
+              hyphens: style.hyphens,
+            };
+          }),
         })),
       );
+      expect(tableRegions.length, `${path} did not render a table`).toBeGreaterThan(0);
       expect(
         tableRegions.every((region) => region.scrollWidth <= region.clientWidth),
         `${path} contained a horizontal table scroller at ${width}px`,
@@ -353,6 +383,27 @@ test("desktop and mobile layouts contain content without horizontal scrollers", 
       expect(
         tableRegions.every((region) => region.unlabeledCells === 0),
         `${path} contained an unlabeled mobile table cell`,
+      ).toBe(true);
+      expect(
+        tableRegions.every((region) =>
+          region.cellStyles.every((style) =>
+            Math.abs(style.rowWidth - style.cellWidth) <= 2)),
+        `${path} retained a desktop column width on mobile at ${width}px`,
+      ).toBe(true);
+      expect(
+        tableRegions.every((region) =>
+          region.cellStyles.every((style) => (
+            style.overflowWrap === "break-word"
+            && style.wordBreak === "normal"
+            && style.hyphens === "none"
+          ))),
+        `${path} allowed mobile table values to split ordinary words at ${width}px`,
+      ).toBe(true);
+      expect(
+        tableRegions.every((region) =>
+          region.cellStyles.every((style) =>
+            width <= 480 ? style.gridColumnCount === 1 : style.gridColumnCount === 2)),
+        `${path} used a cramped mobile table layout at ${width}px`,
       ).toBe(true);
     }
   }
@@ -629,10 +680,55 @@ test("complete-dataset filtering remains bounded at 10,000 records", async ({ pa
   await expect(page.locator("[data-result-count]")).toContainText(
     "filtered page 1 of 200",
   );
+  const topPagination = page.getByRole("navigation", {
+    name: "Filtered notification pages above results",
+  });
+  const desktopPages = topPagination.locator(".pagination__pages--desktop");
+  await expect(desktopPages).toBeVisible();
+  await expect(
+    desktopPages.getByRole("link", { name: "Go to filtered notification page 6" }),
+  ).toBeVisible();
+  await expect(
+    desktopPages.getByRole("link", { name: "Go to filtered notification page 200" }),
+  ).toBeVisible();
   await page.getByLabel("Sort results").selectOption("organization");
   await expect(page.locator("[data-results] tbody tr").first()).toContainText(
     "Scale organization 00001",
   );
+
+  await page.setViewportSize({ width: 320, height: 900 });
+  const mobilePages = topPagination.locator(".pagination__pages--mobile");
+  await expect(desktopPages).toBeHidden();
+  await expect(mobilePages).toBeVisible();
+  await expect(topPagination.locator(".pagination__status")).toHaveText("Page 1 of 200");
+  for (const pageNumber of [2, 3, 4, 200]) {
+    await expect(
+      mobilePages.getByRole("link", {
+        name: `Go to filtered notification page ${pageNumber}`,
+        exact: true,
+      }),
+    ).toBeVisible();
+  }
+  const paginationWidths = await topPagination.evaluate((navigation) => ({
+    clientWidth: navigation.clientWidth,
+    scrollWidth: navigation.scrollWidth,
+  }));
+  expect(paginationWidths.scrollWidth).toBeLessThanOrEqual(paginationWidths.clientWidth);
+
+  await mobilePages.getByRole("link", {
+    name: "Go to filtered notification page 4",
+    exact: true,
+  }).click();
+  await expect(page).toHaveURL(/#source=scale&sort=organization&page=4$/);
+  await expect(topPagination.locator(".pagination__status")).toHaveText("Page 4 of 200");
+  for (const pageNumber of [1, 3, 5, 200]) {
+    await expect(
+      mobilePages.getByRole("link", {
+        name: `Go to filtered notification page ${pageNumber}`,
+        exact: true,
+      }),
+    ).toBeVisible();
+  }
 });
 
 test("notification search preserves the complete static register when the manifest fails", async ({ page }) => {
