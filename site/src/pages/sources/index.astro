@@ -1,5 +1,6 @@
 ---
 import Hero from "../../components/Hero.astro";
+import SourceInformationNav from "../../components/SourceInformationNav.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getPublication } from "../../lib/data";
 import { label } from "../../lib/format";
@@ -9,10 +10,11 @@ const policies = Object.values(publication.policies).sort((a, b) => a.name.local
 const healthBySource = new Map(publication.source_health.sources.map((source) => [source.source_id, source]));
 ---
 
-<BaseLayout title="Source directory" description="Official source policies, thresholds, windows, licences, and limitations.">
+<BaseLayout title="Source policies" description="Official source policies, thresholds, windows, licences, and limitations.">
+  <SourceInformationNav />
   <Hero
     eyebrow="Provenance directory"
-    title="Sources, thresholds, and windows"
+    title="Source policies"
     intro="Each policy defines what one row means, who can appear, what threshold applies, how long records remain visible, and which publication rights were reviewed."
   />
   <section class="section shell">
@@ -27,10 +29,5 @@ const healthBySource = new Map(publication.source_health.sources.map((source) =>
         </article>
       ))}
     </div>
-    <p>
-      <a href={`${import.meta.env.BASE_URL}source-coverage/`}>Compare source windows and record units</a>
-      {" · "}
-      <a href={`${import.meta.env.BASE_URL}source-health/`}>Review source freshness and update checkpoints</a>
-    </p>
   </section>
 </BaseLayout>

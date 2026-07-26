@@ -1,5 +1,6 @@
 ---
 import Hero from "../components/Hero.astro";
+import SourceInformationNav from "../components/SourceInformationNav.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { getAllNotifications, getPublication } from "../lib/data";
 import { date, label } from "../lib/format";
@@ -80,12 +81,13 @@ const countries = new Set(implemented.map((policy) => policy.country));
 ---
 
 <BaseLayout
-  title="Coverage and comparability"
+  title="Compare sources"
   description="Source-by-source publication windows, record units, and comparison boundaries."
 >
+  <SourceInformationNav />
   <Hero
-    eyebrow="Coverage evidence"
-    title="What can and cannot be compared"
+    eyebrow="Source comparison"
+    title="Compare sources"
     intro="Breach Gazette combines official publications without pretending that different thresholds, windows, and record units measure the same thing."
     warning="A larger source count can reflect a broader law, a longer publication window, or repeated notifications. It does not by itself establish more breaches."
   />
