@@ -1,4 +1,4 @@
-annotated-doc==0.0.4
+annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.14.2
 ast_serialize==0.6.0
@@ -20,7 +20,7 @@ h11==0.16.0
 hatchling==1.31.0
 httpcore==1.0.9
 httpx==0.28.1
-hypothesis==6.161.2
+hypothesis==6.161.5
 idna==3.18
 iniconfig==2.3.0
 librt==0.13.0
