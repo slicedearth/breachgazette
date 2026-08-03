@@ -23,13 +23,13 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "click==8.4.2",
-  "hypothesis==6.161.5",
+  "hypothesis==6.164.0",
   "mypy==2.3.0",
   "pip-audit==2.10.1",
   "pytest==9.1.1",
   "pytest-cov==7.1.0",
   "respx==0.23.1",
-  "ruff==0.16.0",
+  "ruff==0.16.1",
   "types-PyYAML==6.0.12.20260724",
 ]
 
