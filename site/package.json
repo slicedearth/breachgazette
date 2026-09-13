@@ -21,11 +21,11 @@
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",
-    "@astrojs/sitemap": "3.7.3",
-    "@axe-core/playwright": "4.12.1",
-    "@playwright/test": "1.62.1",
+    "@astrojs/sitemap": "3.7.4",
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
     "@types/estree": "1.0.9",
-    "astro": "7.1.6",
+    "astro": "7.3.2",
     "typescript": "6.0.3"
   }
 }
