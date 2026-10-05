@@ -67,4 +67,4 @@ typer==0.27.2
 types-PyYAML==6.0.12.20260724
 typing-inspection==0.4.4
 typing_extensions==4.16.0
-urllib3==2.7.0
+urllib3==2.8.0

@@ -12,7 +12,8 @@ MAX_RIGHTS_REVIEW_AGE_DAYS = 366
 
 
 def repository_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    checkout = Path(__file__).resolve().parents[2]
+    return checkout if (checkout / "sources").is_dir() else Path(__file__).parent / "resources"
 
 
 def load_source_policies(root: Path | None = None) -> dict[str, SourcePolicy]:

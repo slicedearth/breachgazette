@@ -89,6 +89,9 @@ Requirements:
 - Node.js 24
 - npm 11
 
+Transactional private-state updates require Linux or macOS filesystem locking.
+The deployed site remains static and has no operating-system requirement for visitors.
+
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip==26.1.2
@@ -101,6 +104,13 @@ npm ci
 
 Regenerate `requirements.lock` in a fresh isolated Python 3.12 environment with
 `.venv/bin/python scripts/lock_python.py`.
+Use `--constraints requirements.lock` for a focused reviewed update to retain
+unchanged build and transitive pins.
+
+Built wheels include the source-policy, monitoring, retention and regulatory
+catalogues required by the CLI. An installed package loads these immutable
+resources when no repository checkout is present. Private state and review
+decisions remain separately configured and are never bundled in the wheel.
 
 Run deterministic tests:
 
@@ -245,7 +255,8 @@ spreadsheet formulas, control characters, and unapproved fields.
 
 Search and filtering run in the browser against the published bounded dataset.
 Shareable filters use a URL fragment, which browsers do not send in HTTP
-requests. No query leaves the visitor's device. Reviewed alias and relationship
+requests. The literal query stays on the visitor's device, but requested
+source/year partition paths may appear in hosting logs. Reviewed alias and relationship
 catalogues remain private operational state. See [PRIVACY.md](PRIVACY.md) and
 [SECURITY.md](SECURITY.md).
 

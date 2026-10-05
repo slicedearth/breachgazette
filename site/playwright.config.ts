@@ -18,7 +18,7 @@ export default defineConfig({
     command:
       "BREACHGAZETTE_TEST_BUILD=1 " +
       "BREACHGAZETTE_SITE_DATA_DIR=../tests/fixtures/site " +
-      "npm run preview -- --host 127.0.0.1 --port 41733",
+      "node scripts/serve-test-build.mjs",
     port: 41733,
     reuseExistingServer: false,
     timeout: 30_000,
