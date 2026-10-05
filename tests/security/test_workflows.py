@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+import yaml
+
 WORKFLOW_ROOT = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 SHA_PIN = re.compile(r"^\s*uses:\s+[^@\s]+@[0-9a-f]{40}(?:\s+#.*)?$")
 LOCAL_WORKFLOW = re.compile(r"^\s*uses:\s+\./\.github/workflows/[a-z0-9-]+\.yml$")
@@ -18,6 +20,34 @@ def test_every_external_action_is_pinned_and_local_workflows_are_repository_rela
     ]
     assert action_references
     assert all(SHA_PIN.match(line) or LOCAL_WORKFLOW.match(line) for line in action_references)
+
+
+def test_site_install_jobs_select_the_declared_package_manager_first() -> None:
+    package = json.loads(
+        (WORKFLOW_ROOT.parents[1] / "site" / "package.json").read_text(encoding="utf-8")
+    )
+    assert re.fullmatch(r"npm@\d+\.\d+\.\d+", package["packageManager"])
+    checked_jobs = 0
+    for filename in ("ci.yml", "netlify.yml"):
+        workflow = yaml.safe_load((WORKFLOW_ROOT / filename).read_text(encoding="utf-8"))
+        for job in workflow["jobs"].values():
+            steps = job.get("steps", [])
+            for index, step in enumerate(steps):
+                if "npm ci " not in step.get("run", ""):
+                    continue
+                selectors = [
+                    earlier
+                    for earlier in steps[:index]
+                    if earlier.get("name") == "Select pinned package manager"
+                ]
+                assert len(selectors) == 1
+                selector = selectors[0]["run"]
+                assert "require('./site/package.json').packageManager" in selector
+                assert 'npm install --prefix "$RUNNER_TEMP/npm-runtime"' in selector
+                assert '--ignore-scripts --no-audit --no-fund "$package_manager"' in selector
+                assert '"$RUNNER_TEMP/npm-runtime/node_modules/.bin" >> "$GITHUB_PATH"' in selector
+                checked_jobs += 1
+    assert checked_jobs == 3
 
 
 def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:

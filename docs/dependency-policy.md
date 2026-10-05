@@ -6,8 +6,12 @@ and `npm ci --ignore-scripts --no-audit` in automation. A separate, explicit
 audit step keeps the vulnerability gate fail-closed without repeating the same
 registry request during installation.
 
+Automation selects the npm release declared in `site/package.json` before
+installing site dependencies. The package manager is installed in the runner's
+temporary directory without requiring a global installation.
+
 The Python lock is generated in an isolated Python 3.12 environment with pip
-26.1.2. Regenerate it with `.venv/bin/python scripts/lock_python.py`, or verify
+26.2.1. Regenerate it with `.venv/bin/python scripts/lock_python.py`, or verify
 the active environment against it with
 `.venv/bin/python scripts/lock_python.py --check-installed`. The command checks
 that every build, runtime, and development dependency declared in

@@ -94,7 +94,7 @@ The deployed site remains static and has no operating-system requirement for vis
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip==26.1.2
+.venv/bin/python -m pip install --upgrade pip==26.2.1
 .venv/bin/pip install -r requirements.lock
 .venv/bin/pip install -e . --no-deps --no-build-isolation
 .venv/bin/python scripts/lock_python.py --check-installed

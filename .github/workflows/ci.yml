@@ -51,6 +51,11 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: site/package-lock.json
+      - name: Select pinned package manager
+        run: |
+          package_manager="$(node -p "require('./site/package.json').packageManager")"
+          npm install --prefix "$RUNNER_TEMP/npm-runtime" --ignore-scripts --no-audit --no-fund "$package_manager"
+          echo "$RUNNER_TEMP/npm-runtime/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install locked site dependencies
         working-directory: site
         run: |
@@ -90,6 +95,11 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: site/package-lock.json
+      - name: Select pinned package manager
+        run: |
+          package_manager="$(node -p "require('./site/package.json').packageManager")"
+          npm install --prefix "$RUNNER_TEMP/npm-runtime" --ignore-scripts --no-audit --no-fund "$package_manager"
+          echo "$RUNNER_TEMP/npm-runtime/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install locked site dependencies
         working-directory: site
         run: npm ci --ignore-scripts --no-audit

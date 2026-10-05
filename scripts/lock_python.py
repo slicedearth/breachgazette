@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LOCK = ROOT / "requirements.lock"
 LOCK_PYTHON = (3, 12)
-LOCK_PIP = "26.1.2"
+LOCK_PIP = "26.2.1"
 PIN = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s]+)$")
 
 
