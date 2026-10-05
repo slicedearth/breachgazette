@@ -19,7 +19,17 @@ Alias proposals remain private operational reports and cannot change public
 identities. Source-health artifacts contain source IDs, counts, checksums,
 timestamps, statuses, and bounded reasons, not source records. Public search
 uses static same-origin partitions and sends no query to an application server.
-The query-routing Bloom values are irreversible derived bitsets and are exempt
+The query-routing Bloom values are derived indexes of public records, not
+encryption or a confidentiality boundary. They are exempt
 from text-pattern detectors only by exact field name; the underlying public
 records still pass the full privacy audit. CSV export is user-initiated,
 browser-local, field-allowlisted, and formula-neutralized.
+
+Generated search-partition asset names have a separate narrow exemption only
+after their source/year/page identifier and digest-derived suffix agree in a
+typed manifest. Arbitrary source fields named `asset` remain subject to text
+detectors, and formula detection is not disabled.
+
+The literal fragment query is not sent in HTTP requests. Candidate partition
+requests can still reveal which source and year groups were accessed in hosting
+logs. The index does not promise to hide that access pattern.

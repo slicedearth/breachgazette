@@ -27,8 +27,35 @@ The candidate is copied beside the configured root without `.git`, updated,
 health-checked, published into a temporary directory, privacy-audited,
 compacted, and size-checked. Promotion moves the original root aside, preserves
 its repository metadata, installs the verified candidate, and rolls back if
-that swap fails. Without `--promote`, the complete cycle is a non-mutating
-rehearsal.
+that swap fails. Without `--promote`, the complete cycle leaves the authoritative
+data root unchanged. A coordination lock file remains beside that root; it is
+not source state or a health report.
+
+Individual `update-source` commands also stage a complete generation under a
+single-writer filesystem lock. A failed write or promotion leaves prior records,
+snapshots and events intact; the failed checkpoint is a separate diagnostic.
+The lock is local to one filesystem and is not a distributed scheduler lock.
+Source IDs must be unique within each source snapshot before persistence.
+
+Use `--attempt-report /absolute/diagnostic/path/attempt.json` to retain a bounded
+sanitised cycle report outside authoritative state. This is an explicit write,
+including during a rehearsal. Without that option, a rehearsal does not write a
+report into production state. Attempts distinguish failed, complete and
+not-attempted sources, and report publication failures separately from retrieval.
+Candidate accepted counts and the previous production count/update time are
+separate fields; a discarded attempt never advances the production timestamp.
+The scheduled workflow retains that report even when a candidate is discarded.
+The public site still describes the last successfully published generation; it
+cannot expose a failed deployment that never reached the static host. Bounded
+public recovery history includes only retained health observations, not every
+failed or discarded attempt.
+
+OAIC semantic metric IDs use normalization version 2.0. Existing 1.0 state is
+blocked from update until its mapping is reviewed. Prepare an offline mapping
+with `plan_identity_migration` against a disposable copy, reject duplicate
+semantic metrics, preserve first-observed times, and retain old-to-new mappings
+and event identities. Verify an independent backup before any real migration.
+No migration is performed by an update or publication command.
 
 The monitoring catalogue also enforces a reviewed minimum record count,
 minimum retained fraction, maximum growth factor, and 240-hour freshness

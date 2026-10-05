@@ -11,7 +11,6 @@ from email.utils import parsedate_to_datetime
 from io import BytesIO
 from pathlib import PurePosixPath
 from urllib.parse import urljoin, urlparse
-from zipfile import BadZipFile, ZipFile
 
 import httpx
 from bs4 import BeautifulSoup
@@ -23,6 +22,7 @@ from breachgazette.clients.base import (
     SourceClientError,
     source_snapshot,
 )
+from breachgazette.clients.xlsx import validate_xlsx_archive
 from breachgazette.contracts import SourceAggregateRecord
 from breachgazette.contracts.enums import (
     Completeness,
@@ -250,25 +250,9 @@ def _source_updated_at(headers: httpx.Headers) -> datetime:
 
 def _validate_xlsx_archive(content: bytes) -> None:
     try:
-        with ZipFile(BytesIO(content)) as archive:
-            entries = archive.infolist()
-            if not entries or len(entries) > 100:
-                raise SourceClientError("ICO workbook archive exceeded its file-count bound")
-            total_size = 0
-            for entry in entries:
-                path = PurePosixPath(entry.filename)
-                if (
-                    path.is_absolute()
-                    or ".." in path.parts
-                    or entry.flag_bits & 0x1
-                    or entry.file_size > 100_000_000
-                ):
-                    raise SourceClientError("ICO workbook archive contained an unsafe entry")
-                total_size += entry.file_size
-            if total_size > 120_000_000:
-                raise SourceClientError("ICO workbook archive exceeded its expanded-size bound")
-    except BadZipFile as exc:
-        raise SourceClientError("ICO workbook was not a valid XLSX archive") from exc
+        validate_xlsx_archive(content)
+    except SourceClientError as exc:
+        raise SourceClientError(f"ICO {exc}") from exc
 
 
 def _cell_text(value: object, *, field_name: str) -> str:

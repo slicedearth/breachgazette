@@ -16,6 +16,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     warning="A missing page does not mean that an official notification was deleted, resolved, or found to be inaccurate."
   />
   <section class="section shell">
+    <p hidden data-legacy-record><a data-legacy-record-link>Look up this record in the current publication</a></p>
     <div class="grid">
       <article class="card">
         <h2><a href={`${import.meta.env.BASE_URL}latest/`}>Search notifications</a></h2>
@@ -27,4 +28,18 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       </article>
     </div>
   </section>
+  <script>
+    const match = /^\/notifications\/([^/]+)\/?$/.exec(window.location.pathname);
+    if (match) {
+      try {
+        const record = decodeURIComponent(match[1]!);
+        if (record.length <= 300) {
+          const parameters = new URLSearchParams({ query: record, record });
+          const link = document.querySelector<HTMLAnchorElement>("[data-legacy-record-link]")!;
+          link.href = `${import.meta.env.BASE_URL}latest/#${parameters}`;
+          document.querySelector<HTMLElement>("[data-legacy-record]")!.hidden = false;
+        }
+      } catch { /* Invalid encoding retains the ordinary not-found page. */ }
+    }
+  </script>
 </BaseLayout>

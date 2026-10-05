@@ -141,7 +141,30 @@ def _finding(
 
 def audit_public_value(value: Any, *, record_identity: str) -> list[QualityFinding]:
     findings: list[QualityFinding] = []
-    for field, item in _walk(canonical_data(value)):
+    canonical = canonical_data(value)
+    safe_assets: set[str] = set()
+    if (
+        isinstance(canonical, dict)
+        and canonical.get("schema_version") == "1.0"
+        and isinstance(canonical.get("query_routing"), dict)
+        and canonical["query_routing"].get("algorithm") == "normalized_trigram_bloom"
+        and isinstance(canonical.get("partitions"), list)
+    ):
+        for index, partition in enumerate(canonical["partitions"]):
+            if not isinstance(partition, dict):
+                continue
+            identifier = partition.get("id")
+            digest = partition.get("sha256")
+            asset = partition.get("asset")
+            if (
+                isinstance(identifier, str)
+                and isinstance(digest, str)
+                and re.fullmatch(r"[a-z][a-z_]{0,60}-(?:\d{4}|unknown)-\d{3,4}", identifier)
+                and re.fullmatch(r"[0-9a-f]{64}", digest)
+                and asset == f"{identifier}-{digest[:16]}"
+            ):
+                safe_assets.add(f"$.partitions[{index}].asset")
+    for field, item in _walk(canonical):
         leaf = re.sub(r"\[\d+\]", "", field.rsplit(".", 1)[-1])
         if not isinstance(item, str):
             continue
@@ -155,7 +178,7 @@ def audit_public_value(value: Any, *, record_identity: str) -> list[QualityFindi
                     record_identity,
                 )
             )
-        if leaf in SKIP_TEXT_DETECTORS_FOR_FIELDS:
+        if leaf in SKIP_TEXT_DETECTORS_FOR_FIELDS or field in safe_assets:
             try:
                 parsed = urlparse(item)
                 if leaf.endswith("url") and (

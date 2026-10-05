@@ -16,6 +16,7 @@ export type Notification = {
   source_retrieval_time: string;
   local_first_observed_time: string;
   local_last_observed_time: string;
+  local_last_material_change_time?: string | null;
   regulator: string;
   jurisdiction: string;
   reporting_scheme: string;
@@ -72,6 +73,7 @@ export type SearchManifest = {
   partition_max_bytes: number;
   query_routing: {
     algorithm: "normalized_trigram_bloom";
+    normalization_version?: string;
     encoding: "hex";
     bits: number;
     hashes: number;

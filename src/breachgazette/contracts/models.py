@@ -111,6 +111,7 @@ class RecordProvenance(ContractModel):
     source_retrieval_time: datetime
     local_first_observed_time: datetime
     local_last_observed_time: datetime
+    local_last_material_change_time: datetime | None = None
     parser_version: str
     normalization_version: str
     limitations: list[str] = Field(default_factory=list, max_length=20)

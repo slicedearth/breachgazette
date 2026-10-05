@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, date, datetime
-from io import BytesIO
 from typing import Any
 
 import httpx
-from openpyxl import load_workbook
 
 from breachgazette.clients.base import (
     AdapterResult,
@@ -16,6 +14,7 @@ from breachgazette.clients.base import (
     SourceClientError,
     source_snapshot,
 )
+from breachgazette.clients.xlsx import bounded_workbook
 from breachgazette.contracts import SourceAggregateRecord
 from breachgazette.contracts.enums import (
     Completeness,
@@ -92,10 +91,65 @@ def _numeric(value: Any) -> int | float | None:
     return None
 
 
+def oaic_metric_id(
+    *,
+    sheet: str,
+    period_start: date,
+    period_end: date,
+    dimension: str,
+    category: str,
+    parent: str | None,
+    unit: str,
+    population_scope: str,
+) -> str:
+    return (
+        "oaic:v2:"
+        + sha256_hex(
+            [
+                sheet,
+                period_start,
+                period_end,
+                dimension,
+                category,
+                parent,
+                unit,
+                population_scope,
+            ]
+        )[:32]
+    )
+
+
+def plan_identity_migration(records: list[SourceAggregateRecord]) -> dict[str, str]:
+    """Produce a reviewable mapping only. Never rewrite IDs, events or observations."""
+    mapping: dict[str, str] = {}
+    for record in records:
+        sheet = record.source_record_id.split(":", 1)[0]
+        if (
+            record.source_id != "oaic_ndb"
+            or record.normalization_version != "1.0"
+            or sheet not in EXPECTED_SHEETS[1:]
+        ):
+            raise ValueError("migration requires reviewed legacy OAIC metrics")
+        new_id = oaic_metric_id(
+            sheet=sheet,
+            period_start=record.reporting_period_start,
+            period_end=record.reporting_period_end,
+            dimension=record.dimension,
+            category=record.category,
+            parent=record.parent_category,
+            unit=record.unit,
+            population_scope=record.population_scope,
+        )
+        if new_id in mapping.values() or record.source_record_id in mapping:
+            raise ValueError("identity migration contains ambiguous metrics")
+        mapping[record.source_record_id] = new_id
+    return mapping
+
+
 class OaicNdbAdapter:
     source_id = "oaic_ndb"
     adapter_version = "1.0"
-    normalization_version = "1.0"
+    normalization_version = "2.0"
     max_records = 2_000
 
     def __init__(self, *, transport: httpx.BaseTransport | None = None) -> None:
@@ -143,7 +197,23 @@ class OaicNdbAdapter:
             ):
                 raise SourceClientError("OAIC resource returned an unexpected content type")
 
-        workbook = load_workbook(BytesIO(content), read_only=True, data_only=True)
+        with bounded_workbook(
+            content,
+            max_rows=5_000,
+            max_columns=64,
+            max_entry_bytes=20_000_000,
+            max_expanded_bytes=60_000_000,
+        ) as workbook:
+            return self._parse(workbook, resource, dataset, content, observed_at)
+
+    def _parse(
+        self,
+        workbook: Any,
+        resource: dict[str, Any],
+        dataset: dict[str, Any],
+        content: bytes,
+        observed_at: datetime,
+    ) -> AdapterResult:
         if tuple(workbook.sheetnames) != EXPECTED_SHEETS:
             raise SourceClientError("OAIC workbook sheet schema changed")
         period_start, period_end = _resource_period(str(resource["name"]))
@@ -160,6 +230,8 @@ class OaicNdbAdapter:
             current_parent: str | None = None
             population_scope = "Notifications received under the NDB scheme"
             for row_number, row in enumerate(worksheet.iter_rows(values_only=True), start=1):
+                if row_number > 5_000:
+                    raise SourceClientError("OAIC worksheet exceeded its row bound")
                 label_raw = row[0] if row else None
                 value_raw = row[1] if len(row) > 1 else None
                 if not isinstance(label_raw, str):
@@ -194,10 +266,20 @@ class OaicNdbAdapter:
                     parent = current_parent
                 unit = "percent" if isinstance(value_raw, str) and "%" in value_raw else "count"
                 rounding = ValueState.ESTIMATED if unit == "percent" else ValueState.PRESENT
-                source_record_id = (
-                    f"{worksheet.title.strip()}:{row_number}:"
-                    f"{sha256_hex([label, parent, value])[:12]}"
+                source_record_id = oaic_metric_id(
+                    sheet=worksheet.title,
+                    period_start=period_start,
+                    period_end=period_end,
+                    dimension=dimension,
+                    category=label,
+                    parent=parent,
+                    unit=unit,
+                    population_scope=population_scope,
                 )
+                if any(record.source_record_id == source_record_id for record in records):
+                    raise SourceClientError("OAIC workbook contained duplicate semantic metrics")
+                if len(records) >= self.max_records:
+                    raise SourceClientError("OAIC metric count exceeded its bound")
                 records.append(
                     SourceAggregateRecord(
                         source_id=self.source_id,
@@ -232,7 +314,6 @@ class OaicNdbAdapter:
                         source_notes=source_notes,
                     )
                 )
-        workbook.close()
         if not records or len(records) > self.max_records:
             raise SourceClientError("OAIC metric count was empty or exceeded its bound")
         snapshot = source_snapshot(

@@ -1,4 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  validateSearchManifest,
+  validateSearchPartition,
+} from "./searchValidation";
 import { isAbsolute, join, resolve } from "node:path";
 import type {
   Notification,
@@ -12,11 +17,15 @@ function dataDirectory(): string {
   if (!configured) {
     throw new Error("BREACHGAZETTE_SITE_DATA_DIR is required");
   }
-  return isAbsolute(configured) ? configured : resolve(process.cwd(), configured);
+  return isAbsolute(configured)
+    ? configured
+    : resolve(process.cwd(), configured);
 }
 
-function readJson<T>(name: string): T {
+function readJson<T>(name: string, maxBytes = 60_000_000): T {
   const path = join(dataDirectory(), name);
+  if (statSync(path).size > maxBytes)
+    throw new Error("Publication input exceeds its byte budget");
   return JSON.parse(readFileSync(path, "utf8")) as T;
 }
 
@@ -27,7 +36,10 @@ export function getPublication(): Publication {
   const publication = readJson<Publication>("publication.json");
   const datasetClass = publication.manifest?.dataset_class;
   const testBuild = process.env.BREACHGAZETTE_TEST_BUILD === "1";
-  if (datasetClass !== "real_source_data" && !(testBuild && datasetClass === "test_fixture")) {
+  if (
+    datasetClass !== "real_source_data" &&
+    !(testBuild && datasetClass === "test_fixture")
+  ) {
     throw new Error("Production site builds require real_source_data");
   }
   if (!publication.quality?.passed) {
@@ -41,52 +53,9 @@ let searchManifestCache: SearchManifest | undefined;
 
 export function getSearchManifest(): SearchManifest {
   if (searchManifestCache) return searchManifestCache;
-  const manifest = readJson<SearchManifest>("search-manifest.json");
-  const facetNames = [
-    "jurisdictions",
-    "regulators",
-    "sources",
-    "years",
-    "causes",
-    "information_categories",
-    "population_bands",
-    "roles",
-    "publication_levels",
-  ] as const;
-  if (
-    !manifest ||
-    !Array.isArray(manifest.partitions) ||
-    !Number.isInteger(manifest.record_count) ||
-    !manifest.facets ||
-    !manifest.facet_counts ||
-    facetNames.some(
-      (facet) =>
-        !Array.isArray(manifest.facets[facet]) ||
-        typeof manifest.facet_counts[facet] !== "object" ||
-        manifest.facet_counts[facet] === null ||
-        Object.values(manifest.facet_counts[facet]).some(
-          (count) => !Number.isInteger(count) || count < 1,
-        ),
-    ) ||
-    manifest.query_routing?.algorithm !== "normalized_trigram_bloom" ||
-    manifest.query_routing?.encoding !== "hex" ||
-    !Number.isInteger(manifest.query_routing.bits) ||
-    !Number.isInteger(manifest.query_routing.hashes) ||
-    !Number.isInteger(manifest.partition_max_bytes) ||
-    manifest.partition_max_bytes <= 0 ||
-    manifest.partitions.some(
-      (partition) =>
-        partition.asset !== `${partition.id}-${partition.sha256.slice(0, 16)}` ||
-        !/^[a-z0-9_-]+-[0-9a-f]{16}$/.test(partition.asset) ||
-        !partition.query_bloom ||
-        !Number.isInteger(partition.bytes) ||
-        partition.bytes <= 0 ||
-        partition.bytes > manifest.partition_max_bytes ||
-        !/^[0-9a-f]{64}$/.test(partition.sha256),
-    )
-  ) {
-    throw new Error("search-manifest.json is invalid");
-  }
+  const manifest = validateSearchManifest(
+    readJson<unknown>("search-manifest.json", 5_000_000),
+  );
   searchManifestCache = manifest;
   return searchManifestCache;
 }
@@ -104,9 +73,21 @@ export function getSearchPartition(id: string): SearchPartition {
   if (!metadata) {
     throw new Error("search partition id is not declared");
   }
-  const partition = readJson<SearchPartition>(
-    join("search-partitions", `${metadata.asset}.json`),
+  const partition = validateSearchPartition(
+    readJson<unknown>(
+      join("search-partitions", `${metadata.asset}.json`),
+      manifest.partition_max_bytes + 1,
+    ),
+    id,
+    metadata.count,
   );
+  const encoded = Buffer.from(JSON.stringify(partition), "utf8");
+  if (
+    encoded.length !== metadata.bytes ||
+    createHash("sha256").update(encoded).digest("hex") !== metadata.sha256
+  ) {
+    throw new Error("search partition failed build-time integrity validation");
+  }
   if (
     partition.partition_id !== id ||
     !Array.isArray(partition.records) ||
@@ -121,11 +102,13 @@ export function getSearchPartition(id: string): SearchPartition {
 let notificationCache: Notification[] | undefined;
 
 function latestSourceDate(notification: Notification): string {
-  return notification.dates
-    .map((item) => item.normalized_date)
-    .filter((value): value is string => Boolean(value))
-    .sort()
-    .at(-1) ?? "0001-01-01";
+  return (
+    notification.dates
+      .map((item) => item.normalized_date)
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .at(-1) ?? "0001-01-01"
+  );
 }
 
 export function getAllNotifications(): Notification[] {
@@ -139,9 +122,10 @@ export function getAllNotifications(): Notification[] {
       `notification partitions contain ${notifications.length} records; expected ${manifest.record_count}`,
     );
   }
-  notificationCache = notifications.sort((left, right) =>
-    latestSourceDate(right).localeCompare(latestSourceDate(left))
-    || right.source_record_id.localeCompare(left.source_record_id)
+  notificationCache = notifications.sort(
+    (left, right) =>
+      latestSourceDate(right).localeCompare(latestSourceDate(left)) ||
+      right.source_record_id.localeCompare(left.source_record_id),
   );
   return notificationCache;
 }

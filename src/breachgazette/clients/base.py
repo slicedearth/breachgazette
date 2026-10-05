@@ -11,6 +11,7 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from breachgazette.clients.deadline import DeadlineTransport
 from breachgazette.contracts import SourceSnapshot
 from breachgazette.contracts.models import RecordProvenance
 
@@ -53,7 +54,7 @@ class BoundedSourceClient:
         self._client = httpx.Client(
             timeout=httpx.Timeout(timeout_seconds, connect=min(timeout_seconds, 10.0)),
             follow_redirects=False,
-            transport=transport,
+            transport=transport or DeadlineTransport(self._remaining),
             headers={
                 "Accept-Encoding": "identity",
                 "User-Agent": user_agent,
@@ -80,8 +81,20 @@ class BoundedSourceClient:
             raise SourceClientError("source URL path is not allowlisted")
 
     def _deadline(self) -> None:
-        if time.monotonic() - self._started > self.total_deadline_seconds:
+        self._remaining()
+
+    def _remaining(self) -> float:
+        remaining = self.total_deadline_seconds - (time.monotonic() - self._started)
+        if remaining <= 0:
             raise SourceClientError("source request exceeded the total deadline")
+        return remaining
+
+    def _sleep(self, duration: float) -> None:
+        remaining = self._remaining()
+        if duration >= remaining:
+            raise SourceClientError("source delay would exceed the total deadline")
+        time.sleep(duration)
+        self._deadline()
 
     def get_bytes(self, url: str, *, accept: str) -> tuple[bytes, httpx.Headers, str]:
         self._validate_url(url)
@@ -91,10 +104,12 @@ class BoundedSourceClient:
             self._deadline()
             try:
                 for _redirect in range(4):
+                    self._deadline()
                     self._validate_url(current)
                     with self._client.stream(
                         "GET", current, headers={"Accept": accept}
                     ) as response:
+                        self._deadline()
                         if response.status_code in {301, 302, 303, 307, 308}:
                             location = response.headers.get("Location")
                             if not location:
@@ -114,20 +129,22 @@ class BoundedSourceClient:
                         chunks: list[bytes] = []
                         total = 0
                         for chunk in response.iter_bytes():
+                            self._deadline()
                             total += len(chunk)
                             if total > self.max_response_bytes:
                                 raise SourceClientError(
                                     "source response exceeded the decompressed byte cap"
                                 )
                             chunks.append(chunk)
-                        time.sleep(self.rate_delay_seconds)
+                        self._sleep(self.rate_delay_seconds)
+                        self._deadline()
                         return b"".join(chunks), response.headers, str(response.url)
                 raise SourceClientError("source exceeded the redirect limit")
             except (httpx.HTTPError, SourceClientError, ValueError) as exc:
                 last_error = exc
                 if attempt == self.max_retries:
                     break
-                time.sleep(min(2**attempt, 4))
+                self._sleep(min(2**attempt, 4))
         raise SourceClientError("official source request failed safely") from last_error
 
     def get_json(self, url: str) -> tuple[Any, httpx.Headers, str]:

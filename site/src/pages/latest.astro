@@ -14,7 +14,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
   <Hero
     eyebrow="Named source records"
     title="Latest public notifications"
-    intro="Filter the complete bounded published notification dataset locally. Search terms stay in this browser and are not transmitted."
+    intro="Filter the complete bounded published notification dataset locally. Search terms stay in this browser; loading data partitions still creates requests to the site host."
     warning="A notification is not automatically a unique incident. The source role of the named entity is preserved."
   />
   <section class="section shell">
@@ -43,7 +43,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
             <label>Source date to<input type="date" name="date_to" /></label>
             <label>Breach cause<select name="cause"><option value="">All published causes</option></select></label>
             <label>Information category<select name="information"><option value="">All published categories</option></select></label>
-            <label>Affected population<select name="population"><option value="">All population bands</option><option value="not_published">Not published</option><option value="500_999">500–999</option><option value="1000_9999">1,000–9,999</option><option value="10000_99999">10,000–99,999</option><option value="100000_plus">100,000+</option></select></label>
+            <label>Affected population<select name="population"><option value="">All population bands</option><option value="not_published">Not published</option><option value="zero">Source reports zero</option><option value="1_499">1–499</option><option value="500_999">500–999</option><option value="1000_9999">1,000–9,999</option><option value="10000_99999">10,000–99,999</option><option value="100000_plus">100,000+</option></select></label>
             <label>Entity role<select name="role"><option value="">All roles</option></select></label>
             <label>Publication level<select name="publication"><option value="">All publication levels</option></select></label>
             <label>Sort results<select name="sort"><option value="">Newest source date</option><option value="oldest">Oldest source date</option><option value="organization">Entity name A–Z</option></select></label>
@@ -62,7 +62,8 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         <span class="table-note" data-share-status>Search-link filters stay in the URL fragment and are not sent in HTTP requests.</span>
       </div>
     </div>
-    <p aria-live="polite" data-result-count>Loading bounded dataset…</p>
+    <p aria-live="polite" tabindex="-1" data-result-count>Loading bounded dataset…</p>
+    <button type="button" class="button-secondary" data-search-retry hidden>Retry search</button>
     <div class="filtered-facets" data-filtered-facets hidden aria-live="polite"></div>
     <div data-results>
       <p class="directory-summary">
@@ -106,6 +107,9 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
   </section>
   <script>
     import { label, date } from "../lib/format";
+    import { matchesPartition, matchesRecord, snapshotFilters } from "../lib/search";
+    import { notificationCsv } from "../lib/searchExport";
+    import { boundedResponseBytes, validateSearchManifest, validateSearchPartition } from "../lib/searchValidation";
     import {
       getNotificationPaginationItems,
       NOTIFICATIONS_PER_PAGE,
@@ -114,7 +118,6 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       Notification,
       SearchFacets,
       SearchManifest,
-      SearchPartition,
       SearchPartitionMetadata,
     } from "../lib/types";
 
@@ -125,13 +128,19 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
     const count = document.querySelector<HTMLElement>("[data-result-count]");
     const recordDialog = document.querySelector<HTMLDialogElement>("[data-record-dialog]");
     if (controls && results && count) {
-      const response = await fetch(`${base}data/notifications/manifest.json`, {
-        credentials: "same-origin",
-      }).catch(() => null);
-      if (!response?.ok) {
+      const retry = document.querySelector<HTMLButtonElement>("[data-search-retry]")!;
+      retry.addEventListener("click", () => window.location.reload());
+      let loadedManifest: SearchManifest | null = null;
+      try {
+        const response = await fetch(`${base}data/notifications/manifest.json`, { credentials: "same-origin" });
+        const bytes = await boundedResponseBytes(response, 5_000_000);
+        loadedManifest = validateSearchManifest(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));
+      } catch {
         count.textContent = "Search manifest could not be loaded. The complete static register remains available.";
-      } else {
-      const manifest = (await response.json()) as SearchManifest;
+        retry.hidden = false;
+      }
+      if (loadedManifest) {
+      const manifest = loadedManifest;
       const jurisdiction = controls.querySelector<HTMLSelectElement>('[name="jurisdiction"]')!;
       const regulator = controls.querySelector<HTMLSelectElement>('[name="regulator"]')!;
       const source = controls.querySelector<HTMLSelectElement>('[name="source"]')!;
@@ -139,10 +148,8 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       const sourceDateTo = controls.querySelector<HTMLInputElement>('[name="date_to"]')!;
       const cause = controls.querySelector<HTMLSelectElement>('[name="cause"]')!;
       const information = controls.querySelector<HTMLSelectElement>('[name="information"]')!;
-      const population = controls.querySelector<HTMLSelectElement>('[name="population"]')!;
       const role = controls.querySelector<HTMLSelectElement>('[name="role"]')!;
       const publication = controls.querySelector<HTMLSelectElement>('[name="publication"]')!;
-      const sort = controls.querySelector<HTMLSelectElement>('[name="sort"]')!;
       const query = controls.querySelector<HTMLInputElement>('[name="query"]')!;
       const exportButton = document.querySelector<HTMLButtonElement>("[data-export-results]")!;
       const exportStatus = document.querySelector<HTMLElement>("[data-export-status]")!;
@@ -275,15 +282,6 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           ? "This search can be bookmarked without sending its filters in HTTP requests."
           : "Search-link filters stay in the URL fragment and are not sent in HTTP requests.";
       };
-      const populationBand = (record: Notification) => {
-        const affected = record.affected_population?.count;
-        if (affected === null || affected === undefined) return "not_published";
-        if (affected < 1_000) return "500_999";
-        if (affected < 10_000) return "1000_9999";
-        if (affected < 100_000) return "10000_99999";
-        return "100000_plus";
-      };
-
       const initialResults = results.cloneNode(true) as HTMLElement;
       const initialCount = results.querySelectorAll("tbody tr").length;
       const partitionCache = new Map<string, Notification[]>();
@@ -301,7 +299,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           { credentials: "same-origin", signal },
         );
         if (!partitionResponse.ok) throw new Error("Notification search partition is unavailable.");
-        const encoded = new Uint8Array(await partitionResponse.arrayBuffer());
+        const encoded = await boundedResponseBytes(partitionResponse, Math.min(partition.bytes, CLIENT_PARTITION_MAX_BYTES));
         if (
           encoded.byteLength > partition.bytes ||
           encoded.byteLength > manifest.partition_max_bytes ||
@@ -315,81 +313,11 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         if (digest !== partition.sha256) {
           throw new Error("Notification search partition failed its integrity check.");
         }
-        const payload = JSON.parse(new TextDecoder().decode(encoded)) as SearchPartition;
-        if (
-          payload.partition_id !== partition.id ||
-          !Array.isArray(payload.records) ||
-          payload.records.length !== partition.count
-        ) {
-          throw new Error("Notification search partition is invalid.");
-        }
+        if (encoded.byteLength !== partition.bytes) throw new Error("Partition byte count is inconsistent.");
+        const payload = validateSearchPartition(JSON.parse(new TextDecoder().decode(encoded)), partition.id, partition.count);
         partitionCache.set(partition.id, payload.records);
         return payload.records;
       };
-
-      const normalizeSearch = (value: string) =>
-        value.toLocaleLowerCase().split(/\s+/).filter(Boolean).join(" ");
-      const searchText = (record: Notification) =>
-        normalizeSearch([
-          record.named_entity.source_name,
-          record.source_record_id,
-          record.jurisdiction,
-          record.regulator,
-          record.reporting_scheme,
-          record.named_entity.role,
-        ].filter(Boolean).join(" "));
-      const trigrams = (value: string) => {
-        const normalized = normalizeSearch(value);
-        const grams = new Set<string>();
-        for (let index = 0; index <= normalized.length - 3; index += 1) {
-          grams.add(normalized.slice(index, index + 3));
-        }
-        return grams;
-      };
-      const fnv1a = (value: string) => {
-        let hash = 2_166_136_261;
-        for (const byte of new TextEncoder().encode(value)) {
-          hash ^= byte;
-          hash = Math.imul(hash, 16_777_619) >>> 0;
-        }
-        return hash;
-      };
-      const queryTokens = (value: string) =>
-        normalizeSearch(value).split(" ").filter(Boolean);
-      const queryMayMatch = (partition: SearchPartitionMetadata, term: string) => {
-        if (!partition.query_bloom) return true;
-        const bloom = Uint8Array.from(
-          partition.query_bloom.match(/.{2}/g) ?? [],
-          (pair) => Number.parseInt(pair, 16),
-        );
-        for (const token of queryTokens(term)) {
-          if (token.length < manifest.query_routing.minimum_query_length) continue;
-          for (const gram of trigrams(token)) {
-            for (let seed = 0; seed < manifest.query_routing.hashes; seed += 1) {
-              const bit = fnv1a(`${seed}|${gram}`) % manifest.query_routing.bits;
-              if ((bloom[Math.floor(bit / 8)]! & (1 << (bit % 8))) === 0) return false;
-            }
-          }
-        }
-        return true;
-      };
-
-      const partitionIntersectsDateRange = (partition: SearchPartitionMetadata) =>
-        partition.years.some((year) =>
-          (!sourceDateFrom.value || year >= sourceDateFrom.value.slice(0, 4)) &&
-          (!sourceDateTo.value || year <= sourceDateTo.value.slice(0, 4))
-        );
-      const matchesPartition = (partition: SearchPartitionMetadata) =>
-        (!jurisdiction.value || partition.jurisdictions.includes(jurisdiction.value)) &&
-        (!regulator.value || partition.regulators.includes(regulator.value)) &&
-        (!source.value || partition.sources.includes(source.value)) &&
-        partitionIntersectsDateRange(partition) &&
-        (!cause.value || partition.causes.includes(cause.value)) &&
-        (!information.value || partition.information_categories.includes(information.value)) &&
-        (!population.value || partition.population_bands.includes(population.value)) &&
-        (!role.value || partition.roles.includes(role.value)) &&
-        (!publication.value || partition.publication_levels.includes(publication.value)) &&
-        queryMayMatch(partition, normalizeSearch(query.value));
 
       const cell = (tag: "th" | "td", value: string, dataLabel?: string) => {
         const element = document.createElement(tag);
@@ -456,6 +384,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           ["Source completeness", label(record.source_completeness)],
           ["First locally observed", date(record.local_first_observed_time)],
           ["Last locally observed", date(record.local_last_observed_time)],
+          ["Last observed material change", date(record.local_last_material_change_time)],
         ];
         definitions.replaceChildren();
         for (const [term, description] of definitionsData) {
@@ -719,50 +648,9 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           `${loadedPartitionCount.toLocaleString()} of ${manifest.partitions.length.toLocaleString()} partitions.`;
       };
 
-      const csvCell = (value: string | number | null | undefined) => {
-        let text = String(value ?? "");
-        if (/^[=+\-@]/.test(text)) text = `'${text}`;
-        return `"${text.replaceAll('"', '""')}"`;
-      };
       const exportCsv = () => {
-        if (!filteredRecords.length) return;
-        const headers = [
-          "source_id",
-          "source_record_id",
-          "named_entity",
-          "source_role",
-          "jurisdiction",
-          "regulator",
-          "reporting_scheme",
-          "source_dates",
-          "publication_level",
-          "affected_population",
-          "information_categories",
-          "breach_cause",
-          "source_url",
-        ];
-        const rows = filteredRecords.map((record) => [
-          record.source_id,
-          record.source_record_id,
-          record.named_entity.source_name,
-          record.named_entity.role,
-          record.jurisdiction,
-          record.regulator,
-          record.reporting_scheme,
-          record.dates
-            .map((item) => item.normalized_date)
-            .filter((value): value is string => Boolean(value))
-            .join("; "),
-          record.publication_level,
-          record.affected_population?.count,
-          record.information_categories.map((item) => item.normalized_label).join("; "),
-          record.breach_cause?.normalized_label,
-          record.source_url,
-        ]);
-        const csv = [
-          headers.map(csvCell).join(","),
-          ...rows.map((row) => row.map(csvCell).join(",")),
-        ].join("\r\n");
+        if (exportButton.disabled || !filteredRecords.length) return;
+        const csv = notificationCsv(filteredRecords);
         const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
         const link = document.createElement("a");
         link.href = url;
@@ -773,6 +661,8 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       };
       exportButton.addEventListener("click", exportCsv);
       resetButton.addEventListener("click", () => {
+        invalidateSearch();
+        requestedRecordId = null;
         for (const control of filterControls) control.value = "";
         currentPage = 1;
         if (mobileFilters.matches) advancedFilters.open = false;
@@ -791,8 +681,18 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
 
       let renderVersion = 0;
       let debounce: number | undefined;
+      const invalidateSearch = () => {
+        ++renderVersion;
+        window.clearTimeout(debounce);
+        activeSearch?.abort();
+        activeSearch = null;
+        filteredRecords = [];
+        exportButton.disabled = true;
+        exportStatus.textContent = "Search has changed. Export will be available when it finishes.";
+      };
       const render = async () => {
         const version = ++renderVersion;
+        const filters = snapshotFilters(filterControls);
         activeSearch?.abort();
         activeSearch = null;
         if (!hasFilters()) {
@@ -825,7 +725,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           count.textContent = "Source date from must be on or before source date to.";
           return;
         }
-        const candidatePartitions = manifest.partitions.filter(matchesPartition);
+        const candidatePartitions = manifest.partitions.filter((partition) => matchesPartition(partition, filters, manifest));
         const controller = new AbortController();
         activeSearch = controller;
         results.setAttribute("aria-busy", "true");
@@ -842,24 +742,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
             count.textContent = `Searching ${Math.min(offset + batch.length, candidatePartitions.length).toLocaleString()} of ${candidatePartitions.length.toLocaleString()} relevant data partitions locally…`;
           }
           if (version !== renderVersion) return;
-          const terms = queryTokens(query.value);
-          const filtered = records.filter((record) =>
-            (terms.length === 0 || terms.every((term) => searchText(record).includes(term))) &&
-            (!jurisdiction.value || record.jurisdiction === jurisdiction.value) &&
-            (!regulator.value || record.regulator === regulator.value) &&
-            (!source.value || record.source_id === source.value) &&
-            ((!sourceDateFrom.value && !sourceDateTo.value) ||
-              record.dates.some((item) =>
-                Boolean(item.normalized_date) &&
-                (!sourceDateFrom.value || item.normalized_date! >= sourceDateFrom.value) &&
-                (!sourceDateTo.value || item.normalized_date! <= sourceDateTo.value)
-              )) &&
-            (!cause.value || record.breach_cause?.normalized_label === cause.value) &&
-            (!information.value || record.information_categories.some((item) => item.normalized_label === information.value)) &&
-            (!population.value || populationBand(record) === population.value) &&
-            (!role.value || record.named_entity.role === role.value) &&
-            (!publication.value || record.publication_level === publication.value)
-          );
+          const filtered = records.filter((record) => matchesRecord(record, filters));
           const latestDate = (record: Notification) =>
             record.dates
               .map((item) => item.normalized_date)
@@ -867,12 +750,12 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
               .sort()
               .at(-1) ?? "";
           filteredRecords = [...filtered].sort((left, right) => {
-            if (sort.value === "organization") {
+            if (filters.sort === "organization") {
               return left.named_entity.source_name.localeCompare(
                 right.named_entity.source_name,
               ) || left.source_record_id.localeCompare(right.source_record_id);
             }
-            if (sort.value === "oldest") {
+            if (filters.sort === "oldest") {
               return (latestDate(left) || "9999").localeCompare(
                 latestDate(right) || "9999",
               ) || left.source_record_id.localeCompare(right.source_record_id);
@@ -895,6 +778,8 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
             if (requestedRecord) {
               showRecordDetail(requestedRecord);
               requestedRecordId = null;
+            } else {
+              count.textContent += " The requested record is not available in this publication. Check the official source or clear other filters.";
             }
           }
           results.removeAttribute("aria-busy");
@@ -911,10 +796,12 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           exportButton.disabled = true;
           exportStatus.textContent = "Export is unavailable while search data is unavailable.";
           count.textContent = "Search partitions could not be loaded. The complete static register remains available.";
+          retry.hidden = false;
         }
       };
 
       controls.addEventListener("input", () => {
+        invalidateSearch();
         requestedRecordId = null;
         currentPage = 1;
         syncHashState();
@@ -928,6 +815,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         const control = filterControls.find((item) => item.name === name);
         if (!control) return;
         control.value = "";
+        invalidateSearch();
         requestedRecordId = null;
         currentPage = 1;
         syncHashState();
@@ -939,19 +827,27 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         const link = event.target.closest<HTMLAnchorElement>("a[data-filter-page]");
         if (!link || !results.contains(link)) return;
         event.preventDefault();
+        if (results.hasAttribute("aria-busy") || !filteredRecords.length) return;
         const page = Number.parseInt(link.dataset.filterPage ?? "1", 10);
         if (!Number.isFinite(page) || page < 1) return;
         currentPage = page;
         syncHashState("push");
         renderFilteredPage();
+        count.focus();
         document.querySelector<HTMLElement>("[data-result-count]")?.scrollIntoView({
           block: "start",
         });
       });
       window.addEventListener("hashchange", () => {
+        const restoreFocus = results.contains(document.activeElement);
+        invalidateSearch();
         applyHashState();
         syncHashState();
-        void render();
+        const rendering = render();
+        const focusVersion = renderVersion;
+        void rendering.then(() => {
+          if (restoreFocus && focusVersion === renderVersion) count.focus();
+        });
       });
       mobileFilters.addEventListener("change", () => {
         if (mobileFilters.matches && !advancedControls.some((control) => control.value)) {

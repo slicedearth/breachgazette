@@ -81,14 +81,19 @@ jobs:
       - name: Verify and promote an isolated candidate
         id: update_cycle
         continue-on-error: true
-        run: breachgazette update-cycle --data-root .private-production-data --promote --json
+        run: >-
+          breachgazette update-cycle --data-root .private-production-data --promote --json
+          --attempt-report "$RUNNER_TEMP/breachgazette-attempt.json"
       - name: Write sanitized operator summary
         if: always()
         continue-on-error: true
         run: |
+          if test -f "$RUNNER_TEMP/breachgazette-attempt.json"; then
+            breachgazette attempt-summary "$RUNNER_TEMP/breachgazette-attempt.json" >> "$GITHUB_STEP_SUMMARY"
+          fi
           if test "${{ steps.update_cycle.outcome }}" != "success"; then
             echo "## Breach Gazette source health" >> "$GITHUB_STEP_SUMMARY"
-            echo "The bounded update failed and no candidate state was promoted." >> "$GITHUB_STEP_SUMMARY"
+            echo "The bounded cycle failed. No private-state commit or publication is authorised; inspect the attempt phase and local state before retrying." >> "$GITHUB_STEP_SUMMARY"
           elif test -f .private-production-data/reports/source-health.json; then
             breachgazette source-health-summary \
               .private-production-data/reports/source-health.json \
@@ -102,7 +107,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: breachgazette-source-health
-          path: .private-production-data/reports/source-health.json
+          path: |
+            ${{ runner.temp }}/breachgazette-attempt.json
+            .private-production-data/reports/source-health.json
           if-no-files-found: warn
           retention-days: 14
       - name: Commit verified private state

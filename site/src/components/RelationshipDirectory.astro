@@ -67,7 +67,9 @@ const relationshipUrl = (candidateId: string) =>
             <ul>
               {relationship.reasons.map((reason) => (
                 <li>
-                  <strong>{label(reason.code)}:</strong> {reason.explanation}{" "}
+                  <strong>{reason.code === "compatible_occurrence_interval"
+                    ? "Identical source-backed date"
+                    : label(reason.code)}:</strong> {reason.explanation}{" "}
                   <span>Evidence: {reason.evidence.join("; ")}.</span>
                 </li>
               ))}

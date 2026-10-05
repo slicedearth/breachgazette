@@ -1,5 +1,11 @@
 # Data dictionary
 
+`local_last_observed_time` records the latest successful observation, including
+unchanged snapshots. `local_last_material_change_time` records a first
+observation or material correction under the current comparator. Older state
+may leave the latter null; it is not inferred from retrieval time. The Atom
+`updated` value currently remains observation-based for reader compatibility.
+
 | Contract | Meaning |
 | --- | --- |
 | `SourcePolicy` | Reviewed semantics, dated rights assessment, limits, and correction boundary |

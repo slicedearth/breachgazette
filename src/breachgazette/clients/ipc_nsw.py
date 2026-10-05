@@ -95,6 +95,8 @@ class NswPublicNotificationsAdapter:
         if len(tables) < 2:
             raise SourceClientError("NSW register did not expose current and expired tables")
         records: list[RecordProvenance] = []
+        discovered = 0
+        seen_ids: set[str] = set()
         for table_index, table in enumerate(tables[:2]):
             headers = [
                 normalize_text(header.get_text(" ", strip=True), maximum=200)
@@ -107,19 +109,25 @@ class NswPublicNotificationsAdapter:
                 raise SourceClientError("NSW public register column schema changed")
             state = "current" if table_index == 0 else "expired"
             for row in table.select("tbody tr"):
+                discovered += 1
+                if discovered > self.max_records:
+                    raise SourceClientError("NSW register exceeded its row bound")
                 cells = row.find_all("td", recursive=False)
                 if len(cells) < 3:
-                    continue
+                    raise SourceClientError("NSW register contained a malformed row")
                 publication_date = normalize_text(cells[0].get_text(" ", strip=True), maximum=300)
                 incident_date = normalize_text(cells[1].get_text(" ", strip=True), maximum=500)
                 agency = normalize_text(cells[2].get_text(" ", strip=True), maximum=500)
                 if not agency:
-                    continue
+                    raise SourceClientError("NSW register omitted an agency label")
                 detail_url: str | None = None
                 link = cells[3].find("a", href=True) if len(cells) >= 4 else None
                 if link is not None:
                     detail_url = sanitize_public_url(str(link["href"]))
                 record_id = f"nsw:{sha256_hex([publication_date, incident_date, agency])[:24]}"
+                if record_id in seen_ids:
+                    raise SourceClientError("NSW register contained a duplicate notification")
+                seen_ids.add(record_id)
                 records.append(
                     SourceNotificationRecord(
                         source_id=self.source_id,
@@ -167,7 +175,7 @@ class NswPublicNotificationsAdapter:
             revision=checksum[:16],
             checksum=checksum,
             completeness=Completeness.ROLLING_WINDOW,
-            discovered=len(records),
+            discovered=discovered,
             accepted=len(records),
             rejected=0,
             bounded_limit=self.max_records,
@@ -280,7 +288,7 @@ class NswAggregateAdapter:
         header = [normalize_text(str(cell or ""), maximum=100) for cell in table[0][3:8]]
         if tuple(header) != EXPECTED_SECTORS:
             raise SourceClientError("NSW sector table headers changed")
-        numeric_rows: list[list[str]] = []
+        numeric_rows: dict[str, list[str]] = {}
         for row in table[1:]:
             values = [normalize_text(str(cell or ""), maximum=100) for cell in row[3:8]]
             if (
@@ -288,14 +296,24 @@ class NswAggregateAdapter:
                 and len(values) == 5
                 and all(values)
             ):
-                numeric_rows.append(values)
+                metric = normalize_text(" ".join(str(cell or "") for cell in row[:3]), maximum=300)
+                if metric not in EXPECTED_TABLE_METRICS or metric in numeric_rows:
+                    raise SourceClientError("NSW sector table metric labels changed or duplicated")
+                expected_unit = "percent" if metric.startswith("Percent ") else "count"
+                for raw_cell in values:
+                    if raw_cell != "N/A" and _cell_value(raw_cell)[1] != expected_unit:
+                        raise SourceClientError("NSW sector table metric units changed")
+                numeric_rows[metric] = values
         if len(numeric_rows) != len(EXPECTED_TABLE_METRICS):
             raise SourceClientError("NSW sector table row layout changed")
 
         records: list[RecordProvenance] = []
-        for metric, values in zip(EXPECTED_TABLE_METRICS, numeric_rows, strict=True):
+        for metric in EXPECTED_TABLE_METRICS:
+            values = numeric_rows[metric]
             for sector, raw_value in zip(EXPECTED_SECTORS, values, strict=True):
                 value, unit, state = _cell_value(raw_value)
+                if state == ValueState.NOT_APPLICABLE:
+                    unit = "percent" if metric.startswith("Percent ") else "count"
                 record_id = f"nsw-sector:{sha256_hex([period_start, metric, sector])[:20]}"
                 records.append(
                     SourceAggregateRecord(

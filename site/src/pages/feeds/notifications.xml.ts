@@ -22,12 +22,7 @@ export const GET: APIRoute = ({ site }) => {
   ).toString();
   const homeUrl = new URL(import.meta.env.BASE_URL, site).toString();
   const entries = getAllNotifications().slice(0, 50).map((record) => {
-    const detailUrl = record.has_detail_page
-      ? new URL(
-          `${import.meta.env.BASE_URL}notifications/${encodeURIComponent(record.source_record_id)}/`,
-          site,
-        ).toString()
-      : new URL(
+    const detailUrl = new URL(
           `${import.meta.env.BASE_URL}latest/#query=${encodeURIComponent(record.source_record_id)}&record=${encodeURIComponent(record.source_record_id)}`,
           site,
         ).toString();

@@ -20,7 +20,7 @@ from breachgazette.monitoring import (
     load_monitoring_catalogue,
     write_source_health_report,
 )
-from breachgazette.operations import run_update_cycle, source_health_summary
+from breachgazette.operations import attempt_summary, run_update_cycle, source_health_summary
 from breachgazette.pipeline import (
     ADAPTERS,
     compare_summary,
@@ -276,6 +276,7 @@ def update_cycle_command(
     data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
     source: Annotated[list[str] | None, typer.Option("--source")] = None,
     promote: Annotated[bool, typer.Option("--promote")] = False,
+    attempt_report: Annotated[Path | None, typer.Option("--attempt-report")] = None,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     _emit(
@@ -283,9 +284,15 @@ def update_cycle_command(
             data_root=_data_root(data_root),
             sources=source,
             promote=promote,
+            attempt_report=attempt_report,
         ),
         json_output=json_output,
     )
+
+
+@app.command("attempt-summary")
+def attempt_summary_command(report: Annotated[Path, typer.Argument(exists=True)]) -> None:
+    typer.echo(attempt_summary(report), nl=False)
 
 
 @app.command("ingest-fixture")
