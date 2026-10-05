@@ -103,11 +103,13 @@ def run(command: list[str], *, environment: dict[str, str] | None = None) -> str
 
 
 def frozen_requirements(python: Path, *, environment: dict[str, str] | None = None) -> str:
+    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    project_name = configuration["project"]["name"]
     command_environment = (environment or os.environ).copy()
     command_environment.setdefault("PIP_DISABLE_PIP_VERSION_CHECK", "1")
     command_environment.setdefault("PIP_NO_CACHE_DIR", "1")
     output = run(
-        [str(python), "-m", "pip", "freeze", "--exclude-editable"],
+        [str(python), "-m", "pip", "freeze", "--exclude-editable", "--exclude", project_name],
         environment=command_environment,
     )
     pins = parse_requirements(output.splitlines(), source="installed environment")
