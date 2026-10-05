@@ -213,6 +213,8 @@ class OaicNdbAdapter:
         dataset: dict[str, Any],
         content: bytes,
         observed_at: datetime,
+        *,
+        identity_rows: dict[tuple[str, int], str] | None = None,
     ) -> AdapterResult:
         if tuple(workbook.sheetnames) != EXPECTED_SHEETS:
             raise SourceClientError("OAIC workbook sheet schema changed")
@@ -220,6 +222,8 @@ class OaicNdbAdapter:
         checksum = sha256_hex(content)
         revision = f"{resource.get('id')}:{dataset.get('metadata_modified')}"
         records: list[RecordProvenance] = []
+        by_identity: dict[str, SourceAggregateRecord] = {}
+        repeated_cells = 0
         source_notes = [
             "Data are based on information self-reported by notifying entities.",
             "Statistics may be revised.",
@@ -281,53 +285,67 @@ class OaicNdbAdapter:
                     unit=unit,
                     population_scope=population_scope,
                 )
-                if any(record.source_record_id == source_record_id for record in records):
-                    raise SourceClientError("OAIC workbook contained duplicate semantic metrics")
-                if len(records) >= self.max_records:
+                if len(records) + repeated_cells >= self.max_records:
                     raise SourceClientError("OAIC metric count exceeded its bound")
-                records.append(
-                    SourceAggregateRecord(
-                        source_id=self.source_id,
-                        source_record_id=source_record_id,
-                        source_url=DATASET_URL,
-                        source_revision=revision,
-                        source_checksum=checksum,
-                        source_completeness=Completeness.COMPLETE,
-                        source_retrieval_time=observed_at,
-                        local_first_observed_time=observed_at,
-                        local_last_observed_time=observed_at,
-                        parser_version=self.adapter_version,
-                        normalization_version=self.normalization_version,
-                        limitations=["Aggregate metrics do not identify notifying organizations."],
-                        regulator="Office of the Australian Information Commissioner",
-                        reporting_scheme="Notifiable Data Breaches scheme",
-                        publication_level=PublicationLevel.NATIONAL_AGGREGATE,
-                        reporting_period_start=period_start,
-                        reporting_period_end=period_end,
-                        dimension=dimension,
-                        category=label,
-                        parent_category=parent,
-                        value=ObservedValue(
-                            value=value,
-                            origin=ValueOrigin.SOURCE_OBSERVED,
-                            state=rounding,
-                            source_label=str(value_raw),
-                        ),
-                        unit=unit,
-                        population_scope=population_scope,
-                        rounding_state=rounding,
-                        source_notes=source_notes,
-                    )
+                record = SourceAggregateRecord(
+                    source_id=self.source_id,
+                    source_record_id=source_record_id,
+                    source_url=DATASET_URL,
+                    source_revision=revision,
+                    source_checksum=checksum,
+                    source_completeness=Completeness.COMPLETE,
+                    source_retrieval_time=observed_at,
+                    local_first_observed_time=observed_at,
+                    local_last_observed_time=observed_at,
+                    parser_version=self.adapter_version,
+                    normalization_version=self.normalization_version,
+                    limitations=["Aggregate metrics do not identify notifying organizations."],
+                    regulator="Office of the Australian Information Commissioner",
+                    reporting_scheme="Notifiable Data Breaches scheme",
+                    publication_level=PublicationLevel.NATIONAL_AGGREGATE,
+                    reporting_period_start=period_start,
+                    reporting_period_end=period_end,
+                    dimension=dimension,
+                    category=label,
+                    parent_category=parent,
+                    value=ObservedValue(
+                        value=value,
+                        origin=ValueOrigin.SOURCE_OBSERVED,
+                        state=rounding,
+                        source_label=str(value_raw),
+                    ),
+                    unit=unit,
+                    population_scope=population_scope,
+                    rounding_state=rounding,
+                    source_notes=source_notes,
                 )
+                previous = by_identity.get(source_record_id)
+                if previous is not None:
+                    if worksheet.title != "Source of breach" or previous != record:
+                        raise SourceClientError(
+                            "OAIC workbook contained duplicate semantic metrics"
+                        )
+                    repeated_cells += 1
+                else:
+                    by_identity[source_record_id] = record
+                    records.append(record)
+                if identity_rows is not None:
+                    identity_rows[(worksheet.title, row_number)] = source_record_id
         if not records or len(records) > self.max_records:
             raise SourceClientError("OAIC metric count was empty or exceeded its bound")
+        if repeated_cells:
+            source_notes = [
+                *source_notes,
+                f"Reconciled {repeated_cells} exact repeated source-of-breach cells; "
+                "conflicting repeated values are not accepted.",
+            ]
         snapshot = source_snapshot(
             source_id=self.source_id,
             retrieved_at=observed_at,
             revision=revision,
             checksum=checksum,
             completeness=Completeness.COMPLETE,
-            discovered=len(records),
+            discovered=len(records) + repeated_cells,
             accepted=len(records),
             rejected=0,
             bounded_limit=self.max_records,

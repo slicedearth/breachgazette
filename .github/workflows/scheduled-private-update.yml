@@ -124,7 +124,10 @@ jobs:
           if git diff --cached --quiet; then
             echo "No private state changes to commit."
           else
-            git commit -m "Update verified Breach Gazette source state"
+            git commit \
+              -m "Update verified source state" \
+              -m "Persist the complete candidate generation only after collection, monitoring, publication quality and privacy checks have passed." \
+              -m "Retain observations, snapshots, checkpoints, history and reviewed identity bridges together. Exclude public source files and temporary publication output."
             git push origin HEAD
           fi
       - name: Resolve promoted private-state revision

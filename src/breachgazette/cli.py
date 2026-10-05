@@ -450,9 +450,12 @@ def plan_oaic_migration_command(
     output: Annotated[Path, typer.Option("--output")],
     data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
     json_output: Annotated[bool, typer.Option("--json")] = False,
+    workbook: Annotated[Path | None, typer.Option("--workbook")] = None,
 ) -> None:
     try:
-        result = plan_oaic_migration(data_root=_data_root(data_root), output=output)
+        result = plan_oaic_migration(
+            data_root=_data_root(data_root), output=output, workbook=workbook
+        )
     except (OSError, ValueError, RuntimeError):
         _emit({"passed": False, "error": "identity_plan_failed"}, json_output=json_output)
         raise typer.Exit(code=2) from None
@@ -467,6 +470,7 @@ def migrate_oaic_identities_command(
     expected_backup_sha256: Annotated[str | None, typer.Option("--expected-backup-sha256")] = None,
     apply: Annotated[bool, typer.Option("--apply")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
+    workbook: Annotated[Path | None, typer.Option("--workbook")] = None,
 ) -> None:
     try:
         result = migrate_oaic_identities(
@@ -475,6 +479,7 @@ def migrate_oaic_identities_command(
             backup=backup,
             expected_backup_sha256=expected_backup_sha256,
             apply=apply,
+            workbook=workbook,
         )
     except (OSError, ValueError, RuntimeError):
         _emit({"passed": False, "error": "identity_transition_failed"}, json_output=json_output)

@@ -1,5 +1,13 @@
 # Data dictionary
 
+Aggregate metric identity includes reporting period, dimension, category,
+parent category, unit and population scope. Sector totals are headings for their
+cause breakdowns. Exact repeated source-of-breach cells may resolve to one
+metric only when all fields agree; they are recorded in snapshot notes and
+discovery counts. Different values or scopes are never consolidated. A private
+reviewed identity bridge preserves every legacy ID. Historical events remain
+unchanged in the private event store.
+
 `local_last_observed_time` records the latest successful observation, including
 unchanged snapshots. `local_last_material_change_time` records a first
 observation or material correction under the current comparator. Older state

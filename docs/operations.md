@@ -70,6 +70,16 @@ with `approved: false`. Review the mapping against official reporting periods
 and scopes on a disposable copy. Do not replace IDs solely to bypass an update
 failure. Keep the mapping private and mark `approved: true` only after review.
 
+When legacy sector context is missing or an exact source-of-breach cell is
+repeated, provide the checksum-matched original workbook with `--workbook`
+to both commands and to the application command below. This creates a version
+1.1 evidence plan. The workbook remains private, outside both state and source
+roots; it is re-read and verified during every dry run and application. Row
+coordinates are used only to verify old IDs against that exact evidence, never
+as new metric identities. All legacy rows must be covered. Only missing sector
+parents can be restored; other field changes, incomplete evidence, conflicting
+repetitions or repetitions with different observation provenance are rejected.
+
 Create an independent backup of that same generation using `backup-state`.
 Retain its checksum separately. Only an explicitly authorised operator should
 apply the reviewed transition:
@@ -86,11 +96,22 @@ apply the reviewed transition:
 Application acquires the single-writer lock, checks that the reviewed generation
 has not changed, restores and verifies the complete backup in a temporary
 directory, and stages the transition before promotion. It preserves observation
-times, source snapshots, dataset class, repository metadata and historical event
-bytes. The private `reviews/oaic-identity-bridge.json` retains the approved
+times, dataset class, repository metadata and historical event bytes.
+Identity-only transitions also preserve source snapshots byte for byte.
+The private `reviews/oaic-identity-bridge.json` retains the approved
 old-to-new mapping and backup checksum. A changed generation, unapproved or
 modified mapping, stale backup, repeated application or staging failure is
 rejected. No migration is performed by an update or publication command.
+
+For a reviewed exact repetition, every old ID remains in the private bridge,
+while one representative retains the original metric fields and observation
+times. The current snapshot's accepted count is corrected to the unique metric
+count without changing retrieval, completion, freshness, revision or source
+checksum. Its complete original snapshot is retained in the bridge and verified
+backup. Historical events are never removed or rewritten. Ordinary collection
+also reconciles only fully identical repeated cells in the source-of-breach
+sheet, records the repetition in snapshot notes and discovery counts, and stops
+on any conflicting duplicate. This is not incident deduplication.
 
 The monitoring catalogue also enforces a reviewed minimum record count,
 minimum retained fraction, maximum growth factor, and 240-hour freshness
@@ -227,6 +248,25 @@ contains only source ID, status, count, and overall result. GitHub’s normal
 failed-run notification is the default operator alert.
 
 ## Publication
+
+### Coordinated normalisation cutover
+
+An identity version boundary needs an explicitly authorised cutover, not just
+a source-code push. Pause the scheduled-update flag before switching either
+production input. Push the source review branch and require its complete hosted
+CI, including both analysis languages, before merging the protected production
+branch. Old private state will fail closed under the new publication gate.
+
+With the approved source revision active, re-check that the reviewed private
+generation still matches its plan and backup. Persist the verified private
+transition without force-pushing or overwriting a newer generation. Publish its
+exact private commit only after the matching source revision has passed CI.
+Verify the deployed publication identity and response headers, then re-enable
+the schedule. A failed gate leaves publication and automatic updates paused;
+never relax a gate to complete the cutover. All remote steps require operator
+approval. A local rehearsal is not an authoritative migration or deployment.
+
+### Offline publication checks
 
 Run the offline preflight before preparing a release:
 

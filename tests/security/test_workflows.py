@@ -67,6 +67,12 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
         "Fail incomplete update after preserving health report"
     )
     assert "git push origin HEAD" in workflow
+    assert '-m "Update verified source state"' in workflow
+    assert "Persist the complete candidate generation only after collection" in workflow
+    assert (
+        "Retain observations, snapshots, checkpoints, history and reviewed identity bridges"
+        in workflow
+    )
     assert workflow.index("Verify and promote an isolated candidate") < workflow.index(
         "git push origin HEAD"
     )
