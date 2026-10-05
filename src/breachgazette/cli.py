@@ -36,6 +36,11 @@ from breachgazette.relationships import (
     load_relationship_catalogue,
     relationship_decision_id,
 )
+from breachgazette.release import (
+    deployment_preflight,
+    migrate_oaic_identities,
+    plan_oaic_migration,
+)
 from breachgazette.retention import (
     compact_state,
     create_state_backup,
@@ -427,6 +432,54 @@ def state_inventory_command(
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     _emit(state_inventory(_data_root(data_root)), json_output=json_output)
+
+
+@app.command("deployment-preflight")
+def deployment_preflight_command(
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    report = deployment_preflight(data_root=_data_root(data_root))
+    _emit(report, json_output=json_output)
+    if not report["passed"]:
+        raise typer.Exit(code=2)
+
+
+@app.command("plan-oaic-migration")
+def plan_oaic_migration_command(
+    output: Annotated[Path, typer.Option("--output")],
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    try:
+        result = plan_oaic_migration(data_root=_data_root(data_root), output=output)
+    except (OSError, ValueError, RuntimeError):
+        _emit({"passed": False, "error": "identity_plan_failed"}, json_output=json_output)
+        raise typer.Exit(code=2) from None
+    _emit(result, json_output=json_output)
+
+
+@app.command("migrate-oaic-identities")
+def migrate_oaic_identities_command(
+    plan: Annotated[Path, typer.Option("--plan")],
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    backup: Annotated[Path | None, typer.Option("--backup")] = None,
+    expected_backup_sha256: Annotated[str | None, typer.Option("--expected-backup-sha256")] = None,
+    apply: Annotated[bool, typer.Option("--apply")] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    try:
+        result = migrate_oaic_identities(
+            data_root=_data_root(data_root),
+            plan_path=plan,
+            backup=backup,
+            expected_backup_sha256=expected_backup_sha256,
+            apply=apply,
+        )
+    except (OSError, ValueError, RuntimeError):
+        _emit({"passed": False, "error": "identity_transition_failed"}, json_output=json_output)
+        raise typer.Exit(code=2) from None
+    _emit(result, json_output=json_output)
 
 
 @app.command("compact-state")

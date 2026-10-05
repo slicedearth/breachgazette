@@ -177,6 +177,12 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert 'echo "source_revision=$source_revision" >> "$GITHUB_OUTPUT"' in workflow
     assert "npm run build:budget" in workflow
     assert "breachgazette audit-public-tree dist --json" in workflow
+    assert (
+        "breachgazette deployment-preflight --data-root .private-production-data --json" in workflow
+    )
+    assert workflow.index("Verify offline production-state compatibility") < workflow.index(
+        "Generate privacy-minimised real publication"
+    )
     assert "netlify-cli" not in workflow
     assert 'zip -q -r -X -D "$RUNNER_TEMP/breachgazette-site.zip" .' in workflow
     assert "Content-Type: application/zip" in workflow

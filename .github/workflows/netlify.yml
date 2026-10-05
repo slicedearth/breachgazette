@@ -146,6 +146,8 @@ jobs:
           python -m pip install -r requirements.lock
           python -m pip install --no-deps --no-build-isolation -e .
           npm ci --ignore-scripts --no-audit --prefix site
+      - name: Verify offline production-state compatibility
+        run: breachgazette deployment-preflight --data-root .private-production-data --json
       - name: Generate privacy-minimised real publication
         id: publication
         env:

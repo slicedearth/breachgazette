@@ -3,8 +3,10 @@
 `local_last_observed_time` records the latest successful observation, including
 unchanged snapshots. `local_last_material_change_time` records a first
 observation or material correction under the current comparator. Older state
-may leave the latter null; it is not inferred from retrieval time. The Atom
-`updated` value currently remains observation-based for reader compatibility.
+may leave the latter null; it is not inferred from retrieval time. Atom entry
+`updated` values use the material-change time when known. Legacy records with
+no known material-change time retain their observation-based timestamp; the
+feed does not invent a historical correction date.
 
 | Contract | Meaning |
 | --- | --- |

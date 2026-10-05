@@ -217,6 +217,13 @@ disabled until the schedule variable is deliberately enabled.
 
 ## Production static build
 
+Use `breachgazette deployment-preflight --data-root /absolute/private/state --json`
+to check offline state compatibility and publication gates without retrieving
+sources or promoting state. Legacy OAIC identity transitions require a private,
+reviewed mapping and a restore-verified backup. See [operations](docs/operations.md)
+for the dry-run and explicit application commands. Passing this preflight does
+not establish hosted CI, provider configuration or deployment readiness.
+
 Generate temporary real publication data, then point Astro at it:
 
 ```bash

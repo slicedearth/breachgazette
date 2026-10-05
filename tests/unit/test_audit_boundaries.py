@@ -473,6 +473,38 @@ def test_oaic_metric_ids_are_semantic_not_values_or_offsets() -> None:
     )
 
 
+def test_numeric_sector_totals_preserve_child_scope_when_blocks_move() -> None:
+    def content(reverse=False):
+        workbook = Workbook()
+        workbook.remove(workbook.active)
+        for name in EXPECTED_SHEETS:
+            workbook.create_sheet(name).append(["Heading", None])
+        blocks = [
+            [["Synthetic sector A", 30], ["Human error", 10], ["System fault", 20]],
+            [["Synthetic sector B", 40], ["Human error", 10], ["System fault", 30]],
+        ]
+        for block in reversed(blocks) if reverse else blocks:
+            for row in block:
+                workbook["Top 5 sectors by source"].append(row)
+        output = BytesIO()
+        workbook.save(output)
+        workbook.close()
+        return output.getvalue()
+
+    before = _oaic_result(content()).records
+    after = _oaic_result(content(True)).records
+    assert len(before) == 6
+    assert {record.source_record_id for record in before} == {
+        record.source_record_id for record in after
+    }
+    children = [record for record in before if record.category == "Human error"]
+    assert {record.parent_category for record in children} == {
+        "Synthetic sector A",
+        "Synthetic sector B",
+    }
+    assert len({record.source_record_id for record in children}) == 2
+
+
 def test_oaic_migration_mapping_is_deterministic_and_non_mutating() -> None:
     current = _oaic_result(_oaic_content()).records[0]
     legacy = current.model_copy(deep=True)

@@ -261,6 +261,11 @@ class OaicNdbAdapter:
                     current_parent = label
                     dimension = "source_of_breach"
                     parent = None
+                elif worksheet.title == "Top 5 sectors by source" and label not in ROOT_CAUSES:
+                    # Sector headings publish their totals in the same numeric column.
+                    current_parent = label
+                    dimension = "top_5_sectors_by_source"
+                    parent = None
                 else:
                     dimension = re.sub(r"[^a-z0-9]+", "_", worksheet.title.casefold()).strip("_")
                     parent = current_parent

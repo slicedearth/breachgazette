@@ -51,11 +51,46 @@ public recovery history includes only retained health observations, not every
 failed or discarded attempt.
 
 OAIC semantic metric IDs use normalization version 2.0. Existing 1.0 state is
-blocked from update until its mapping is reviewed. Prepare an offline mapping
-with `plan_identity_migration` against a disposable copy, reject duplicate
-semantic metrics, preserve first-observed times, and retain old-to-new mappings
-and event identities. Verify an independent backup before any real migration.
-No migration is performed by an update or publication command.
+blocked from update and unattended publication until its mapping is reviewed.
+Prepare a private draft outside both the authoritative state root and source
+checkout:
+
+```bash
+.venv/bin/breachgazette plan-oaic-migration \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" \
+  --output /secure/path/oaic-identity-plan.json --json
+.venv/bin/breachgazette migrate-oaic-identities \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" \
+  --plan /secure/path/oaic-identity-plan.json --json
+```
+
+Both commands leave source state unchanged. The draft rejects ambiguous
+semantic metrics, records an exact fingerprint of all managed state, and starts
+with `approved: false`. Review the mapping against official reporting periods
+and scopes on a disposable copy. Do not replace IDs solely to bypass an update
+failure. Keep the mapping private and mark `approved: true` only after review.
+
+Create an independent backup of that same generation using `backup-state`.
+Retain its checksum separately. Only an explicitly authorised operator should
+apply the reviewed transition:
+
+```bash
+.venv/bin/breachgazette migrate-oaic-identities \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" \
+  --plan /secure/path/oaic-identity-plan.json \
+  --backup /secure/path/breachgazette-state.zip \
+  --expected-backup-sha256 "<checksum_sha256 from backup-state>" \
+  --apply --json
+```
+
+Application acquires the single-writer lock, checks that the reviewed generation
+has not changed, restores and verifies the complete backup in a temporary
+directory, and stages the transition before promotion. It preserves observation
+times, source snapshots, dataset class, repository metadata and historical event
+bytes. The private `reviews/oaic-identity-bridge.json` retains the approved
+old-to-new mapping and backup checksum. A changed generation, unapproved or
+modified mapping, stale backup, repeated application or staging failure is
+rejected. No migration is performed by an update or publication command.
 
 The monitoring catalogue also enforces a reviewed minimum record count,
 minimum retained fraction, maximum growth factor, and 240-hour freshness
@@ -192,6 +227,29 @@ contains only source ID, status, count, and overall result. GitHub’s normal
 failed-run notification is the default operator alert.
 
 ## Publication
+
+Run the offline preflight before preparing a release:
+
+```bash
+.venv/bin/breachgazette deployment-preflight \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" --json
+```
+
+This reads state without fetching sources or promoting a generation. It checks
+source rights and monitoring policy, state bounds, current OAIC identities,
+real-data classification, freshness, and a temporary publication's quality,
+privacy and public-tree gates. It rejects fixture state and concurrent changes.
+Reports contain check names and outcomes, not source records or exception text.
+Temporary publication data is removed when the check finishes. The dedicated
+temporary private checkout used by the publication workflow is read-only for
+this command; migration tooling still refuses state inside the source checkout.
+
+A preflight pass applies only to the inspected private-state generation. It is
+not a substitute for hosted CI and both analysis languages at the exact source
+revision, a complete static-site build, provider configuration review or live
+post-deployment verification. Unattended publication runs this preflight before
+building its real output. Legacy identity state fails closed rather than being
+silently rewritten during deployment.
 
 ```bash
 publication_dir="$(mktemp -d /tmp/breachgazette-publication.XXXXXX)"
