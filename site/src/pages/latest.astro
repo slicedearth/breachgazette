@@ -722,6 +722,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           results.replaceChildren(
             ...[...initialResults.childNodes].map((node) => node.cloneNode(true)),
           );
+          results.removeAttribute("aria-busy");
           count.textContent = "Source date from must be on or before source date to.";
           return;
         }

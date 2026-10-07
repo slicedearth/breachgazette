@@ -6,6 +6,7 @@ import {
   normalizeSearch,
   matchesPartition,
   matchesRecord,
+  queryMayMatch,
 } from "../src/lib/search";
 import { csvCell, notificationCsv } from "../src/lib/searchExport";
 
@@ -20,6 +21,84 @@ const golden = JSON.parse(
     partitions: Record<string, SearchPartition>;
   };
 };
+
+test("supplementary code points enter Bloom routing rather than the short-query fallback", () => {
+  const query = "𐐨ex";
+  expect(Array.from(normalizeSearch(query))).toHaveLength(3);
+  const partition = golden.manifest.partitions.find((item) =>
+    golden.partitions[item.asset]!.records.some((record) => matchesRecord(record, { query })),
+  )!;
+  expect(partition).toBeDefined();
+  expect(queryMayMatch(partition, query, golden.manifest)).toBe(true);
+  expect(queryMayMatch(
+    { ...partition, query_bloom: "00".repeat(golden.manifest.query_routing.bits / 8) },
+    query,
+    golden.manifest,
+  )).toBe(false);
+});
+
+for (const entry of ["input", "hash"] as const) {
+  test(`invalid dates settle busy state after ${entry} navigation without settling newer work`, async ({ page }) => {
+    const gates = [0, 1].map(() => {
+      let started!: () => void;
+      let release!: () => void;
+      let finished!: () => void;
+      return {
+        requested: new Promise<void>((resolve) => { started = resolve; }),
+        held: new Promise<void>((resolve) => { release = resolve; }),
+        done: new Promise<void>((resolve) => { finished = resolve; }),
+        start: () => started(), unlock: () => release(), finish: () => finished(),
+      };
+    });
+    await page.route("**/data/notifications/manifest.json", (route) =>
+      route.fulfill({ json: golden.manifest }),
+    );
+    await page.route(/\/data\/notifications\/fixture-.*\.json$/, async (route) => {
+      const asset = new URL(route.request().url()).pathname.split("/").at(-1)!.slice(0, -5);
+      const partition = golden.partitions[asset]!;
+      const index = Number(partition.records[0]!.source_record_id.split("-").at(-1));
+      const gate = index < 2 ? gates[index]! : undefined;
+      if (gate) { gate.start(); await gate.held; }
+      try { await route.fulfill({ json: partition }); }
+      catch { /* The invalid date render has deliberately aborted superseded fetches. */ }
+      finally { gate?.finish(); }
+    });
+    try {
+      await page.goto("/latest/#query=STRASSE");
+      await gates[0]!.requested;
+      const results = page.locator("[data-results]");
+      await expect(results).toHaveAttribute("aria-busy", "true");
+      if (entry === "input") {
+        await page.locator('[name="date_from"]').fill("2026-02-01");
+        await page.locator('[name="date_to"]').fill("2026-01-01");
+      } else {
+        await page.evaluate(() => {
+          location.hash = "query=STRASSE&date_from=2026-02-01&date_to=2026-01-01";
+        });
+      }
+      await expect(page.locator("[data-result-count]")).toHaveText(
+        "Source date from must be on or before source date to.",
+      );
+      await expect(page.locator("[data-export-results]")).toBeDisabled();
+      await expect(results).not.toHaveAttribute("aria-busy", "true");
+      await expect(results.getByRole("navigation", { name: "Notification pages above results" })).toBeVisible();
+      await expect(results.locator(".directory-summary")).toContainText("complete published register");
+      await page.evaluate(() => {
+        location.hash = "query=%C4%B0STANBUL&date_from=2025-12-01&date_to=2026-01-31";
+      });
+      await gates[1]!.requested;
+      await expect(results).toHaveAttribute("aria-busy", "true");
+      gates[0]!.unlock();
+      await gates[0]!.done;
+      await expect(results).toHaveAttribute("aria-busy", "true");
+      gates[1]!.unlock();
+      await expect(page.locator("[data-result-count]")).toContainText("1 matching source records");
+      await expect(results).toContainText("İstanbul Example");
+      await expect(results).not.toHaveAttribute("aria-busy", "true");
+      await expect(page.locator("[data-export-results]")).toBeEnabled();
+    } finally { for (const gate of gates) gate.unlock(); }
+  });
+}
 
 test("export retains its field allowlist and neutralises formula prefixes", () => {
   expect(csvCell("=SUM(A1)")).toBe('"\'=SUM(A1)"');

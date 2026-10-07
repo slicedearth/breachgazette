@@ -16,7 +16,7 @@ names = [
     "İstanbul Example",
     "CAFÉ Example",
     "Cafe\u0301 Example",
-    "𐐀 Example",
+    "𐐀ex Example",
     "Whitespace\u2003Example",
     "Example One",
     "Example Two",
@@ -68,7 +68,7 @@ builder.SEARCH_PARTITION_SIZE = 1  # Exercise cold and out-of-order partitions i
 manifest, partitions = _build_search_assets(
     records, detail_ids=set(), generated_at=datetime(2026, 1, 15, tzinfo=UTC)
 )
-queries = ["STRASSE", "İSTANBUL", "CAFÉ", "CAFE\u0301", "𐐨", "Whitespace\u0085Example"]
+queries = ["STRASSE", "İSTANBUL", "CAFÉ", "CAFE\u0301", "𐐨", "𐐨ex", "Whitespace\u0085Example"]
 aged_records = [records[0].model_copy(deep=True)]
 for index in range(251):
     newer = records[0].model_copy(deep=True)
