@@ -121,6 +121,13 @@ def oaic_metric_id(
 
 def plan_identity_migration(records: list[SourceAggregateRecord]) -> dict[str, str]:
     """Produce a reviewable mapping only. Never rewrite IDs, events or observations."""
+    sectors = {
+        record.category
+        for record in records
+        if record.source_record_id.rsplit(":", 2)[0] == "Top 5 sectors by source"
+        and record.category not in ROOT_CAUSES
+        and record.parent_category is None
+    }
     mapping: dict[str, str] = {}
     for record in records:
         sheet = record.source_record_id.split(":", 1)[0]
@@ -130,6 +137,11 @@ def plan_identity_migration(records: list[SourceAggregateRecord]) -> dict[str, s
             or sheet not in EXPECTED_SHEETS[1:]
         ):
             raise ValueError("migration requires reviewed legacy OAIC metrics")
+        if sheet == "Top 5 sectors by source" and (
+            (record.category in ROOT_CAUSES and record.parent_category not in sectors)
+            or (record.category not in ROOT_CAUSES and record.parent_category is not None)
+        ):
+            raise ValueError("legacy sector context requires checksum-matched workbook evidence")
         new_id = oaic_metric_id(
             sheet=sheet,
             period_start=record.reporting_period_start,
