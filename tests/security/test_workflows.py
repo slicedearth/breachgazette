@@ -129,7 +129,16 @@ def test_ci_covers_private_catalogue_contracts_and_all_browser_engines() -> None
         browser_job,
     )
     assert "ruff check --select S src" in workflow
+    assert "npm run test:build-budget" in verify_job
     assert "python scripts/lock_python.py --check-installed" in workflow
+    assert "Verify non-editable installed resources" in verify_job
+    assert "python -m pip wheel --no-deps --no-build-isolation" in verify_job
+    assert '"$smoke_dir/venv/bin/python" -m pip install --no-deps "${wheels[0]}"' in verify_job
+    assert 'cd "$smoke_dir"' in verify_job
+    assert (
+        "venv/bin/python smoke_installed.py synthetic-notifications.json synthetic-publication.json"
+        in verify_job
+    )
     assert "tests/fixtures/reviews/organization-aliases.yml" in workflow
     assert "tests/fixtures/reviews/relationship-decisions.yml" in workflow
     assert "playwright install" not in workflow

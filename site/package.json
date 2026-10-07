@@ -17,7 +17,8 @@
     "check:test": "BREACHGAZETTE_TEST_BUILD=1 BREACHGAZETTE_SITE_DATA_DIR=../tests/fixtures/site astro check",
     "preview": "astro preview",
     "test:e2e": "playwright test --project=chromium",
-    "test:e2e:ci": "playwright test"
+    "test:e2e:ci": "playwright test",
+    "test:build-budget": "node --test scripts/tests/build-budget.test.mjs"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",

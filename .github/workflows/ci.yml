@@ -45,6 +45,24 @@ jobs:
           breachgazette validate-relationships \
             --catalogue tests/fixtures/reviews/relationship-decisions.yml --json
           pip-audit -r requirements.lock
+      - name: Verify non-editable installed resources
+        run: |
+          wheel_dir="$RUNNER_TEMP/installed-wheel"
+          smoke_dir="$RUNNER_TEMP/installed-smoke"
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir "$wheel_dir" .
+          python -m venv "$smoke_dir/venv"
+          "$smoke_dir/venv/bin/python" -m pip install -r requirements.lock
+          wheels=("$wheel_dir"/*.whl)
+          test "${#wheels[@]}" -eq 1
+          "$smoke_dir/venv/bin/python" -m pip install --no-deps "${wheels[0]}"
+          "$smoke_dir/venv/bin/python" -m pip check
+          cp scripts/smoke_installed.py "$smoke_dir/smoke_installed.py"
+          cp tests/fixtures/site/notifications.json "$smoke_dir/synthetic-notifications.json"
+          cp tests/fixtures/site/publication.json "$smoke_dir/synthetic-publication.json"
+          (
+            cd "$smoke_dir"
+            venv/bin/python smoke_installed.py synthetic-notifications.json synthetic-publication.json
+          )
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -65,6 +83,7 @@ jobs:
         working-directory: site
         run: |
           npm run check:test
+          npm run test:build-budget
           npm audit --audit-level=high
           npm run build:test
           breachgazette audit-public-tree dist --json
