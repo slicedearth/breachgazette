@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from io import BytesIO
@@ -11,6 +12,7 @@ from zipfile import BadZipFile, ZipFile
 
 from defusedxml.ElementTree import iterparse  # type: ignore[import-untyped]
 from openpyxl import load_workbook
+from openpyxl.utils.cell import range_boundaries
 
 from breachgazette.clients.base import SourceClientError
 
@@ -68,25 +70,54 @@ def bounded_workbook(
                 continue
             with archive.open(name) as stream:
                 rows = 0
+                actual_row = actual_column = 0
+                declared: tuple[int, int, int, int] | None = None
                 for _, element in iterparse(stream, events=("end",)):
                     tag = element.tag.rsplit("}", 1)[-1]
-                    if tag == "row":
+                    if tag == "dimension":
+                        reference = element.get("ref", "")
+                        if declared is not None or not reference or len(reference) > 32:
+                            raise SourceClientError("workbook dimensions were invalid")
+                        try:
+                            declared = range_boundaries(reference)
+                        except ValueError as error:
+                            raise SourceClientError("workbook dimensions were invalid") from error
+                        if (
+                            any(value is None or value < 1 for value in declared)
+                            or declared[0] > declared[2]
+                            or declared[1] > declared[3]
+                            or declared[2] > max_columns
+                            or declared[3] > max_rows
+                        ):
+                            raise SourceClientError("workbook dimensions exceeded reviewed bounds")
+                    elif tag == "row":
                         rows += 1
-                        if rows > max_rows or int(element.get("r", rows)) > max_rows:
+                        index = element.get("r", str(rows))
+                        if not index.isdigit() or len(index) > 7 or int(index) < 1:
+                            raise SourceClientError("workbook row coordinate was invalid")
+                        actual_row = max(actual_row, int(index))
+                        if rows > max_rows or actual_row > max_rows:
                             raise SourceClientError("workbook rows exceeded their reviewed bound")
                     elif tag == "c":
                         coordinate = element.get("r", "")
-                        letters = coordinate.rstrip("0123456789")
+                        match = re.fullmatch(r"([A-Z]{1,3})([1-9][0-9]{0,6})", coordinate)
+                        if match is None:
+                            raise SourceClientError("workbook cell coordinate was invalid")
+                        letters, row = match.groups()
                         column = 0
                         for letter in letters:
-                            if not "A" <= letter <= "Z":
-                                raise SourceClientError("workbook cell coordinate was invalid")
                             column = column * 26 + ord(letter) - ord("A") + 1
+                        actual_row = max(actual_row, int(row))
+                        actual_column = max(actual_column, column)
+                        if actual_row > max_rows:
+                            raise SourceClientError("workbook rows exceeded their reviewed bound")
                         if column > max_columns:
                             raise SourceClientError(
                                 "workbook columns exceeded their reviewed bound"
                             )
                     element.clear()
+                if declared is None or actual_row > declared[3] or actual_column > declared[2]:
+                    raise SourceClientError("workbook dimensions truncated observed XML extents")
     workbook = load_workbook(BytesIO(content), read_only=True, data_only=True, keep_links=False)
     try:
         for sheet in workbook.worksheets:
