@@ -98,6 +98,10 @@ has not changed, restores and verifies the complete backup in a temporary
 directory, and stages the transition before promotion. It preserves observation
 times, dataset class, repository metadata and historical event bytes.
 Identity-only transitions also preserve source snapshots byte for byte.
+Plain identity-only plans reject missing or unreconciled sector context in the
+Top 5 metrics, including previously prepared plans. Those records require the
+checksum-matched workbook route; persisted row order is never used to guess a
+sector. Nonempty conflicting context remains rejected rather than silently repaired.
 The private `reviews/oaic-identity-bridge.json` retains the approved
 old-to-new mapping and backup checksum. A changed generation, unapproved or
 modified mapping, stale backup, repeated application or staging failure is
@@ -157,6 +161,27 @@ at `$BREACHGAZETTE_DATA_ROOT/reviews/relationship-decisions.yml`; they are
 private operational state and must not be committed to the public repository.
 
 ## Retention, backup, and restore
+
+### Interrupted generation promotion
+
+Ordinary exceptions roll promotion back under the single-writer lock. Abrupt
+process termination or machine loss can interrupt the directory renames instead.
+This can leave the configured root absent with recoverable data in its sibling
+`.<root-name>-previous` and `.<root-name>-candidate-*` directories. Do not run a
+new update, migration or restore over these paths, and do not delete them.
+
+Pause writers and acquire `state_lock` for the exact configured root before
+inspection. Verify the previous generation against an independently recorded
+inventory or restored backup. If the root is absent, preserve the candidate for
+inspection, return its `.git` directory to the verified previous generation if
+that metadata was moved, and rename the verified previous directory back to the
+configured root. Check the complete inventory and repository metadata before
+releasing the lock. If the root already contains the complete new generation,
+retain both generations for review; do not replace it solely because a previous
+directory remains. Ambiguous paths or mismatched checksums require operator
+review, not automatic recovery. The current protocol has no durable journal and
+does not establish crash-atomic promotion or protection against power-loss
+filesystem corruption.
 
 The committed policy bounds managed private-state directories to 1 GiB,
 retains the latest 53 weekly health-history reports, and allows archives up to
@@ -246,6 +271,20 @@ The health artifact is retained for 14 days and contains counts, checksums,
 timestamps, states, and bounded reasons, not source records. The job summary
 contains only source ID, status, count, and overall result. GitHub’s normal
 failed-run notification is the default operator alert.
+
+## Collection timing
+
+The remaining client-lifetime budget is shared across requests, redirects,
+network reads and writes, TLS negotiation and retry delays. Request and body
+protocol failures use the same bounded retry contract. A connection or TLS
+stream returned after the budget expires is closed and rejected.
+
+The blocking backend may spend time in DNS resolution independently of its
+socket timeout, or reuse a timeout across multiple address attempts. The budget
+checks cannot preempt those operations. They reject a late return rather than
+establishing a strict end-to-end wall-clock deadline. A preemptive resolver or
+an isolated worker with a bounded termination protocol would need separate
+compatibility and recovery review.
 
 ## Publication
 
