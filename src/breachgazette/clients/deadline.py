@@ -3,10 +3,45 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import httpcore
 import httpx
+
+_ERROR_TYPES: dict[type[Exception], type[httpx.HTTPError]] = {
+    httpcore.TimeoutException: httpx.TimeoutException,
+    httpcore.ConnectTimeout: httpx.ConnectTimeout,
+    httpcore.ReadTimeout: httpx.ReadTimeout,
+    httpcore.WriteTimeout: httpx.WriteTimeout,
+    httpcore.PoolTimeout: httpx.PoolTimeout,
+    httpcore.NetworkError: httpx.NetworkError,
+    httpcore.ConnectError: httpx.ConnectError,
+    httpcore.ReadError: httpx.ReadError,
+    httpcore.WriteError: httpx.WriteError,
+    httpcore.ProxyError: httpx.ProxyError,
+    httpcore.UnsupportedProtocol: httpx.UnsupportedProtocol,
+    httpcore.ProtocolError: httpx.ProtocolError,
+    httpcore.LocalProtocolError: httpx.LocalProtocolError,
+    httpcore.RemoteProtocolError: httpx.RemoteProtocolError,
+}
+
+
+@contextmanager
+def _translate_errors() -> Iterator[None]:
+    """Keep request, body and cleanup errors in the same bounded retry contract."""
+    try:
+        yield
+    except Exception as error:
+        selected: type[httpx.HTTPError] | None = None
+        for original, translated in _ERROR_TYPES.items():
+            if isinstance(error, original) and (
+                selected is None or issubclass(translated, selected)
+            ):
+                selected = translated
+        if selected is None:
+            raise
+        raise selected("bounded source transport operation failed") from error
 
 
 class DeadlineStream(httpcore.NetworkStream):
@@ -30,14 +65,17 @@ class DeadlineStream(httpcore.NetworkStream):
     def start_tls(
         self, ssl_context: Any, server_hostname: str | None = None, timeout: float | None = None
     ) -> httpcore.NetworkStream:
-        return DeadlineStream(
-            self.stream.start_tls(
-                ssl_context,
-                server_hostname,
-                timeout=self._timeout(timeout),
-            ),
-            self.remaining,
+        stream = self.stream.start_tls(
+            ssl_context,
+            server_hostname,
+            timeout=self._timeout(timeout),
         )
+        try:
+            self.remaining()
+        except BaseException:
+            stream.close()
+            raise
+        return DeadlineStream(stream, self.remaining)
 
     def get_extra_info(self, info: str) -> Any:
         return self.stream.get_extra_info(info)
@@ -66,6 +104,11 @@ class DeadlineBackend(httpcore.NetworkBackend):
             local_address,
             socket_options,
         )
+        try:
+            self.remaining()
+        except BaseException:
+            stream.close()
+            raise
         return DeadlineStream(stream, self.remaining)
 
     def connect_unix_socket(
@@ -79,16 +122,13 @@ class _ResponseStream(httpx.SyncByteStream):
         self.stream = stream
 
     def __iter__(self) -> Iterator[bytes]:
-        try:
+        with _translate_errors():
             yield from self.stream
-        except httpcore.ReadTimeout as exc:
-            raise httpx.ReadTimeout("bounded source read timed out") from exc
-        except httpcore.ReadError as exc:
-            raise httpx.ReadError("bounded source read failed") from exc
 
     def close(self) -> None:
-        if hasattr(self.stream, "close"):
-            self.stream.close()
+        with _translate_errors():
+            if hasattr(self.stream, "close"):
+                self.stream.close()
 
 
 class DeadlineTransport(httpx.BaseTransport):
@@ -98,7 +138,7 @@ class DeadlineTransport(httpx.BaseTransport):
         self.pool = httpcore.ConnectionPool(network_backend=DeadlineBackend(remaining, backend))
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
-        try:
+        with _translate_errors():
             response = self.pool.handle_request(
                 httpcore.Request(
                     method=request.method,
@@ -113,12 +153,6 @@ class DeadlineTransport(httpx.BaseTransport):
                     extensions=request.extensions,
                 )
             )
-        except httpcore.TimeoutException as exc:
-            raise httpx.TimeoutException("bounded source operation timed out") from exc
-        except httpcore.NetworkError as exc:
-            raise httpx.NetworkError("bounded source network operation failed") from exc
-        except httpcore.ProtocolError as exc:
-            raise httpx.ProtocolError("bounded source protocol operation failed") from exc
         if not isinstance(response.stream, Iterable):
             raise httpx.ProtocolError("bounded source returned an asynchronous stream")
         return httpx.Response(
@@ -129,4 +163,5 @@ class DeadlineTransport(httpx.BaseTransport):
         )
 
     def close(self) -> None:
-        self.pool.close()
+        with _translate_errors():
+            self.pool.close()
