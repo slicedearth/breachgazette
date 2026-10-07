@@ -353,13 +353,18 @@ def test_preflight_does_not_apply_migration_or_bypass_a_stale_health_gate(legacy
     assert not release.deployment_preflight(data_root=legacy_root)["passed"]
 
 
-def test_exact_workflow_checkout_exception_is_read_only(tmp_path, monkeypatch):
+@pytest.mark.parametrize("outside_workflow", [None, "false", "True", "1"])
+def test_exact_workflow_checkout_exception_is_read_only(tmp_path, monkeypatch, outside_workflow):
     checkout = tmp_path / "synthetic-checkout"
     checkout.mkdir()
     (checkout / "pyproject.toml").write_text("# synthetic marker")
     root = checkout / ".private-production-data"
     root.mkdir()
     monkeypatch.setattr(release, "_source_checkout", lambda: checkout)
+    if outside_workflow is None:
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    else:
+        monkeypatch.setenv("GITHUB_ACTIONS", outside_workflow)
     assert not release.deployment_preflight(data_root=root)["checks"]["private_root_valid"]
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     assert release.deployment_preflight(data_root=root)["checks"]["private_root_valid"]
