@@ -238,7 +238,7 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert "deployment-provenance.json" in workflow
     assert "Checksummed workflow provenance; not a cryptographic signature." in workflow
     assert "signed: false" in workflow
-    assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
+    assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in workflow
     assert "retention-days: 30" in workflow
     assert "EXPECTED_SOURCE_REVISION" in workflow
     assert ".search_manifest_binding.sha256" in workflow

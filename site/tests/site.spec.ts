@@ -304,6 +304,7 @@ test("mobile notification search keeps advanced controls compact and resettable"
   await page.goto("/latest/");
 
   const advanced = page.locator("[data-advanced-filters]");
+  const population = page.getByLabel("Affected population");
   const reset = page.getByRole("button", { name: "Clear filters" });
   const query = page.getByLabel("Organization or agency");
   await expect(advanced).not.toHaveAttribute("open");
@@ -316,18 +317,30 @@ test("mobile notification search keeps advanced controls compact and resettable"
   await expect(page.getByRole("button", { name: "Remove Search filter" })).toBeVisible();
 
   await advanced.locator("summary").click();
-  await page.getByLabel("Affected population").selectOption("1000_9999");
+  await expect(population).toBeVisible();
+  await population.selectOption("1000_9999");
   await expect(advanced).toHaveAttribute("open");
   await expect(advanced.locator("[data-advanced-filter-count]")).toHaveText("1 active");
   await expect(page).toHaveURL(/population=1000_9999/);
 
   await reset.click();
   await expect(query).toHaveValue("");
-  await expect(page.getByLabel("Affected population")).toHaveValue("");
+  await expect(population).toHaveValue("");
+  await expect(population).toBeHidden();
   await expect(advanced).not.toHaveAttribute("open");
   await expect(reset).toBeDisabled();
   await expect(page).not.toHaveURL(/#/);
   await expect(page.locator("[data-result-count]")).toContainText("no search partitions loaded");
+
+  await advanced.locator("summary").focus();
+  await page.keyboard.press("Enter");
+  await expect(population).toBeVisible();
+  await population.selectOption("500_999");
+  await expect(population).toHaveValue("500_999");
+  await expect(page).toHaveURL(/#population=500_999$/);
+  await reset.click();
+  await expect(population).toHaveValue("");
+  await expect(population).toBeHidden();
 
   await page.setViewportSize({ width: 900, height: 900 });
   await expect(advanced).toHaveAttribute("open");
