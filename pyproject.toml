@@ -17,7 +17,7 @@ dependencies = [
   "httpcore==1.0.9",
   "openpyxl==3.1.5",
   "pdfplumber==0.11.10",
-  "pydantic==2.13.5",
+  "pydantic==2.14.0",
   "PyYAML==6.0.3",
   "typer==0.27.3",
 ]
@@ -31,7 +31,7 @@ dev = [
   "pytest==9.1.1",
   "pytest-cov==7.1.0",
   "respx==0.23.1",
-  "ruff==0.16.10",
+  "ruff==0.17.0",
   "types-PyYAML==6.0.12.20260906",
 ]
 

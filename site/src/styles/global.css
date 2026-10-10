@@ -799,7 +799,6 @@ footer { margin-top: 5rem; padding-block: 2.5rem; color: var(--white); backgroun
   }
   .advanced-filters { padding-top: 0; border-top: 0; }
   .advanced-filters summary { display: flex; }
-  .advanced-filters:not([open]) .filters--advanced { display: none; }
 }
 
 @media (max-width: 480px) {
