@@ -1,5 +1,39 @@
 # Operations
 
+## Publication authority and analysis baselines
+
+Production publication uses only the current protected `main` revision. The
+latest CI run for that revision must have completed successfully on a push to
+`main`, with both repository identities matching this repository. Manual and
+scheduled publication use the same policy as automatic publication. A release
+tag, feature-branch run or successful pull-request check is insufficient.
+The check is repeated immediately before deployment and private-state persistence
+to reject a source revision superseded during a build or collection cycle.
+API failures stop publication. A later main push can still race a completed check;
+the checks do not provide a transaction across independent hosting services.
+
+CodeQL retains its CI and standalone configuration identities for Python and
+JavaScript/TypeScript. Both invocations run on main pushes and pull requests,
+using separate concurrency groups and explicit historical category names.
+This compatibility arrangement refreshes retained baselines without deleting
+analysis history or changing required CI check names. It performs two analyses
+per language. Keep both until an authorised configuration-retirement review has
+confirmed the retained alert history and replacement coverage.
+
+After the relevant base and pull-request analyses finish, inspect their exact
+revisions with the read-only command:
+
+```bash
+node .github/scripts/codeql-baseline.mjs <pull-request-number>
+```
+
+Each of the four configurations must be current, successfully processed, and
+associated with the expected main or pull-request merge revision. Missing, stale,
+failed or renamed configurations fail this check. A successful workflow alone
+does not prove that GitHub has reconciled differential alert coverage. Review the
+separate code-scanning check as well. Refreshing an older base analysis requires
+an explicitly authorised main workflow run; this command never dispatches one.
+
 ## Manual update
 
 Configure an absolute private root, validate policies, and run the fixed-source
@@ -49,6 +83,22 @@ The public site still describes the last successfully published generation; it
 cannot expose a failed deployment that never reached the static host. Bounded
 public recovery history includes only retained health observations, not every
 failed or discarded attempt.
+
+For persistent local diagnostics, add
+`--attempt-history /absolute/private/path/attempt-history`. This explicitly writes
+sanitised attempt records even for a failed or non-promoting cycle. The directory
+must be separate from authoritative state and outside the source checkout, with
+owner-only permissions. New directories use mode 0700 and reports use mode 0600.
+History retains the latest 53 attempts, each at most 24,000 bytes. Entries are
+immutable and checksummed; only the oldest entries are removed for retention.
+Unexpected files, symlinks or changed checksums stop history writes. Records
+contain source IDs, bounded status/count fields and timestamps, with no URLs,
+exception text or source records. They are never copied into public output.
+
+This option does not configure a remote store or change the scheduled artifact's
+14-day retention. A local owner must retain and back up this private directory.
+Diagnostic storage failure is reported even if a candidate was already promoted;
+inspect authoritative state before retrying after that kind of failure.
 
 OAIC semantic metric IDs use normalization version 2.0. Existing 1.0 state is
 blocked from update and unattended publication until its mapping is reviewed.
@@ -170,18 +220,34 @@ This can leave the configured root absent with recoverable data in its sibling
 `.<root-name>-previous` and `.<root-name>-candidate-*` directories. Do not run a
 new update, migration or restore over these paths, and do not delete them.
 
-Pause writers and acquire `state_lock` for the exact configured root before
-inspection. Verify the previous generation against an independently recorded
-inventory or restored backup. If the root is absent, preserve the candidate for
-inspection, return its `.git` directory to the verified previous generation if
-that metadata was moved, and rename the verified previous directory back to the
-configured root. Check the complete inventory and repository metadata before
-releasing the lock. If the root already contains the complete new generation,
-retain both generations for review; do not replace it solely because a previous
-directory remains. Ambiguous paths or mismatched checksums require operator
-review, not automatic recovery. The current protocol has no durable journal and
-does not establish crash-atomic promotion or protection against power-loss
-filesystem corruption.
+Promotion now writes and synchronises a sibling `.<root-name>.promotion.json`
+journal before the first rename. It records checksums of both complete state
+trees and the device/inode identity of the repository metadata. State files,
+directories and rename parents are synchronised. A pending journal blocks new
+writers; candidate cleanup preserves interrupted generations.
+
+Pause writers and inspect the journal under the same filesystem lock:
+
+```bash
+.venv/bin/breachgazette recover-state --data-root "$BREACHGAZETTE_DATA_ROOT" --json
+.venv/bin/breachgazette recover-state --data-root "$BREACHGAZETTE_DATA_ROOT" --apply --json
+```
+
+The first command only inspects. Applying recovery restores the verified previous
+generation when the root is absent, including repository metadata moved into the
+candidate. It retains the candidate. If the complete new root is already present,
+recovery keeps it and moves the verified previous generation to a reported
+recovery directory. Nothing is silently promoted from an uninstalled candidate.
+Repeated recovery is harmless after the journal has been cleared. Retained
+recovery directories require separate operator review and disposal.
+
+Ambiguous paths, changed checksums, duplicate metadata and unsupported journals
+fail closed. A previous directory without a journal, including an interruption
+from an older version, still requires manual verification against an independent
+inventory or restored backup. No automatic migration or recovery occurs during
+ordinary read-only preflight. The protocol supports process-crash recovery on a
+local POSIX filesystem; it does not promise continuous root availability between
+renames, distributed locking or protection against filesystem/hardware corruption.
 
 The committed policy bounds managed private-state directories to 1 GiB,
 retains the latest 53 weekly health-history reports, and allows archives up to
@@ -288,6 +354,21 @@ compatibility and recovery review.
 
 ## Publication
 
+New publications include a versioned SHA-256 binding to the exact search-manifest
+bytes. Static builds reject a mismatched summary/manifest pair even if record
+counts agree. The manifest endpoint preserves those bytes, and browser search
+checks the digest embedded in its page before enabling filters. A stale or mixed
+generation leaves the complete static register available with a retry control.
+Existing publications without a binding remain readable for compatibility, but
+do not gain that cross-generation guarantee. Partition hashes and all existing
+schema, byte and privacy gates remain mandatory.
+
+The production build has a 120-second execution budget. On Linux and macOS it
+signals the complete build process group, then forcibly terminates remaining
+processes after a five-second grace period. Windows can terminate the immediate
+child but does not provide the same process-group guarantee; hosted production
+builds run on Linux.
+
 ### Coordinated normalisation cutover
 
 An identity version boundary needs an explicitly authorised cutover, not just
@@ -360,7 +441,7 @@ The Netlify publication workflow requires:
 
 Publication runs automatically after successful `main` CI and after a
 successful scheduled or explicitly persisted private-state update. A manual
-dispatch remains available for an exact private-state commit or tag. The
+dispatch remains available for an exact private-state commit. The
 workflow records the resolved source and private-state commit IDs, audits the
 result, publishes the source revision and publication checksum, and atomically
 deploys only `site/dist`. It retains the deployment archive and a provenance
