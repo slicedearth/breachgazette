@@ -20,6 +20,8 @@ from breachgazette.entities import load_alias_catalogue, resolve_organizations
 from breachgazette.monitoring import build_source_health_report
 from breachgazette.policies import load_source_policies
 from breachgazette.privacy.audit import require_public_safe
+from breachgazette.publish.search import NORMALIZATION_VERSION, normalize_search, population_band
+from breachgazette.publish.search import search_trigrams as _search_trigrams
 from breachgazette.quality import DataQualityError, build_quality_report
 from breachgazette.quality.temporal import exclude_temporal_conflicts
 from breachgazette.relationships import (
@@ -85,26 +87,39 @@ def _latest_date(record: SourceNotificationRecord) -> str:
     return max(dates, default="0001-01-01")
 
 
+def _detail_record_ids(ordered_notifications: list[NormalizedNotification]) -> set[str]:
+    """Bound generated detail routes without removing older searchable records."""
+    detail_ids: set[str] = set()
+    for source_id in sorted({record.source_id for record in ordered_notifications}):
+        source_records = [
+            record for record in ordered_notifications if record.source_id == source_id
+        ]
+        detail_ids.update(
+            record.source_record_id for record in source_records[:DETAIL_RECORDS_PER_SOURCE]
+        )
+    return detail_ids
+
+
 def _search_year(record: NormalizedNotification) -> str:
     normalized_dates = sorted(
         observation.normalized_date
         for observation in record.dates
         if observation.normalized_date is not None
     )
-    return str(normalized_dates[-1].year) if normalized_dates else "unknown"
+    return f"{normalized_dates[-1].year:04d}" if normalized_dates else "unknown"
 
 
 def _population_band(record: NormalizedNotification) -> str:
     count = record.affected_population.count if record.affected_population else None
-    if count is None:
-        return "not_published"
-    if count < 1_000:
-        return "500_999"
-    if count < 10_000:
-        return "1000_9999"
-    if count < 100_000:
-        return "10000_99999"
-    return "100000_plus"
+    return population_band(count)
+
+
+def _search_years(record: NormalizedNotification) -> set[str]:
+    return {
+        f"{observation.normalized_date.year:04d}"
+        for observation in record.dates
+        if observation.normalized_date is not None
+    } or {"unknown"}
 
 
 def _search_facets(records: list[NormalizedNotification]) -> dict[str, list[str]]:
@@ -112,7 +127,9 @@ def _search_facets(records: list[NormalizedNotification]) -> dict[str, list[str]
         "jurisdictions": sorted({record.jurisdiction for record in records}),
         "regulators": sorted({record.regulator for record in records}),
         "sources": sorted({record.source_id for record in records}),
-        "years": sorted({_search_year(record) for record in records}, reverse=True),
+        "years": sorted(
+            {year for record in records for year in _search_years(record)}, reverse=True
+        ),
         "causes": sorted(
             {
                 record.breach_cause.normalized_label
@@ -140,7 +157,7 @@ def _search_facet_counts(
         "jurisdictions": [record.jurisdiction for record in records],
         "regulators": [record.regulator for record in records],
         "sources": [record.source_id for record in records],
-        "years": [_search_year(record) for record in records],
+        "years": [year for record in records for year in sorted(_search_years(record))],
         "causes": [
             record.breach_cause.normalized_label
             for record in records
@@ -149,23 +166,18 @@ def _search_facet_counts(
         "information_categories": [
             category
             for record in records
-            for category in {
-                item.normalized_label for item in record.information_categories
-            }
+            for category in {item.normalized_label for item in record.information_categories}
         ],
         "population_bands": [_population_band(record) for record in records],
         "roles": [str(record.named_entity.role) for record in records],
         "publication_levels": [str(record.publication_level) for record in records],
     }
-    return {
-        facet: dict(sorted(Counter(items).items()))
-        for facet, items in values.items()
-    }
+    return {facet: dict(sorted(Counter(items).items())) for facet, items in values.items()}
 
 
 def _normalized_search_text(record: NormalizedNotification) -> str:
     return " ".join(
-        " ".join(value.casefold().split())
+        normalize_search(value)
         for value in (
             record.named_entity.source_name,
             record.source_record_id,
@@ -175,15 +187,6 @@ def _normalized_search_text(record: NormalizedNotification) -> str:
             str(record.named_entity.role),
         )
         if value
-    )
-
-
-def _search_trigrams(value: str) -> set[str]:
-    normalized = " ".join(value.casefold().split())
-    return (
-        {normalized[index : index + 3] for index in range(len(normalized) - 2)}
-        if len(normalized) >= 3
-        else set()
     )
 
 
@@ -411,6 +414,7 @@ def _build_search_assets(
         "partition_max_bytes": SEARCH_PARTITION_MAX_BYTES,
         "query_routing": {
             "algorithm": "normalized_trigram_bloom",
+            "normalization_version": NORMALIZATION_VERSION,
             "encoding": "hex",
             "bits": SEARCH_BLOOM_BITS,
             "hashes": SEARCH_BLOOM_HASHES,
@@ -479,45 +483,34 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     organizations = resolve_organizations(
         notifications,
         regulatory_actions,
-        alias_catalogue=load_alias_catalogue(
-            data_root / "reviews" / "organization-aliases.yml"
-        ),
+        alias_catalogue=load_alias_catalogue(data_root / "reviews" / "organization-aliases.yml"),
     )
     organization_by_alias = {
-        alias.normalized_name: identity.organization_id
+        (alias.source_id, alias.normalized_name): identity.organization_id
         for identity in organizations
         for alias in identity.aliases
     }
     for notification in notifications:
         notification.canonical_organization_id = organization_by_alias.get(
-            notification.named_entity.normalized_name
+            (notification.source_id, notification.named_entity.normalized_name)
         )
     for action in regulatory_actions:
-        action.canonical_organization_id = organization_by_alias.get(action.entity.normalized_name)
+        action.canonical_organization_id = organization_by_alias.get(
+            (action.source_id, action.entity.normalized_name)
+        )
     relationships, _relationship_decisions = apply_relationship_decisions(
         generate_candidates(notifications),
-        catalogue=load_relationship_catalogue(
-            data_root / "reviews" / "relationship-decisions.yml"
-        ),
+        catalogue=load_relationship_catalogue(data_root / "reviews" / "relationship-decisions.yml"),
     )
     all_events = store.load_events()
-    events = [
-        event for event in all_events if event.event_type != "notification_first_observed"
-    ]
+    events = [event for event in all_events if event.event_type != "notification_first_observed"]
     policies = load_source_policies()
     ordered_notifications = sorted(
         notifications,
         key=lambda record: (_latest_date(record), record.source_record_id),
         reverse=True,
     )
-    detail_ids: set[str] = set()
-    for source_id in sorted({record.source_id for record in notifications}):
-        source_records = [
-            record for record in ordered_notifications if record.source_id == source_id
-        ]
-        detail_ids.update(
-            record.source_record_id for record in source_records[:DETAIL_RECORDS_PER_SOURCE]
-        )
+    detail_ids = _detail_record_ids(ordered_notifications)
     detail_notifications = [
         record for record in ordered_notifications if record.source_record_id in detail_ids
     ]
@@ -617,6 +610,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
             "corrections": len(events),
         },
         source_snapshots=snapshots,
+        search_manifest_binding={"schema_version": "1.0", "sha256": sha256_hex(search_manifest)},
         publication_checksum=publication_checksum,
         publication_checksum_algorithm="sha256_canonical_json_v1",
         publication_checksum_scope="publication_summary_and_search_partition_digests",

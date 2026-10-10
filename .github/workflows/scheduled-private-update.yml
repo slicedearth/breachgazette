@@ -21,7 +21,9 @@ concurrency:
 
 jobs:
   update:
-    if: github.event_name == 'workflow_dispatch' || vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' || vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -45,6 +47,12 @@ jobs:
           echo "data_ref=$CONFIGURED_DATA_REF" >> "$GITHUB_OUTPUT"
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Verify protected source before private-state access
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/publication-policy.mjs
       - name: Mint write-scoped private-state token
         id: state-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -81,14 +89,19 @@ jobs:
       - name: Verify and promote an isolated candidate
         id: update_cycle
         continue-on-error: true
-        run: breachgazette update-cycle --data-root .private-production-data --promote --json
+        run: >-
+          breachgazette update-cycle --data-root .private-production-data --promote --json
+          --attempt-report "$RUNNER_TEMP/breachgazette-attempt.json"
       - name: Write sanitized operator summary
         if: always()
         continue-on-error: true
         run: |
+          if test -f "$RUNNER_TEMP/breachgazette-attempt.json"; then
+            breachgazette attempt-summary "$RUNNER_TEMP/breachgazette-attempt.json" >> "$GITHUB_STEP_SUMMARY"
+          fi
           if test "${{ steps.update_cycle.outcome }}" != "success"; then
             echo "## Breach Gazette source health" >> "$GITHUB_STEP_SUMMARY"
-            echo "The bounded update failed and no candidate state was promoted." >> "$GITHUB_STEP_SUMMARY"
+            echo "The bounded cycle failed. No private-state commit or publication is authorised; inspect the attempt phase and local state before retrying." >> "$GITHUB_STEP_SUMMARY"
           elif test -f .private-production-data/reports/source-health.json; then
             breachgazette source-health-summary \
               .private-production-data/reports/source-health.json \
@@ -102,9 +115,18 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: breachgazette-source-health
-          path: .private-production-data/reports/source-health.json
+          path: |
+            ${{ runner.temp }}/breachgazette-attempt.json
+            .private-production-data/reports/source-health.json
           if-no-files-found: warn
           retention-days: 14
+      - name: Recheck protected source before persisting state
+        if: >-
+          steps.update_cycle.outcome == 'success' &&
+          (github.event_name == 'schedule' || inputs.persist_private_state)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/publication-policy.mjs
       - name: Commit verified private state
         if: >-
           steps.update_cycle.outcome == 'success' &&
@@ -117,7 +139,10 @@ jobs:
           if git diff --cached --quiet; then
             echo "No private state changes to commit."
           else
-            git commit -m "Update verified Breach Gazette source state"
+            git commit \
+              -m "Update verified source state" \
+              -m "Persist the complete candidate generation only after collection, monitoring, publication quality and privacy checks have passed." \
+              -m "Retain observations, snapshots, checkpoints, history and reviewed identity bridges together. Exclude public source files and temporary publication output."
             git push origin HEAD
           fi
       - name: Resolve promoted private-state revision

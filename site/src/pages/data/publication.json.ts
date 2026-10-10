@@ -16,6 +16,7 @@ export const GET: APIRoute = () => {
       publication.manifest.publication_checksum_algorithm,
     publication_checksum_scope:
       publication.manifest.publication_checksum_scope,
+    search_manifest_binding: publication.manifest.search_manifest_binding ?? null,
     published_corrections: publication.corrections.length,
     max_public_corrections: publication.manifest.max_public_corrections,
     update_digest: publication.update_digest,

@@ -147,7 +147,7 @@ def test_fixture_and_inventory_cli(tmp_path: Path, notification_factory) -> None
         "error": "data_quality_error",
         "message": (
             "publication quality gates failed: required_sources_present, "
-            "source_snapshots_present, fixture_isolation"
+            "source_snapshots_present, source_identities_coherent, fixture_isolation"
         ),
         "passed": False,
     }

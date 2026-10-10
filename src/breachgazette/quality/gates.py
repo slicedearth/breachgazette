@@ -44,6 +44,24 @@ def build_quality_report(
     snapshots_present = set(snapshot_by_source) >= REQUIRED_SOURCES
     attribution_present = all(snapshot.revision for snapshot in snapshots)
     no_rejections = all(snapshot.records_rejected == 0 for snapshot in snapshots)
+    identities_coherent = (
+        len(snapshot_by_source) == len(snapshots)
+        and set(snapshot_by_source) == source_ids
+        and all(
+            all(record.source_id == source_id for record in records)
+            and len({record.source_record_id for record in records}) == len(records)
+            for source_id, records in records_by_source.items()
+        )
+    )
+    counts_coherent = all(
+        snapshot.records_discovered >= snapshot.records_accepted + snapshot.records_rejected
+        and snapshot.records_accepted <= snapshot.bounded_limit
+        and (
+            snapshot.source_id in {"france_cnil", "united_kingdom_ico"}
+            or snapshot.records_accepted == len(records_by_source.get(snapshot.source_id, []))
+        )
+        for snapshot in snapshots
+    )
     legal_status_explicit = all(
         getattr(record, "legal_status", None) != "status_unknown"
         for records in records_by_source.values()
@@ -65,6 +83,8 @@ def build_quality_report(
         "source_snapshots_present": snapshots_present,
         "source_attribution_present": attribution_present,
         "no_source_rejections": no_rejections,
+        "source_identities_coherent": identities_coherent,
+        "snapshot_counts_coherent": counts_coherent,
         "legal_status_explicit": legal_status_explicit,
         "privacy_audit_passed": not findings,
         "fixture_isolation": fixture_isolation,

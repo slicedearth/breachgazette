@@ -8,10 +8,19 @@ observation times, source URL, and limitations. Occurrence, discovery,
 awareness, consumer notification, regulator submission, public notification,
 source publication, and reporting-period dates remain distinct.
 
-A source-observed date remains visible as raw provenance when it conflicts with
-the source record's own chronology. It receives a `source_conflict` state and
+A California source-observed occurrence date remains visible as raw provenance
+when it post-dates that record's regulator submission. It receives a `source_conflict` state and
 no normalized date, so it cannot influence year facets, ordering, feeds, or
 candidate relationships until the official source corrects it.
+This exclusion is specific to the reviewed California CSV semantics. Other
+sources do not inherit that rule without a separate source review and fixtures.
+
+The extension point is `exclude_temporal_conflicts(record)`, called by the
+California adapter and again on notification copies before publication. A new
+source rule must select its exact source ID, retain raw values, mark conflicts,
+and have source-specific fixtures covering legitimate chronology. Adding a
+rule requires review before it can exclude records; there is no global
+occurrence-versus-submission assumption.
 
 ## Notification, incident, anonymous row, and aggregate
 
@@ -40,7 +49,8 @@ names or reviewed aliases only.
 ## Candidate grouping
 
 Candidate relationships require exact organization identity and an identical
-source-backed compatible date across different sources. Every candidate shows
+source-backed calendar date across different sources, even where the date
+meanings differ. This is not an interval-compatibility rule. Every candidate shows
 its reasons and a disclaimer. Weak similarity is blocked and no candidate
 merges provenance.
 

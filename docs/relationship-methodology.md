@@ -7,8 +7,24 @@ The initial blocking rule requires:
 
 1. different source IDs;
 2. an exact conservative organization-name key; and
-3. at least one identical compatible, source-backed occurrence, awareness,
+3. at least one identical source-backed occurrence, awareness,
    submission, or public-notification date.
+
+The current rule compares calendar dates across these meanings, not occurrence
+intervals or equivalent reporting stages. Equal dates with different meanings
+can produce candidates; this is a review signal, not a claim of compatible
+chronology. Raw, missing and source-conflict dates do not supply a date key.
+
+The retained `compatible_occurrence_interval` reason code is a legacy identifier,
+not a description of interval matching. Its displayed explanation describes
+identical dates. Changing that code or reason evidence changes deterministic
+candidate IDs and requires reconciliation with existing reviewed decisions.
+
+`date_keys` exposes the current `calendar_date_v1` contract and a tested
+`same_meaning_v1` comparison for offline review. Candidate generation uses only
+the current contract. The stricter helper is not enabled by a catalogue or CLI
+option and does not change published candidate coverage. It compares identical
+dates with identical meanings, not overlapping occurrence intervals.
 
 The candidate ID is deterministic over sorted record IDs and displayed
 reasons. New results are labelled `possibly_related_event` and say that they

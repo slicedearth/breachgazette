@@ -11,23 +11,12 @@ from breachgazette.contracts import (
     RelationshipReason,
 )
 from breachgazette.contracts.enums import RelationshipClass, ValueState
+from breachgazette.relationships.date_policy import date_keys
 from breachgazette.utils import normalize_organization_name, stable_id
 
 
 def _date_values(record: NormalizedNotification) -> set[str]:
-    return {
-        observation.normalized_date.isoformat()
-        for observation in record.dates
-        if observation.normalized_date is not None
-        and observation.meaning
-        in {
-            "occurrence_start",
-            "occurrence_end",
-            "awareness_date",
-            "regulator_submission_date",
-            "public_notification_date",
-        }
-    }
+    return date_keys(record)
 
 
 def generate_candidates(

@@ -54,25 +54,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
       - name: Verify source revision passed the complete CI gate
-        if: github.event_name != 'workflow_run'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          source_revision="$(git rev-parse HEAD)"
-          successful_runs="$(
-            gh api \
-              --method GET \
-              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
-              -f head_sha="$source_revision" \
-              -f status=success \
-              -f per_page=10 \
-              --jq '.total_count'
-          )"
-          if test "$successful_runs" -lt 1; then
-            echo "The selected source revision has not passed the complete CI gate."
-            exit 1
-          fi
+          PUBLICATION_TRIGGER_RUN: ${{ github.event.workflow_run.id }}
+        run: node .github/scripts/publication-policy.mjs
       - name: Resolve private production-data revision
         id: data-ref
         env:
@@ -136,11 +123,18 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: site/package-lock.json
+      - name: Select pinned package manager
+        run: |
+          package_manager="$(node -p "require('./site/package.json').packageManager")"
+          npm install --prefix "$RUNNER_TEMP/npm-runtime" --ignore-scripts --no-audit --no-fund "$package_manager"
+          echo "$RUNNER_TEMP/npm-runtime/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install locked dependencies
         run: |
           python -m pip install -r requirements.lock
           python -m pip install --no-deps --no-build-isolation -e .
           npm ci --ignore-scripts --no-audit --prefix site
+      - name: Verify offline production-state compatibility
+        run: breachgazette deployment-preflight --data-root .private-production-data --json
       - name: Generate privacy-minimised real publication
         id: publication
         env:
@@ -189,6 +183,11 @@ jobs:
             >> "$GITHUB_STEP_SUMMARY"
           echo "- Deployment archive SHA-256: \`$archive_sha256\`" \
             >> "$GITHUB_STEP_SUMMARY"
+      - name: Recheck protected source before deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLICATION_TRIGGER_RUN: ${{ github.event.workflow_run.id }}
+        run: node .github/scripts/publication-policy.mjs
       - name: Deploy audited static tree
         id: deploy
         env:
@@ -338,10 +337,15 @@ jobs:
             done
             test "$identity_verified" = "true"
             curl --fail --silent --show-error \
+              -H "Cache-Control: no-cache" \
               "$live_url/data/notifications/manifest.json" > "$manifest_file"
             identity_records="$(jq -r '.record_counts.notifications' "$identity_file")"
             manifest_records="$(jq -r '.record_count' "$manifest_file")"
             test "$identity_records" = "$manifest_records"
+            jq -e '.search_manifest_binding.schema_version == "1.0"' "$identity_file" > /dev/null
+            expected_manifest_sha="$(jq -r '.search_manifest_binding.sha256' "$identity_file")"
+            actual_manifest_sha="$(sha256sum "$manifest_file" | cut -d ' ' -f 1)"
+            test "$expected_manifest_sha" = "$actual_manifest_sha"
             curl --fail --silent --show-error \
               "$live_url/feeds/notifications.xml" > /dev/null
             curl --fail --silent --show-error \

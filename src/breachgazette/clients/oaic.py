@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, date, datetime
-from io import BytesIO
 from typing import Any
 
 import httpx
-from openpyxl import load_workbook
 
 from breachgazette.clients.base import (
     AdapterResult,
@@ -16,6 +14,7 @@ from breachgazette.clients.base import (
     SourceClientError,
     source_snapshot,
 )
+from breachgazette.clients.xlsx import bounded_workbook
 from breachgazette.contracts import SourceAggregateRecord
 from breachgazette.contracts.enums import (
     Completeness,
@@ -92,10 +91,77 @@ def _numeric(value: Any) -> int | float | None:
     return None
 
 
+def oaic_metric_id(
+    *,
+    sheet: str,
+    period_start: date,
+    period_end: date,
+    dimension: str,
+    category: str,
+    parent: str | None,
+    unit: str,
+    population_scope: str,
+) -> str:
+    return (
+        "oaic:v2:"
+        + sha256_hex(
+            [
+                sheet,
+                period_start,
+                period_end,
+                dimension,
+                category,
+                parent,
+                unit,
+                population_scope,
+            ]
+        )[:32]
+    )
+
+
+def plan_identity_migration(records: list[SourceAggregateRecord]) -> dict[str, str]:
+    """Produce a reviewable mapping only. Never rewrite IDs, events or observations."""
+    sectors = {
+        record.category
+        for record in records
+        if record.source_record_id.rsplit(":", 2)[0] == "Top 5 sectors by source"
+        and record.category not in ROOT_CAUSES
+        and record.parent_category is None
+    }
+    mapping: dict[str, str] = {}
+    for record in records:
+        sheet = record.source_record_id.split(":", 1)[0]
+        if (
+            record.source_id != "oaic_ndb"
+            or record.normalization_version != "1.0"
+            or sheet not in EXPECTED_SHEETS[1:]
+        ):
+            raise ValueError("migration requires reviewed legacy OAIC metrics")
+        if sheet == "Top 5 sectors by source" and (
+            (record.category in ROOT_CAUSES and record.parent_category not in sectors)
+            or (record.category not in ROOT_CAUSES and record.parent_category is not None)
+        ):
+            raise ValueError("legacy sector context requires checksum-matched workbook evidence")
+        new_id = oaic_metric_id(
+            sheet=sheet,
+            period_start=record.reporting_period_start,
+            period_end=record.reporting_period_end,
+            dimension=record.dimension,
+            category=record.category,
+            parent=record.parent_category,
+            unit=record.unit,
+            population_scope=record.population_scope,
+        )
+        if new_id in mapping.values() or record.source_record_id in mapping:
+            raise ValueError("identity migration contains ambiguous metrics")
+        mapping[record.source_record_id] = new_id
+    return mapping
+
+
 class OaicNdbAdapter:
     source_id = "oaic_ndb"
     adapter_version = "1.0"
-    normalization_version = "1.0"
+    normalization_version = "2.0"
     max_records = 2_000
 
     def __init__(self, *, transport: httpx.BaseTransport | None = None) -> None:
@@ -143,13 +209,33 @@ class OaicNdbAdapter:
             ):
                 raise SourceClientError("OAIC resource returned an unexpected content type")
 
-        workbook = load_workbook(BytesIO(content), read_only=True, data_only=True)
+        with bounded_workbook(
+            content,
+            max_rows=5_000,
+            max_columns=64,
+            max_entry_bytes=20_000_000,
+            max_expanded_bytes=60_000_000,
+        ) as workbook:
+            return self._parse(workbook, resource, dataset, content, observed_at)
+
+    def _parse(
+        self,
+        workbook: Any,
+        resource: dict[str, Any],
+        dataset: dict[str, Any],
+        content: bytes,
+        observed_at: datetime,
+        *,
+        identity_rows: dict[tuple[str, int], str] | None = None,
+    ) -> AdapterResult:
         if tuple(workbook.sheetnames) != EXPECTED_SHEETS:
             raise SourceClientError("OAIC workbook sheet schema changed")
         period_start, period_end = _resource_period(str(resource["name"]))
         checksum = sha256_hex(content)
         revision = f"{resource.get('id')}:{dataset.get('metadata_modified')}"
         records: list[RecordProvenance] = []
+        by_identity: dict[str, SourceAggregateRecord] = {}
+        repeated_cells = 0
         source_notes = [
             "Data are based on information self-reported by notifying entities.",
             "Statistics may be revised.",
@@ -160,6 +246,8 @@ class OaicNdbAdapter:
             current_parent: str | None = None
             population_scope = "Notifications received under the NDB scheme"
             for row_number, row in enumerate(worksheet.iter_rows(values_only=True), start=1):
+                if row_number > 5_000:
+                    raise SourceClientError("OAIC worksheet exceeded its row bound")
                 label_raw = row[0] if row else None
                 value_raw = row[1] if len(row) > 1 else None
                 if not isinstance(label_raw, str):
@@ -189,59 +277,87 @@ class OaicNdbAdapter:
                     current_parent = label
                     dimension = "source_of_breach"
                     parent = None
+                elif worksheet.title == "Top 5 sectors by source" and label not in ROOT_CAUSES:
+                    # Sector headings publish their totals in the same numeric column.
+                    current_parent = label
+                    dimension = "top_5_sectors_by_source"
+                    parent = None
                 else:
                     dimension = re.sub(r"[^a-z0-9]+", "_", worksheet.title.casefold()).strip("_")
                     parent = current_parent
                 unit = "percent" if isinstance(value_raw, str) and "%" in value_raw else "count"
                 rounding = ValueState.ESTIMATED if unit == "percent" else ValueState.PRESENT
-                source_record_id = (
-                    f"{worksheet.title.strip()}:{row_number}:"
-                    f"{sha256_hex([label, parent, value])[:12]}"
+                source_record_id = oaic_metric_id(
+                    sheet=worksheet.title,
+                    period_start=period_start,
+                    period_end=period_end,
+                    dimension=dimension,
+                    category=label,
+                    parent=parent,
+                    unit=unit,
+                    population_scope=population_scope,
                 )
-                records.append(
-                    SourceAggregateRecord(
-                        source_id=self.source_id,
-                        source_record_id=source_record_id,
-                        source_url=DATASET_URL,
-                        source_revision=revision,
-                        source_checksum=checksum,
-                        source_completeness=Completeness.COMPLETE,
-                        source_retrieval_time=observed_at,
-                        local_first_observed_time=observed_at,
-                        local_last_observed_time=observed_at,
-                        parser_version=self.adapter_version,
-                        normalization_version=self.normalization_version,
-                        limitations=["Aggregate metrics do not identify notifying organizations."],
-                        regulator="Office of the Australian Information Commissioner",
-                        reporting_scheme="Notifiable Data Breaches scheme",
-                        publication_level=PublicationLevel.NATIONAL_AGGREGATE,
-                        reporting_period_start=period_start,
-                        reporting_period_end=period_end,
-                        dimension=dimension,
-                        category=label,
-                        parent_category=parent,
-                        value=ObservedValue(
-                            value=value,
-                            origin=ValueOrigin.SOURCE_OBSERVED,
-                            state=rounding,
-                            source_label=str(value_raw),
-                        ),
-                        unit=unit,
-                        population_scope=population_scope,
-                        rounding_state=rounding,
-                        source_notes=source_notes,
-                    )
+                if len(records) + repeated_cells >= self.max_records:
+                    raise SourceClientError("OAIC metric count exceeded its bound")
+                record = SourceAggregateRecord(
+                    source_id=self.source_id,
+                    source_record_id=source_record_id,
+                    source_url=DATASET_URL,
+                    source_revision=revision,
+                    source_checksum=checksum,
+                    source_completeness=Completeness.COMPLETE,
+                    source_retrieval_time=observed_at,
+                    local_first_observed_time=observed_at,
+                    local_last_observed_time=observed_at,
+                    parser_version=self.adapter_version,
+                    normalization_version=self.normalization_version,
+                    limitations=["Aggregate metrics do not identify notifying organizations."],
+                    regulator="Office of the Australian Information Commissioner",
+                    reporting_scheme="Notifiable Data Breaches scheme",
+                    publication_level=PublicationLevel.NATIONAL_AGGREGATE,
+                    reporting_period_start=period_start,
+                    reporting_period_end=period_end,
+                    dimension=dimension,
+                    category=label,
+                    parent_category=parent,
+                    value=ObservedValue(
+                        value=value,
+                        origin=ValueOrigin.SOURCE_OBSERVED,
+                        state=rounding,
+                        source_label=str(value_raw),
+                    ),
+                    unit=unit,
+                    population_scope=population_scope,
+                    rounding_state=rounding,
+                    source_notes=source_notes,
                 )
-        workbook.close()
+                previous = by_identity.get(source_record_id)
+                if previous is not None:
+                    if worksheet.title != "Source of breach" or previous != record:
+                        raise SourceClientError(
+                            "OAIC workbook contained duplicate semantic metrics"
+                        )
+                    repeated_cells += 1
+                else:
+                    by_identity[source_record_id] = record
+                    records.append(record)
+                if identity_rows is not None:
+                    identity_rows[(worksheet.title, row_number)] = source_record_id
         if not records or len(records) > self.max_records:
             raise SourceClientError("OAIC metric count was empty or exceeded its bound")
+        if repeated_cells:
+            source_notes = [
+                *source_notes,
+                f"Reconciled {repeated_cells} exact repeated source-of-breach cells; "
+                "conflicting repeated values are not accepted.",
+            ]
         snapshot = source_snapshot(
             source_id=self.source_id,
             retrieved_at=observed_at,
             revision=revision,
             checksum=checksum,
             completeness=Completeness.COMPLETE,
-            discovered=len(records),
+            discovered=len(records) + repeated_cells,
             accepted=len(records),
             rejected=0,
             bounded_limit=self.max_records,

@@ -39,6 +39,9 @@ such as IP address, requested path, user agent, and timestamp under its own
 service terms. Search filters in URL fragments are not sent with those
 requests. Optional Netlify analytics or log-export features should remain
 disabled unless this policy is reviewed first.
+The source/year partition paths requested during a search can reveal access
+patterns to the host even though the literal query is absent. The Bloom index
+is derived from public records and is not an encryption or secrecy mechanism.
 
 ## Private and public data
 

@@ -16,6 +16,7 @@ export type Notification = {
   source_retrieval_time: string;
   local_first_observed_time: string;
   local_last_observed_time: string;
+  local_last_material_change_time?: string | null;
   regulator: string;
   jurisdiction: string;
   reporting_scheme: string;
@@ -72,6 +73,7 @@ export type SearchManifest = {
   partition_max_bytes: number;
   query_routing: {
     algorithm: "normalized_trigram_bloom";
+    normalization_version?: string;
     encoding: "hex";
     bits: number;
     hashes: number;
@@ -297,6 +299,7 @@ export type Publication = {
     generated_at: string;
     record_counts: Record<string, number>;
     source_snapshots: SourceSnapshot[];
+    search_manifest_binding?: { schema_version: "1.0"; sha256: string } | null;
     publication_checksum: string;
     publication_checksum_algorithm: "sha256_canonical_json_v1";
     publication_checksum_scope: "publication_summary_and_search_partition_digests";

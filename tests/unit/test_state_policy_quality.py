@@ -356,6 +356,7 @@ def test_search_assets_are_partitioned_and_bounded(notification_factory) -> None
     assert manifest["facet_counts"]["roles"]["notifying_entity"] == len(records)
     assert manifest["query_routing"] == {
         "algorithm": "normalized_trigram_bloom",
+        "normalization_version": "unicode15_casefold_whitespace_codepoint_v1",
         "encoding": "hex",
         "bits": 16_384,
         "hashes": 3,
@@ -646,8 +647,8 @@ def test_production_builder_emits_minimised_real_publication(
                     revision=f"revision-{source_id}",
                     checksum=checksum,
                     completeness="partial" if is_uk else "complete",
-                    discovered=2,
-                    accepted=2,
+                    discovered=1 if is_netherlands else 2,
+                    accepted=1 if is_netherlands else 2,
                     rejected=0,
                     bounded_limit=10,
                 )
@@ -702,6 +703,10 @@ def test_production_builder_emits_minimised_real_publication(
         assert metadata["bytes"] == len(encoded)
         assert metadata["sha256"] == sha256_hex(encoded)
     manifest = publication.pop("manifest")
+    assert manifest["search_manifest_binding"] == {
+        "schema_version": "1.0",
+        "sha256": sha256_hex((output / "search-manifest.json").read_bytes()),
+    }
     assert manifest["max_public_corrections"] == 250
     assert manifest["publication_checksum"] == sha256_hex(
         {

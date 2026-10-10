@@ -6,6 +6,8 @@ export const informationPages = {
       ["Source before synthesis", "Every value retains its regulator, reporting scheme, publication level, threshold, coverage type, source role, revision, and source link. Notification counts are not assumed to equal unique incidents."],
       ["Aggregate versus record", "Aggregate statistics and anonymized notification summaries contain no named organizations. Named notifications and regulatory actions use separate contracts and views."],
       ["Time and change", "Occurrence, awareness, submission, publication, and observation dates retain separate meanings. New source snapshots produce deterministic change events rather than rewriting history silently."],
+      ["Chronology exclusions", "The reviewed California rule excludes an occurrence date from normalised uses when it follows regulator submission, while retaining the raw source value. Other sources do not inherit this rule."],
+      ["Candidate date evidence", "Candidates require an exact organisation-name match, different sources, and an identical published calendar date. Date meanings may differ. This is not interval matching or proof of one incident."],
       ["Cross-country comparisons", "Breach Gazette compares like-for-like measures only when thresholds, periods, population scopes, and units are displayed. It does not publish a generic country ranking."],
     ],
   },
@@ -15,7 +17,7 @@ export const informationPages = {
     sections: [
       ["Conservative resolution", "Normalization is deterministic and limited to spacing, case, punctuation, and reviewed legal suffix handling. Similarity creates private proposals only and never creates an identity."],
       ["Source roles remain", "A notifying entity, public-sector agency, covered entity, business associate, and respondent are distinct roles even when they resolve to one organization profile."],
-      ["Reviewed decisions", "Approved or rejected alias decisions retain a stable ID, source set, evidence, date, and review note. Chains and cycles are rejected."],
+      ["Reviewed decisions", "Approved or rejected alias decisions retain a stable ID, supporting source set, evidence, date, and review note. The current reviewed alias mapping applies globally, not only to the supporting sources. Chains and cycles are rejected."],
       ["What is not inferred", "Parent and subsidiary relationships, brands, renamed companies, and near-matching names remain separate without reviewed evidence."],
     ],
   },
@@ -40,7 +42,8 @@ export const informationPages = {
     title: "Privacy",
     intro: "Breach Gazette publishes organization-level official data while excluding victim, contact, credential, and narrative material.",
     sections: [
-      ["No visitor profiling", "There are no accounts, cookies, analytics, remote fonts, query telemetry, or background requests. Filters execute locally against static data."],
+      ["No visitor profiling", "There are no accounts, cookies, analytics, remote fonts, query telemetry, or unsolicited polling. Filters execute locally against static data."],
+      ["Search requests", "Literal search fragments are not sent in HTTP requests. Requests for source/year partitions can reveal access patterns in hosting logs. Bloom values are derived indexes over public records, not encryption or a confidentiality guarantee."],
       ["Minimised records", "The public output excludes personal emails, phone numbers, street addresses, identifiers, credentials, complete breach notices, complete decisions, free-text narratives, and CNIL raw row combinations."],
       ["Private state", "Raw retrievals, caches, comparison state, and complete source snapshots remain in a configured private data root outside the repository and deployed site."],
     ],

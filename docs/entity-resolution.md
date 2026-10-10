@@ -15,6 +15,12 @@ Every alias retains the source name and role. One resolved organization can
 therefore appear as a notifier in one source and an alleged respondent in
 another without collapsing those meanings.
 
+In the current catalogue contract, `source_ids` records the evidence sources;
+it does not restrict where the approved normalized alias applies. Approval is
+global for that exact key. Homonyms outside those evidence sources can therefore
+be affected. Changing this to source-scoped authorisation requires a reviewed
+catalogue migration and consistent source/name mappings in publication.
+
 `breachgazette propose-aliases` produces a bounded private report from
 token-spacing and contained-token blocks. Proposals never enter the resolver.
 An operator verifies official evidence, records an approved or rejected

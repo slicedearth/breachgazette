@@ -34,6 +34,13 @@ from breachgazette.contracts.models import RecordProvenance
 from breachgazette.monitoring import guard_source_record_count
 from breachgazette.privacy.audit import require_public_safe
 from breachgazette.state import PrivateStateStore
+from breachgazette.state.recovery import promotion_pending
+from breachgazette.state.transaction import (
+    copy_candidate,
+    discard_candidate,
+    promote_candidate,
+    state_lock,
+)
 
 AdapterFactory = Callable[[], Any]
 
@@ -52,7 +59,10 @@ ADAPTERS: dict[str, AdapterFactory] = {
 
 
 def _record_map(records: list[RecordProvenance]) -> dict[str, RecordProvenance]:
-    return {str(record.source_record_id): record for record in records}
+    result = {str(record.source_record_id): record for record in records}
+    if len(result) != len(records):
+        raise ValueError("source snapshot contains duplicate record identifiers")
+    return result
 
 
 def _merge_observation_times(
@@ -69,6 +79,36 @@ def _merge_observation_times(
 
 
 def update_source(source_id: str, *, data_root: Path) -> dict[str, Any]:
+    if source_id not in ADAPTERS:
+        raise ValueError(f"unsupported source: {source_id}")
+    root = data_root.resolve()
+    with state_lock(root):
+        if PrivateStateStore(root).dataset_class() not in {None, "real_source_data"}:
+            raise ValueError("refusing to mix fixture and real production state")
+        candidate = copy_candidate(root)
+        attempted_at = datetime.now(UTC)
+        try:
+            result = _update_source_generation(source_id, data_root=candidate)
+            promote_candidate(root, candidate)
+            return result
+        except Exception:
+            if promotion_pending(root):
+                raise
+            PrivateStateStore(root).write_checkpoint(
+                UpdateCheckpoint(
+                    source_id=source_id,
+                    attempted_at=attempted_at,
+                    completed_at=datetime.now(UTC),
+                    status="failed",
+                    detail="The source generation was not committed; prior records remain.",
+                )
+            )
+            raise
+        finally:
+            discard_candidate(root, candidate)
+
+
+def _update_source_generation(source_id: str, *, data_root: Path) -> dict[str, Any]:
     factory = ADAPTERS.get(source_id)
     if factory is None:
         raise ValueError(f"unsupported source: {source_id}")
@@ -87,7 +127,32 @@ def update_source(source_id: str, *, data_root: Path) -> dict[str, Any]:
         )
     )
     try:
+        if (
+            source_id == "oaic_ndb"
+            and previous_records
+            and any(record.normalization_version != "2.0" for record in previous_records)
+        ):
+            raise ValueError(
+                "OAIC identity migration requires review before updating existing state"
+            )
         result: AdapterResult = factory().collect(observed_at=observed_at)
+        if result.source_id != source_id or result.snapshot.source_id != source_id:
+            raise ValueError("adapter source identity does not match the requested source")
+        _record_map(result.records)
+        if any(record.source_id != source_id for record in result.records):
+            raise ValueError("record source identity does not match its snapshot")
+        if (
+            result.snapshot.records_discovered
+            < result.snapshot.records_accepted + result.snapshot.records_rejected
+            or result.snapshot.records_accepted > result.snapshot.bounded_limit
+        ):
+            raise ValueError("snapshot discovery and accepted counts are inconsistent")
+        # Grouped anonymised metrics count reports, not retained metric cells.
+        if result.snapshot.records_accepted != len(result.records) and source_id not in {
+            "france_cnil",
+            "united_kingdom_ico",
+        }:
+            raise ValueError("snapshot accepted count does not match its records")
         guard_source_record_count(
             source_id,
             previous_count=len(previous_records),
@@ -113,6 +178,20 @@ def update_source(source_id: str, *, data_root: Path) -> dict[str, Any]:
             observed_at=observed_at,
             completeness=result.snapshot.completeness,
         )
+        changed_ids = {
+            event.record_id
+            for event in events
+            if event.event_type in {"notification_first_observed", "source_record_corrected"}
+        }
+        for record in result.records:
+            old = previous_by_id.get(record.source_record_id)
+            record.local_last_material_change_time = (
+                observed_at
+                if record.source_record_id in changed_ids
+                else old.local_last_material_change_time
+                if old
+                else None
+            )
         store.write_records(source_id, result.records)
         store.write_snapshot(result.snapshot)
         events_added = store.append_events(events)

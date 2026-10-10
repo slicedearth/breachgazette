@@ -1,5 +1,39 @@
 # Operations
 
+## Publication authority and analysis baselines
+
+Production publication uses only the current protected `main` revision. The
+latest CI run for that revision must have completed successfully on a push to
+`main`, with both repository identities matching this repository. Manual and
+scheduled publication use the same policy as automatic publication. A release
+tag, feature-branch run or successful pull-request check is insufficient.
+The check is repeated immediately before deployment and private-state persistence
+to reject a source revision superseded during a build or collection cycle.
+API failures stop publication. A later main push can still race a completed check;
+the checks do not provide a transaction across independent hosting services.
+
+CodeQL retains its CI and standalone configuration identities for Python and
+JavaScript/TypeScript. Both invocations run on main pushes and pull requests,
+using separate concurrency groups and explicit historical category names.
+This compatibility arrangement refreshes retained baselines without deleting
+analysis history or changing required CI check names. It performs two analyses
+per language. Keep both until an authorised configuration-retirement review has
+confirmed the retained alert history and replacement coverage.
+
+After the relevant base and pull-request analyses finish, inspect their exact
+revisions with the read-only command:
+
+```bash
+node .github/scripts/codeql-baseline.mjs <pull-request-number>
+```
+
+Each of the four configurations must be current, successfully processed, and
+associated with the expected main or pull-request merge revision. Missing, stale,
+failed or renamed configurations fail this check. A successful workflow alone
+does not prove that GitHub has reconciled differential alert coverage. Review the
+separate code-scanning check as well. Refreshing an older base analysis requires
+an explicitly authorised main workflow run; this command never dispatches one.
+
 ## Manual update
 
 Configure an absolute private root, validate policies, and run the fixed-source
@@ -27,8 +61,111 @@ The candidate is copied beside the configured root without `.git`, updated,
 health-checked, published into a temporary directory, privacy-audited,
 compacted, and size-checked. Promotion moves the original root aside, preserves
 its repository metadata, installs the verified candidate, and rolls back if
-that swap fails. Without `--promote`, the complete cycle is a non-mutating
-rehearsal.
+that swap fails. Without `--promote`, the complete cycle leaves the authoritative
+data root unchanged. A coordination lock file remains beside that root; it is
+not source state or a health report.
+
+Individual `update-source` commands also stage a complete generation under a
+single-writer filesystem lock. A failed write or promotion leaves prior records,
+snapshots and events intact; the failed checkpoint is a separate diagnostic.
+The lock is local to one filesystem and is not a distributed scheduler lock.
+Source IDs must be unique within each source snapshot before persistence.
+
+Use `--attempt-report /absolute/diagnostic/path/attempt.json` to retain a bounded
+sanitised cycle report outside authoritative state. This is an explicit write,
+including during a rehearsal. Without that option, a rehearsal does not write a
+report into production state. Attempts distinguish failed, complete and
+not-attempted sources, and report publication failures separately from retrieval.
+Candidate accepted counts and the previous production count/update time are
+separate fields; a discarded attempt never advances the production timestamp.
+The scheduled workflow retains that report even when a candidate is discarded.
+The public site still describes the last successfully published generation; it
+cannot expose a failed deployment that never reached the static host. Bounded
+public recovery history includes only retained health observations, not every
+failed or discarded attempt.
+
+For persistent local diagnostics, add
+`--attempt-history /absolute/private/path/attempt-history`. This explicitly writes
+sanitised attempt records even for a failed or non-promoting cycle. The directory
+must be separate from authoritative state and outside the source checkout, with
+owner-only permissions. New directories use mode 0700 and reports use mode 0600.
+History retains the latest 53 attempts, each at most 24,000 bytes. Entries are
+immutable and checksummed; only the oldest entries are removed for retention.
+Unexpected files, symlinks or changed checksums stop history writes. Records
+contain source IDs, bounded status/count fields and timestamps, with no URLs,
+exception text or source records. They are never copied into public output.
+
+This option does not configure a remote store or change the scheduled artifact's
+14-day retention. A local owner must retain and back up this private directory.
+Diagnostic storage failure is reported even if a candidate was already promoted;
+inspect authoritative state before retrying after that kind of failure.
+
+OAIC semantic metric IDs use normalization version 2.0. Existing 1.0 state is
+blocked from update and unattended publication until its mapping is reviewed.
+Prepare a private draft outside both the authoritative state root and source
+checkout:
+
+```bash
+.venv/bin/breachgazette plan-oaic-migration \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" \
+  --output /secure/path/oaic-identity-plan.json --json
+.venv/bin/breachgazette migrate-oaic-identities \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" \
+  --plan /secure/path/oaic-identity-plan.json --json
+```
+
+Both commands leave source state unchanged. The draft rejects ambiguous
+semantic metrics, records an exact fingerprint of all managed state, and starts
+with `approved: false`. Review the mapping against official reporting periods
+and scopes on a disposable copy. Do not replace IDs solely to bypass an update
+failure. Keep the mapping private and mark `approved: true` only after review.
+
+When legacy sector context is missing or an exact source-of-breach cell is
+repeated, provide the checksum-matched original workbook with `--workbook`
+to both commands and to the application command below. This creates a version
+1.1 evidence plan. The workbook remains private, outside both state and source
+roots; it is re-read and verified during every dry run and application. Row
+coordinates are used only to verify old IDs against that exact evidence, never
+as new metric identities. All legacy rows must be covered. Only missing sector
+parents can be restored; other field changes, incomplete evidence, conflicting
+repetitions or repetitions with different observation provenance are rejected.
+
+Create an independent backup of that same generation using `backup-state`.
+Retain its checksum separately. Only an explicitly authorised operator should
+apply the reviewed transition:
+
+```bash
+.venv/bin/breachgazette migrate-oaic-identities \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" \
+  --plan /secure/path/oaic-identity-plan.json \
+  --backup /secure/path/breachgazette-state.zip \
+  --expected-backup-sha256 "<checksum_sha256 from backup-state>" \
+  --apply --json
+```
+
+Application acquires the single-writer lock, checks that the reviewed generation
+has not changed, restores and verifies the complete backup in a temporary
+directory, and stages the transition before promotion. It preserves observation
+times, dataset class, repository metadata and historical event bytes.
+Identity-only transitions also preserve source snapshots byte for byte.
+Plain identity-only plans reject missing or unreconciled sector context in the
+Top 5 metrics, including previously prepared plans. Those records require the
+checksum-matched workbook route; persisted row order is never used to guess a
+sector. Nonempty conflicting context remains rejected rather than silently repaired.
+The private `reviews/oaic-identity-bridge.json` retains the approved
+old-to-new mapping and backup checksum. A changed generation, unapproved or
+modified mapping, stale backup, repeated application or staging failure is
+rejected. No migration is performed by an update or publication command.
+
+For a reviewed exact repetition, every old ID remains in the private bridge,
+while one representative retains the original metric fields and observation
+times. The current snapshot's accepted count is corrected to the unique metric
+count without changing retrieval, completion, freshness, revision or source
+checksum. Its complete original snapshot is retained in the bridge and verified
+backup. Historical events are never removed or rewritten. Ordinary collection
+also reconciles only fully identical repeated cells in the source-of-breach
+sheet, records the repetition in snapshot notes and discovery counts, and stops
+on any conflicting duplicate. This is not incident deduplication.
 
 The monitoring catalogue also enforces a reviewed minimum record count,
 minimum retained fraction, maximum growth factor, and 240-hour freshness
@@ -74,6 +211,67 @@ at `$BREACHGAZETTE_DATA_ROOT/reviews/relationship-decisions.yml`; they are
 private operational state and must not be committed to the public repository.
 
 ## Retention, backup, and restore
+
+### Interrupted generation promotion
+
+Ordinary exceptions before the new root is installed roll promotion back under
+the single-writer lock. Once the new root is committed, a cleanup exception does
+not roll it back. Abrupt process termination or machine loss can interrupt the
+renames instead. This can leave the configured root absent with recoverable data
+in its sibling `.<root-name>-previous` and `.<root-name>-candidate-*` directories.
+Do not run a new update, migration or restore over these paths, and do not delete them.
+
+Promotion now writes and synchronises a sibling `.<root-name>.promotion.json`
+journal before the first rename. It records checksums of both complete state
+trees and the device/inode identity of the repository metadata. State files,
+directories and rename parents are synchronised. A pending journal blocks new
+writers; candidate cleanup preserves interrupted generations.
+
+Version 1.1 journals also reserve a unique `.<root-name>-cleanup-*` sibling.
+After installing the complete new root, promotion atomically moves the previous
+tree to this cleanup path and synchronises its parent before deleting any old
+entries. Until that move, the previous tree must still match its complete
+checksum. The separately retired cleanup tree may be partially deleted without
+making the installed generation ambiguous. It is not a rollback source.
+
+Pause writers and inspect the journal under the same filesystem lock:
+
+```bash
+.venv/bin/breachgazette recover-state --data-root "$BREACHGAZETTE_DATA_ROOT" --json
+.venv/bin/breachgazette recover-state --data-root "$BREACHGAZETTE_DATA_ROOT" --apply --json
+```
+
+The first command only inspects. Applying recovery restores the verified previous
+generation when the root is absent, including repository metadata moved into the
+candidate. It retains the candidate. If the complete new root is already present,
+recovery verifies its exact checksum and repository metadata identity before
+settling the journal. A surviving previous tree must be complete and is moved to
+the journal's cleanup path. An already retired tree produces `cleanup_pending`:
+its remaining entries must be bounded regular files and directories, with no
+repository metadata or symbolic links. Recovery leaves those remnants untouched
+and reports their path as `retained_cleanup`, not as a complete backup.
+If cleanup already removed the whole retired directory, recovery
+can settle the journal without a retained path. Cleanup errors and interruption
+during recovery can be inspected and retried using the same command.
+
+Nothing is silently promoted from an uninstalled candidate. Repeated recovery is
+harmless after the journal has been cleared. Retained cleanup and recovery
+directories require separate operator review and disposal. They are not included
+in the configured authoritative root or automatically deleted by the next update.
+
+Ambiguous paths, changed authoritative/candidate checksums, duplicate or moved
+metadata and unsupported journals fail closed. The partial-tree allowance applies
+only to the exact journal-tracked retired cleanup path with a verified committed
+root; it never applies to the previous or candidate paths. Version 1.0 journals
+remain recoverable when their original complete-tree checks pass and report a
+retained old tree as `retained_previous`. A partially deleted previous tree from
+that older protocol still requires manual verification, as does a previous
+directory without a journal. Use an independent inventory or restored backup;
+do not edit the journal or relabel an uncertain previous tree as cleanup to bypass
+verification. No automatic migration or recovery occurs during ordinary read-only
+preflight. The protocol supports process-crash recovery on a local POSIX
+filesystem; it does not promise continuous root availability between
+renames, distributed locking or protection against filesystem/hardware corruption.
 
 The committed policy bounds managed private-state directories to 1 GiB,
 retains the latest 53 weekly health-history reports, and allows archives up to
@@ -164,7 +362,78 @@ timestamps, states, and bounded reasons, not source records. The job summary
 contains only source ID, status, count, and overall result. GitHub’s normal
 failed-run notification is the default operator alert.
 
+## Collection timing
+
+The remaining client-lifetime budget is shared across requests, redirects,
+network reads and writes, TLS negotiation and retry delays. Request and body
+protocol failures use the same bounded retry contract. A connection or TLS
+stream returned after the budget expires is closed and rejected.
+
+The blocking backend may spend time in DNS resolution independently of its
+socket timeout, or reuse a timeout across multiple address attempts. The budget
+checks cannot preempt those operations. They reject a late return rather than
+establishing a strict end-to-end wall-clock deadline. A preemptive resolver or
+an isolated worker with a bounded termination protocol would need separate
+compatibility and recovery review.
+
 ## Publication
+
+New publications include a versioned SHA-256 binding to the exact search-manifest
+bytes. Static builds reject a mismatched summary/manifest pair even if record
+counts agree. The manifest endpoint preserves those bytes, and browser search
+checks the digest embedded in its page before enabling filters. A stale or mixed
+generation leaves the complete static register available with a retry control.
+Existing publications without a binding remain readable for compatibility, but
+do not gain that cross-generation guarantee. Partition hashes and all existing
+schema, byte and privacy gates remain mandatory.
+
+The production build has a 120-second execution budget. On Linux and macOS it
+signals the complete build process group, then forcibly terminates remaining
+processes after a five-second grace period. Windows can terminate the immediate
+child but does not provide the same process-group guarantee; hosted production
+builds run on Linux.
+
+### Coordinated normalisation cutover
+
+An identity version boundary needs an explicitly authorised cutover, not just
+a source-code push. Pause the scheduled-update flag before switching either
+production input. Push the source review branch and require its complete hosted
+CI, including both analysis languages, before merging the protected production
+branch. Old private state will fail closed under the new publication gate.
+
+With the approved source revision active, re-check that the reviewed private
+generation still matches its plan and backup. Persist the verified private
+transition without force-pushing or overwriting a newer generation. Publish its
+exact private commit only after the matching source revision has passed CI.
+Verify the deployed publication identity and response headers, then re-enable
+the schedule. A failed gate leaves publication and automatic updates paused;
+never relax a gate to complete the cutover. All remote steps require operator
+approval. A local rehearsal is not an authoritative migration or deployment.
+
+### Offline publication checks
+
+Run the offline preflight before preparing a release:
+
+```bash
+.venv/bin/breachgazette deployment-preflight \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" --json
+```
+
+This reads state without fetching sources or promoting a generation. It checks
+source rights and monitoring policy, state bounds, current OAIC identities,
+real-data classification, freshness, and a temporary publication's quality,
+privacy and public-tree gates. It rejects fixture state and concurrent changes.
+Reports contain check names and outcomes, not source records or exception text.
+Temporary publication data is removed when the check finishes. The dedicated
+temporary private checkout used by the publication workflow is read-only for
+this command; migration tooling still refuses state inside the source checkout.
+
+A preflight pass applies only to the inspected private-state generation. It is
+not a substitute for hosted CI and both analysis languages at the exact source
+revision, a complete static-site build, provider configuration review or live
+post-deployment verification. Unattended publication runs this preflight before
+building its real output. Legacy identity state fails closed rather than being
+silently rewritten during deployment.
 
 ```bash
 publication_dir="$(mktemp -d /tmp/breachgazette-publication.XXXXXX)"
@@ -196,7 +465,7 @@ The Netlify publication workflow requires:
 
 Publication runs automatically after successful `main` CI and after a
 successful scheduled or explicitly persisted private-state update. A manual
-dispatch remains available for an exact private-state commit or tag. The
+dispatch remains available for an exact private-state commit. The
 workflow records the resolved source and private-state commit IDs, audits the
 result, publishes the source revision and publication checksum, and atomically
 deploys only `site/dist`. It retains the deployment archive and a provenance

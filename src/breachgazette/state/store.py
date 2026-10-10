@@ -71,14 +71,26 @@ class PrivateStateStore:
             if model is None:
                 raise ValueError(f"state for {source_id} contains an unsupported record type")
             records.append(model.model_validate(item))
+        self._validate_records(source_id, records)
         return records
 
     def write_records(self, source_id: str, records: list[RecordProvenance]) -> None:
+        self._validate_records(source_id, records)
         atomic_write_json(self.state_path(source_id), records)
+
+    @staticmethod
+    def _validate_records(source_id: str, records: list[RecordProvenance]) -> None:
+        if any(record.source_id != source_id for record in records):
+            raise ValueError("record source does not match its state file")
+        if len({record.source_record_id for record in records}) != len(records):
+            raise ValueError("source state contains duplicate record identifiers")
 
     def load_snapshot(self, source_id: str) -> SourceSnapshot | None:
         payload = read_json(self.snapshot_path(source_id))
-        return SourceSnapshot.model_validate(payload) if payload else None
+        snapshot = SourceSnapshot.model_validate(payload) if payload else None
+        if snapshot is not None and snapshot.source_id != source_id:
+            raise ValueError("snapshot source does not match its state file")
+        return snapshot
 
     def write_snapshot(self, snapshot: SourceSnapshot) -> None:
         atomic_write_json(self.snapshot_path(snapshot.source_id), snapshot)

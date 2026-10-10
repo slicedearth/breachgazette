@@ -214,7 +214,8 @@ test("keyboard navigation exposes skip link and table alternatives", async ({ pa
   ).toHaveAttribute("aria-current", "page");
 });
 
-test("representative desktop and mobile pages pass automated accessibility checks", async ({
+for (const viewport of [{ width: 1440, height: 900 }, { width: 320, height: 900 }]) {
+test(`representative pages pass automated accessibility checks at ${viewport.width}px`, async ({
   page,
 }) => {
   test.slow();
@@ -230,10 +231,7 @@ test("representative desktop and mobile pages pass automated accessibility check
     "/corrections/",
     "/relationships/",
   ];
-  for (const viewport of [
-    { width: 1440, height: 900 },
-    { width: 320, height: 900 },
-  ]) {
+  {
     await page.setViewportSize(viewport);
     for (const route of routes) {
       await page.goto(route);
@@ -249,6 +247,7 @@ test("representative desktop and mobile pages pass automated accessibility check
     }
   }
 });
+}
 
 test("mobile primary navigation is compact and keyboard operable", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 900 });
@@ -335,172 +334,226 @@ test("mobile notification search keeps advanced controls compact and resettable"
   await expect(page.getByLabel("Breach cause")).toBeVisible();
 });
 
-test("desktop and mobile layouts contain content without horizontal scrollers", async ({ page }) => {
-  test.slow();
-  const paths = [
-    "/",
-    "/latest/",
-    "/sources/",
-    "/jurisdictions/",
-    "/australia/",
-    "/australia/nsw/",
-    "/australia/public-notifications/",
-    "/france/",
-    "/netherlands/",
-    "/united-kingdom/",
-    "/united-states/california/",
-    "/united-states/massachusetts/",
-    "/united-states/washington/",
-    "/source-health/",
-    "/source-coverage/",
-    "/relationships/",
-    "/organizations/org_1111111111111111/",
-    "/sources/oaic_ndb/",
-  ];
-  const tablePaths = [
-    "/",
-    "/latest/",
-    "/australia/",
-    "/australia/nsw/",
-    "/australia/public-notifications/",
-    "/france/",
-    "/netherlands/",
-    "/united-kingdom/",
-    "/united-states/california/",
-    "/united-states/massachusetts/",
-    "/united-states/washington/",
-    "/source-health/",
-    "/source-coverage/",
-    "/organizations/org_1111111111111111/",
-  ];
-  for (const width of [320, 390, 768, 1440]) {
-    await page.setViewportSize({ width, height: 900 });
-    for (const path of paths) {
-      await page.goto(path);
-      const sizes = await page.evaluate(() => ({
-        scrollWidth: document.documentElement.scrollWidth,
-        clientWidth: document.documentElement.clientWidth,
-      }));
-      expect(sizes.scrollWidth, `${path} overflowed at ${width}px`)
-        .toBeLessThanOrEqual(sizes.clientWidth);
+for (const viewportWidth of [320, 390, 768, 1440]) {
+  test(`layouts contain content without horizontal scrollers at ${viewportWidth}px`, async ({
+    page,
+  }) => {
+    test.slow();
+    const paths = [
+      "/",
+      "/latest/",
+      "/sources/",
+      "/jurisdictions/",
+      "/australia/",
+      "/australia/nsw/",
+      "/australia/public-notifications/",
+      "/france/",
+      "/netherlands/",
+      "/united-kingdom/",
+      "/united-states/california/",
+      "/united-states/massachusetts/",
+      "/united-states/washington/",
+      "/source-health/",
+      "/source-coverage/",
+      "/relationships/",
+      "/organizations/org_1111111111111111/",
+      "/sources/oaic_ndb/",
+    ];
+    const tablePaths = [
+      "/",
+      "/latest/",
+      "/australia/",
+      "/australia/nsw/",
+      "/australia/public-notifications/",
+      "/france/",
+      "/netherlands/",
+      "/united-kingdom/",
+      "/united-states/california/",
+      "/united-states/massachusetts/",
+      "/united-states/washington/",
+      "/source-health/",
+      "/source-coverage/",
+      "/organizations/org_1111111111111111/",
+    ];
+    {
+      const width = viewportWidth;
+      await page.setViewportSize({ width, height: 900 });
+      for (const path of paths) {
+        await page.goto(path);
+        const sizes = await page.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+        }));
+        expect(
+          sizes.scrollWidth,
+          `${path} overflowed at ${width}px`,
+        ).toBeLessThanOrEqual(sizes.clientWidth);
+      }
     }
-  }
-  await page.setViewportSize({ width: 320, height: 900 });
-  await page.goto("/latest/");
-  const geometry = await page.evaluate(() => {
-    const heading = document.querySelector("h1");
-    const navigation = document.querySelector<HTMLElement>(".masthead nav");
-    const wrapper = document.querySelector<HTMLElement>(".table-wrap");
-    const header = document.querySelector<HTMLElement>("thead th");
-    const unlabeledCells = [
-      ...document.querySelectorAll<HTMLElement>(".table-wrap tbody tr > th, .table-wrap tbody tr > td"),
-    ].filter((cell) => !cell.dataset.label).length;
-    return {
-      headingOverflowWrap: heading ? getComputedStyle(heading).overflowWrap : "",
-      headingWordBreak: heading ? getComputedStyle(heading).wordBreak : "",
-      navigationClientWidth: navigation?.clientWidth ?? 0,
-      navigationScrollWidth: navigation?.scrollWidth ?? 0,
-      tableClientWidth: wrapper?.clientWidth ?? 0,
-      tableScrollWidth: wrapper?.scrollWidth ?? 0,
-      tableHeaderWhiteSpace: header ? getComputedStyle(header).whiteSpace : "",
-      unlabeledCells,
-    };
-  });
-  expect(geometry.headingOverflowWrap).toBe("normal");
-  expect(geometry.headingWordBreak).toBe("normal");
-  expect(geometry.navigationScrollWidth).toBeLessThanOrEqual(geometry.navigationClientWidth);
-  expect(geometry.tableScrollWidth).toBeLessThanOrEqual(geometry.tableClientWidth);
-  expect(geometry.tableHeaderWhiteSpace).toBe("nowrap");
-  expect(geometry.unlabeledCells).toBe(0);
+    if (viewportWidth === 320) {
+      await page.setViewportSize({ width: 320, height: 900 });
+      await page.goto("/latest/");
+      const geometry = await page.evaluate(() => {
+        const heading = document.querySelector("h1");
+        const navigation = document.querySelector<HTMLElement>(".masthead nav");
+        const wrapper = document.querySelector<HTMLElement>(".table-wrap");
+        const header = document.querySelector<HTMLElement>("thead th");
+        const unlabeledCells = [
+          ...document.querySelectorAll<HTMLElement>(
+            ".table-wrap tbody tr > th, .table-wrap tbody tr > td",
+          ),
+        ].filter((cell) => !cell.dataset.label).length;
+        return {
+          headingOverflowWrap: heading
+            ? getComputedStyle(heading).overflowWrap
+            : "",
+          headingWordBreak: heading ? getComputedStyle(heading).wordBreak : "",
+          navigationClientWidth: navigation?.clientWidth ?? 0,
+          navigationScrollWidth: navigation?.scrollWidth ?? 0,
+          tableClientWidth: wrapper?.clientWidth ?? 0,
+          tableScrollWidth: wrapper?.scrollWidth ?? 0,
+          tableHeaderWhiteSpace: header
+            ? getComputedStyle(header).whiteSpace
+            : "",
+          unlabeledCells,
+        };
+      });
+      expect(geometry.headingOverflowWrap).toBe("normal");
+      expect(geometry.headingWordBreak).toBe("normal");
+      expect(geometry.navigationScrollWidth).toBeLessThanOrEqual(
+        geometry.navigationClientWidth,
+      );
+      expect(geometry.tableScrollWidth).toBeLessThanOrEqual(
+        geometry.tableClientWidth,
+      );
+      expect(geometry.tableHeaderWhiteSpace).toBe("nowrap");
+      expect(geometry.unlabeledCells).toBe(0);
+    }
 
-  for (const width of [320, 390, 768, 1024]) {
-    await page.setViewportSize({ width, height: 900 });
-    for (const path of tablePaths) {
-      await page.goto(path);
-      const tableRegions = await page.locator(".table-wrap").evaluateAll((wrappers) =>
-        wrappers.map((wrapper) => ({
+    {
+      const width = viewportWidth === 1440 ? 1024 : viewportWidth;
+      await page.setViewportSize({ width, height: 900 });
+      for (const path of tablePaths) {
+        await page.goto(path);
+        const tableRegions = await page
+          .locator(".table-wrap")
+          .evaluateAll((wrappers) =>
+            wrappers.map((wrapper) => ({
+              clientWidth: wrapper.clientWidth,
+              scrollWidth: wrapper.scrollWidth,
+              unlabeledCells: [
+                ...wrapper.querySelectorAll<HTMLElement>(
+                  "tbody tr > th, tbody tr > td",
+                ),
+              ].filter((cell) => !cell.dataset.label).length,
+              cellStyles: [
+                ...wrapper.querySelectorAll<HTMLElement>(
+                  "tbody tr > th, tbody tr > td",
+                ),
+              ].map((cell) => {
+                const style = getComputedStyle(cell);
+                return {
+                  cellWidth: cell.getBoundingClientRect().width,
+                  gridColumnCount: style.gridTemplateColumns.trim().split(/\s+/)
+                    .length,
+                  overflowWrap: style.overflowWrap,
+                  rowWidth:
+                    cell.parentElement?.getBoundingClientRect().width ?? 0,
+                  wordBreak: style.wordBreak,
+                  hyphens: style.hyphens,
+                };
+              }),
+            })),
+          );
+        expect(
+          tableRegions.length,
+          `${path} did not render a table`,
+        ).toBeGreaterThan(0);
+        expect(
+          tableRegions.every(
+            (region) => region.scrollWidth <= region.clientWidth,
+          ),
+          `${path} contained a horizontal table scroller at ${width}px`,
+        ).toBe(true);
+        expect(
+          tableRegions.every((region) => region.unlabeledCells === 0),
+          `${path} contained an unlabeled mobile table cell`,
+        ).toBe(true);
+        expect(
+          tableRegions.every((region) =>
+            region.cellStyles.every(
+              (style) => Math.abs(style.rowWidth - style.cellWidth) <= 2,
+            ),
+          ),
+          `${path} retained a desktop column width on mobile at ${width}px`,
+        ).toBe(true);
+        expect(
+          tableRegions.every((region) =>
+            region.cellStyles.every(
+              (style) =>
+                style.overflowWrap === "break-word" &&
+                style.wordBreak === "normal" &&
+                style.hyphens === "none",
+            ),
+          ),
+          `${path} allowed mobile table values to split ordinary words at ${width}px`,
+        ).toBe(true);
+        expect(
+          tableRegions.every((region) =>
+            region.cellStyles.every((style) =>
+              width <= 480
+                ? style.gridColumnCount === 1
+                : style.gridColumnCount === 2,
+            ),
+          ),
+          `${path} used a cramped mobile table layout at ${width}px`,
+        ).toBe(true);
+      }
+    }
+
+    if (viewportWidth === 1440) {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto("/source-coverage/");
+      const coverageTableGeometry = await page
+        .locator(".table-wrap")
+        .evaluate((wrapper) => ({
           clientWidth: wrapper.clientWidth,
           scrollWidth: wrapper.scrollWidth,
-          unlabeledCells: [
-            ...wrapper.querySelectorAll<HTMLElement>("tbody tr > th, tbody tr > td"),
-          ].filter((cell) => !cell.dataset.label).length,
-          cellStyles: [
-            ...wrapper.querySelectorAll<HTMLElement>("tbody tr > th, tbody tr > td"),
-          ].map((cell) => {
-            const style = getComputedStyle(cell);
+        }));
+      expect(coverageTableGeometry.scrollWidth).toBeLessThanOrEqual(
+        coverageTableGeometry.clientWidth,
+      );
+
+      await page.goto("/sources/");
+      const sourceHeadingGeometry = await page
+        .locator(".source-card h2")
+        .evaluateAll((headings) =>
+          headings.map((heading) => {
+            const style = getComputedStyle(heading);
             return {
-              cellWidth: cell.getBoundingClientRect().width,
-              gridColumnCount: style.gridTemplateColumns.trim().split(/\s+/).length,
+              fontSize: Number.parseFloat(style.fontSize),
               overflowWrap: style.overflowWrap,
-              rowWidth: cell.parentElement?.getBoundingClientRect().width ?? 0,
               wordBreak: style.wordBreak,
-              hyphens: style.hyphens,
             };
           }),
-        })),
-      );
-      expect(tableRegions.length, `${path} did not render a table`).toBeGreaterThan(0);
+        );
+      expect(sourceHeadingGeometry.length).toBeGreaterThan(0);
       expect(
-        tableRegions.every((region) => region.scrollWidth <= region.clientWidth),
-        `${path} contained a horizontal table scroller at ${width}px`,
+        Math.max(...sourceHeadingGeometry.map((heading) => heading.fontSize)),
+      ).toBeLessThanOrEqual(29);
+      expect(
+        sourceHeadingGeometry.every(
+          (heading) => heading.overflowWrap === "normal",
+        ),
       ).toBe(true);
       expect(
-        tableRegions.every((region) => region.unlabeledCells === 0),
-        `${path} contained an unlabeled mobile table cell`,
-      ).toBe(true);
-      expect(
-        tableRegions.every((region) =>
-          region.cellStyles.every((style) =>
-            Math.abs(style.rowWidth - style.cellWidth) <= 2)),
-        `${path} retained a desktop column width on mobile at ${width}px`,
-      ).toBe(true);
-      expect(
-        tableRegions.every((region) =>
-          region.cellStyles.every((style) => (
-            style.overflowWrap === "break-word"
-            && style.wordBreak === "normal"
-            && style.hyphens === "none"
-          ))),
-        `${path} allowed mobile table values to split ordinary words at ${width}px`,
-      ).toBe(true);
-      expect(
-        tableRegions.every((region) =>
-          region.cellStyles.every((style) =>
-            width <= 480 ? style.gridColumnCount === 1 : style.gridColumnCount === 2)),
-        `${path} used a cramped mobile table layout at ${width}px`,
+        sourceHeadingGeometry.every(
+          (heading) => heading.wordBreak === "normal",
+        ),
       ).toBe(true);
     }
-  }
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/source-coverage/");
-  const coverageTableGeometry = await page.locator(".table-wrap").evaluate((wrapper) => ({
-    clientWidth: wrapper.clientWidth,
-    scrollWidth: wrapper.scrollWidth,
-  }));
-  expect(coverageTableGeometry.scrollWidth).toBeLessThanOrEqual(
-    coverageTableGeometry.clientWidth,
-  );
-
-  await page.goto("/sources/");
-  const sourceHeadingGeometry = await page.locator(".source-card h2").evaluateAll(
-    (headings) => headings.map((heading) => {
-      const style = getComputedStyle(heading);
-      return {
-        fontSize: Number.parseFloat(style.fontSize),
-        overflowWrap: style.overflowWrap,
-        wordBreak: style.wordBreak,
-      };
-    }),
-  );
-  expect(sourceHeadingGeometry.length).toBeGreaterThan(0);
-  expect(Math.max(...sourceHeadingGeometry.map((heading) => heading.fontSize)))
-    .toBeLessThanOrEqual(29);
-  expect(sourceHeadingGeometry.every((heading) => heading.overflowWrap === "normal"))
-    .toBe(true);
-  expect(sourceHeadingGeometry.every((heading) => heading.wordBreak === "normal"))
-    .toBe(true);
-});
+  });
+}
 
 test("runtime requests remain same-origin and no remote font or analytics is present", async ({ page }) => {
   const origins = new Set<string>();

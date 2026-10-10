@@ -45,21 +45,47 @@ jobs:
           breachgazette validate-relationships \
             --catalogue tests/fixtures/reviews/relationship-decisions.yml --json
           pip-audit -r requirements.lock
+      - name: Verify non-editable installed resources
+        run: |
+          wheel_dir="$RUNNER_TEMP/installed-wheel"
+          smoke_dir="$RUNNER_TEMP/installed-smoke"
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir "$wheel_dir" .
+          python -m venv "$smoke_dir/venv"
+          "$smoke_dir/venv/bin/python" -m pip install -r requirements.lock
+          wheels=("$wheel_dir"/*.whl)
+          test "${#wheels[@]}" -eq 1
+          "$smoke_dir/venv/bin/python" -m pip install --no-deps "${wheels[0]}"
+          "$smoke_dir/venv/bin/python" -m pip check
+          cp scripts/smoke_installed.py "$smoke_dir/smoke_installed.py"
+          cp tests/fixtures/site/notifications.json "$smoke_dir/synthetic-notifications.json"
+          cp tests/fixtures/site/publication.json "$smoke_dir/synthetic-publication.json"
+          (
+            cd "$smoke_dir"
+            venv/bin/python smoke_installed.py synthetic-notifications.json synthetic-publication.json
+          )
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: site/package-lock.json
+      - name: Select pinned package manager
+        run: |
+          package_manager="$(node -p "require('./site/package.json').packageManager")"
+          npm install --prefix "$RUNNER_TEMP/npm-runtime" --ignore-scripts --no-audit --no-fund "$package_manager"
+          echo "$RUNNER_TEMP/npm-runtime/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install locked site dependencies
         working-directory: site
         run: |
           npm ci --ignore-scripts --no-audit
           npm ls --depth=0
+      - name: Verify publication authority
+        run: node --test .github/scripts/*.test.mjs
       - name: Verify test-only static site
         working-directory: site
         run: |
           npm run check:test
+          npm run test:build-budget
           npm audit --audit-level=high
           npm run build:test
           breachgazette audit-public-tree dist --json
@@ -79,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --user 1001
     steps:
       - name: Check out source
@@ -90,6 +116,11 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: site/package-lock.json
+      - name: Select pinned package manager
+        run: |
+          package_manager="$(node -p "require('./site/package.json').packageManager")"
+          npm install --prefix "$RUNNER_TEMP/npm-runtime" --ignore-scripts --no-audit --no-fund "$package_manager"
+          echo "$RUNNER_TEMP/npm-runtime/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install locked site dependencies
         working-directory: site
         run: npm ci --ignore-scripts --no-audit
@@ -106,3 +137,5 @@ jobs:
       contents: read
       security-events: write
     uses: ./.github/workflows/codeql.yml
+    with:
+      category_prefix: .github/workflows/ci.yml:analyze

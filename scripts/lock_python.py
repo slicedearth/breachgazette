@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LOCK = ROOT / "requirements.lock"
 LOCK_PYTHON = (3, 12)
-LOCK_PIP = "26.1.2"
+LOCK_PIP = "26.2.1"
 PIN = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s]+)$")
 
 
@@ -103,11 +103,13 @@ def run(command: list[str], *, environment: dict[str, str] | None = None) -> str
 
 
 def frozen_requirements(python: Path, *, environment: dict[str, str] | None = None) -> str:
+    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    project_name = configuration["project"]["name"]
     command_environment = (environment or os.environ).copy()
     command_environment.setdefault("PIP_DISABLE_PIP_VERSION_CHECK", "1")
     command_environment.setdefault("PIP_NO_CACHE_DIR", "1")
     output = run(
-        [str(python), "-m", "pip", "freeze", "--exclude-editable"],
+        [str(python), "-m", "pip", "freeze", "--exclude-editable", "--exclude", project_name],
         environment=command_environment,
     )
     pins = parse_requirements(output.splitlines(), source="installed environment")
@@ -126,9 +128,7 @@ def check_installed(path: Path) -> None:
         missing = sorted(set(locked) - set(installed))
         unexpected = sorted(set(installed) - set(locked))
         changed = sorted(
-            key
-            for key in set(locked) & set(installed)
-            if locked[key][1] != installed[key][1]
+            key for key in set(locked) & set(installed) if locked[key][1] != installed[key][1]
         )
         details = []
         if missing:
@@ -140,7 +140,7 @@ def check_installed(path: Path) -> None:
         raise LockError("installed environment differs from lock; " + "; ".join(details))
 
 
-def regenerate(path: Path) -> None:
+def regenerate(path: Path, *, constraints: Path | None = None) -> None:
     if sys.version_info[:2] != LOCK_PYTHON:
         required = ".".join(str(part) for part in LOCK_PYTHON)
         actual = f"{sys.version_info.major}.{sys.version_info.minor}"
@@ -165,7 +165,14 @@ def regenerate(path: Path) -> None:
             environment=environment,
         )
         run(
-            [str(python), "-m", "pip", "install", *build_requirements],
+            [
+                str(python),
+                "-m",
+                "pip",
+                "install",
+                *(["--constraint", str(constraints.resolve())] if constraints else []),
+                *build_requirements,
+            ],
             environment=environment,
         )
         run(
@@ -174,6 +181,7 @@ def regenerate(path: Path) -> None:
                 "-m",
                 "pip",
                 "install",
+                *(["--constraint", str(constraints.resolve())] if constraints else []),
                 "--no-build-isolation",
                 "--editable",
                 f"{ROOT}[dev]",
@@ -219,6 +227,11 @@ def main() -> int:
         default=DEFAULT_LOCK,
         help="lock path to validate or write (default: requirements.lock)",
     )
+    parser.add_argument(
+        "--constraints",
+        type=Path,
+        help="preserve reviewed pins during regeneration with a constraints file",
+    )
     arguments = parser.parse_args()
     try:
         if arguments.check_installed:
@@ -226,7 +239,7 @@ def main() -> int:
         elif arguments.check:
             validate_lock(arguments.output)
         else:
-            regenerate(arguments.output)
+            regenerate(arguments.output, constraints=arguments.constraints)
     except (LockError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"error: {error}\n")
     return 0

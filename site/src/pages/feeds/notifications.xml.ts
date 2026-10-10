@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { getAllNotifications, getPublication } from "../../lib/data";
 import type { Notification } from "../../lib/types";
+import { notificationFeedUpdated } from "../../lib/notificationFeed";
 
 const xml = (value: string) =>
   value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
@@ -22,12 +23,7 @@ export const GET: APIRoute = ({ site }) => {
   ).toString();
   const homeUrl = new URL(import.meta.env.BASE_URL, site).toString();
   const entries = getAllNotifications().slice(0, 50).map((record) => {
-    const detailUrl = record.has_detail_page
-      ? new URL(
-          `${import.meta.env.BASE_URL}notifications/${encodeURIComponent(record.source_record_id)}/`,
-          site,
-        ).toString()
-      : new URL(
+    const detailUrl = new URL(
           `${import.meta.env.BASE_URL}latest/#query=${encodeURIComponent(record.source_record_id)}&record=${encodeURIComponent(record.source_record_id)}`,
           site,
         ).toString();
@@ -44,7 +40,7 @@ export const GET: APIRoute = ({ site }) => {
       `<id>${xml(`urn:breachgazette:${record.source_id}:${record.source_record_id}`)}</id>`,
       `<title>${xml(title)}</title>`,
       `<link href="${xml(detailUrl)}" />`,
-      `<updated>${xml(record.local_last_observed_time)}</updated>`,
+      `<updated>${xml(notificationFeedUpdated(record))}</updated>`,
       `<published>${xml(`${observed}T00:00:00Z`)}</published>`,
       `<summary>${xml(summary)}</summary>`,
       "</entry>",
