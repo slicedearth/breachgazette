@@ -38,7 +38,13 @@ fixture state.
 Workflows use least privilege, immutable action SHAs, explicit timeouts, locked
 dependencies, and no live sources in CI. Netlify publication runs only after
 successful `main` CI, after a verified persisted private-state update, or by
-manual dispatch. A private GitHub App installed only on the state repository
+manual dispatch. Every publication path requires the current protected `main`
+revision and its latest completed, successful push CI from this repository.
+Pull-request CI, release tags, stale revisions and fork runs cannot authorise
+publication. The source check runs before private-state access and again before
+deployment; the updater also checks it before persisting state. These API checks
+do not make the separate Git and hosting services an atomic transaction.
+A private GitHub App installed only on the state repository
 mints repository-specific installation tokens that expire after one hour. The
 publication job requests read-only Contents access and uploads only the audited
 static tree. Dry-run update workflows make no commit, push, issue, or

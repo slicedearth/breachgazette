@@ -79,6 +79,8 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit
           npm ls --depth=0
+      - name: Verify publication authority
+        run: node --test .github/scripts/*.test.mjs
       - name: Verify test-only static site
         working-directory: site
         run: |
@@ -135,3 +137,5 @@ jobs:
       contents: read
       security-events: write
     uses: ./.github/workflows/codeql.yml
+    with:
+      category_prefix: .github/workflows/ci.yml:analyze

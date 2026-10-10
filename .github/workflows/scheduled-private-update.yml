@@ -21,7 +21,9 @@ concurrency:
 
 jobs:
   update:
-    if: github.event_name == 'workflow_dispatch' || vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' || vars.BREACHGAZETTE_SCHEDULE_ENABLED == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -45,6 +47,12 @@ jobs:
           echo "data_ref=$CONFIGURED_DATA_REF" >> "$GITHUB_OUTPUT"
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Verify protected source before private-state access
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/publication-policy.mjs
       - name: Mint write-scoped private-state token
         id: state-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -112,6 +120,13 @@ jobs:
             .private-production-data/reports/source-health.json
           if-no-files-found: warn
           retention-days: 14
+      - name: Recheck protected source before persisting state
+        if: >-
+          steps.update_cycle.outcome == 'success' &&
+          (github.event_name == 'schedule' || inputs.persist_private_state)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/publication-policy.mjs
       - name: Commit verified private state
         if: >-
           steps.update_cycle.outcome == 'success' &&

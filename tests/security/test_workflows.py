@@ -98,6 +98,14 @@ def test_scheduled_private_update_is_opt_in_and_candidate_gated() -> None:
     assert "data_ref: ${{ vars.BREACHGAZETTE_DATA_REF }}" not in publish_job
     assert "reviews" in workflow
     assert "breachgazette-update@users.noreply.github.com" in workflow
+    assert "github.ref == 'refs/heads/main'" in update_job
+    assert update_job.count("run: node .github/scripts/publication-policy.mjs") == 2
+    assert update_job.index(
+        "Verify protected source before private-state access"
+    ) < update_job.index("Mint write-scoped private-state token")
+    assert update_job.index("Recheck protected source before persisting state") < update_job.index(
+        "Commit verified private state"
+    )
 
 
 def test_source_drift_can_inspect_every_implemented_adapter() -> None:
@@ -151,7 +159,12 @@ def test_ci_covers_private_catalogue_contracts_and_all_browser_engines() -> None
     assert 'BREACHGAZETTE_SITE_URL: "https://breachgazette.example"' in workflow
     codeql = (WORKFLOW_ROOT / "codeql.yml").read_text(encoding="utf-8")
     assert "workflow_call:" in codeql
-    assert "pull_request:" not in codeql
+    assert "pull_request:" in codeql
+    assert "branches: [main]" in codeql
+    assert "codeql-${{ github.workflow }}-${{ github.ref }}" in codeql
+    assert "category_prefix: .github/workflows/ci.yml:analyze" in workflow
+    assert "default: .github/workflows/codeql.yml:analyze" in codeql
+    assert "node --test .github/scripts/*.test.mjs" in workflow
     assert "language: [python, javascript-typescript]" in codeql
 
 
@@ -163,13 +176,17 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert "github.event.workflow_run.conclusion == 'success'" in workflow
     assert "github.event.workflow_run.event == 'push'" in workflow
     assert "github.event.workflow_run.head_branch == 'main'" in workflow
-    assert (
-        "github.event.workflow_run.head_repository.full_name == github.repository"
-        in workflow
-    )
+    assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
     assert "github.event.workflow_run.head_sha" in workflow
     assert "actions: read" in workflow
     assert "Verify source revision passed the complete CI gate" in workflow
+    assert workflow.count("run: node .github/scripts/publication-policy.mjs") == 2
+    assert workflow.index("run: node .github/scripts/publication-policy.mjs") < workflow.index(
+        "Mint read-only private-state token"
+    )
+    assert workflow.index("Recheck protected source before deployment") < workflow.index(
+        "Deploy audited static tree"
+    )
     assert "BREACHGAZETTE_SCHEDULE_ENABLED: ${{ vars.BREACHGAZETTE_SCHEDULE_ENABLED }}" in workflow
     assert "Manual publication requires an exact 40-character private-state commit." in workflow
     assert "vars.BREACHGAZETTE_DATA_REF" in workflow
@@ -186,8 +203,7 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert "persist-credentials: false" in workflow
     assert "vars.BREACHGAZETTE_SITE_URL" in workflow
     assert (
-        "BREACHGAZETTE_SOURCE_REVISION: "
-        "${{ steps.revisions.outputs.source_revision }}"
+        "BREACHGAZETTE_SOURCE_REVISION: ${{ steps.revisions.outputs.source_revision }}"
     ) in workflow
     assert 'echo "source_revision=$source_revision" >> "$GITHUB_OUTPUT"' in workflow
     assert "npm run build:budget" in workflow
@@ -225,6 +241,8 @@ def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() ->
     assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
     assert "retention-days: 30" in workflow
     assert "EXPECTED_SOURCE_REVISION" in workflow
+    assert ".search_manifest_binding.sha256" in workflow
+    assert 'test "$expected_manifest_sha" = "$actual_manifest_sha"' in workflow
     assert ".source_revision == $source_revision" in workflow
     assert "strict-transport-security: max-age=31536000" in workflow
     assert "x-content-type-options: nosniff" in workflow
