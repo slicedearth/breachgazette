@@ -98,7 +98,7 @@ def test_interrupted_promotion_preserves_inspectable_generations_under_recovered
     else:
         assert b'"value":"new"' in (root / "state/generation.json").read_bytes()
         assert (root / ".git/marker").read_bytes() == original[".git/marker"]
-        retained = tmp_path / applied["retained_previous"]
+        retained = tmp_path / applied["retained_cleanup"]
         assert retained.is_dir() and not previous.exists()
     assert recover_generation(root, apply=True) == {"status": "clean", "applied": False}
 

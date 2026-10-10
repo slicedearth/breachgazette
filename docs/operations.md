@@ -214,17 +214,25 @@ private operational state and must not be committed to the public repository.
 
 ### Interrupted generation promotion
 
-Ordinary exceptions roll promotion back under the single-writer lock. Abrupt
-process termination or machine loss can interrupt the directory renames instead.
-This can leave the configured root absent with recoverable data in its sibling
-`.<root-name>-previous` and `.<root-name>-candidate-*` directories. Do not run a
-new update, migration or restore over these paths, and do not delete them.
+Ordinary exceptions before the new root is installed roll promotion back under
+the single-writer lock. Once the new root is committed, a cleanup exception does
+not roll it back. Abrupt process termination or machine loss can interrupt the
+renames instead. This can leave the configured root absent with recoverable data
+in its sibling `.<root-name>-previous` and `.<root-name>-candidate-*` directories.
+Do not run a new update, migration or restore over these paths, and do not delete them.
 
 Promotion now writes and synchronises a sibling `.<root-name>.promotion.json`
 journal before the first rename. It records checksums of both complete state
 trees and the device/inode identity of the repository metadata. State files,
 directories and rename parents are synchronised. A pending journal blocks new
 writers; candidate cleanup preserves interrupted generations.
+
+Version 1.1 journals also reserve a unique `.<root-name>-cleanup-*` sibling.
+After installing the complete new root, promotion atomically moves the previous
+tree to this cleanup path and synchronises its parent before deleting any old
+entries. Until that move, the previous tree must still match its complete
+checksum. The separately retired cleanup tree may be partially deleted without
+making the installed generation ambiguous. It is not a rollback source.
 
 Pause writers and inspect the journal under the same filesystem lock:
 
@@ -236,17 +244,33 @@ Pause writers and inspect the journal under the same filesystem lock:
 The first command only inspects. Applying recovery restores the verified previous
 generation when the root is absent, including repository metadata moved into the
 candidate. It retains the candidate. If the complete new root is already present,
-recovery keeps it and moves the verified previous generation to a reported
-recovery directory. Nothing is silently promoted from an uninstalled candidate.
-Repeated recovery is harmless after the journal has been cleared. Retained
-recovery directories require separate operator review and disposal.
+recovery verifies its exact checksum and repository metadata identity before
+settling the journal. A surviving previous tree must be complete and is moved to
+the journal's cleanup path. An already retired tree produces `cleanup_pending`:
+its remaining entries must be bounded regular files and directories, with no
+repository metadata or symbolic links. Recovery leaves those remnants untouched
+and reports their path as `retained_cleanup`, not as a complete backup.
+If cleanup already removed the whole retired directory, recovery
+can settle the journal without a retained path. Cleanup errors and interruption
+during recovery can be inspected and retried using the same command.
 
-Ambiguous paths, changed checksums, duplicate metadata and unsupported journals
-fail closed. A previous directory without a journal, including an interruption
-from an older version, still requires manual verification against an independent
-inventory or restored backup. No automatic migration or recovery occurs during
-ordinary read-only preflight. The protocol supports process-crash recovery on a
-local POSIX filesystem; it does not promise continuous root availability between
+Nothing is silently promoted from an uninstalled candidate. Repeated recovery is
+harmless after the journal has been cleared. Retained cleanup and recovery
+directories require separate operator review and disposal. They are not included
+in the configured authoritative root or automatically deleted by the next update.
+
+Ambiguous paths, changed authoritative/candidate checksums, duplicate or moved
+metadata and unsupported journals fail closed. The partial-tree allowance applies
+only to the exact journal-tracked retired cleanup path with a verified committed
+root; it never applies to the previous or candidate paths. Version 1.0 journals
+remain recoverable when their original complete-tree checks pass and report a
+retained old tree as `retained_previous`. A partially deleted previous tree from
+that older protocol still requires manual verification, as does a previous
+directory without a journal. Use an independent inventory or restored backup;
+do not edit the journal or relabel an uncertain previous tree as cleanup to bypass
+verification. No automatic migration or recovery occurs during ordinary read-only
+preflight. The protocol supports process-crash recovery on a local POSIX
+filesystem; it does not promise continuous root availability between
 renames, distributed locking or protection against filesystem/hardware corruption.
 
 The committed policy bounds managed private-state directories to 1 GiB,

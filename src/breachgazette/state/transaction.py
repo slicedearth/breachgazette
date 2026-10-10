@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from breachgazette.state.recovery import (
+    cleanup_path,
     clear_journal,
     prepare_journal,
     promotion_pending,
@@ -59,7 +60,7 @@ def copy_candidate(root: Path) -> Path:
 
 def promote_candidate(root: Path, candidate: Path) -> None:
     backup = root.with_name(f".{root.name}-previous")
-    if backup.exists():
+    if backup.exists() or backup.is_symlink():
         raise ValueError("a previous update backup already exists; review it before retrying")
     prepare_journal(root, candidate)
     existed = root.exists()
@@ -88,10 +89,15 @@ def promote_candidate(root: Path, candidate: Path) -> None:
         clear_journal(root)
         raise
     if existed:
-        # The new generation is committed. Cleanup failure must not report a rolled-back write.
-        shutil.rmtree(backup, ignore_errors=True)
-    if not backup.exists():
-        clear_journal(root)
+        # Retire the old tree atomically before any destructive cleanup. A partial
+        # cleanup is not an ambiguous rollback generation in the pending journal.
+        cleanup = cleanup_path(root, candidate.name)
+        backup.rename(cleanup)
+        sync_directory(root.parent)
+        shutil.rmtree(cleanup, ignore_errors=True)
+        if cleanup.exists() or cleanup.is_symlink():
+            return
+    clear_journal(root)
 
 
 def discard_candidate(root: Path, candidate: Path) -> None:
