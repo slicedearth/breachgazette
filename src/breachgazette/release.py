@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import tempfile
 from collections.abc import Callable
 from contextlib import suppress
@@ -24,7 +23,12 @@ from breachgazette.privacy.audit import require_public_safe
 from breachgazette.publish.builder import audit_public_tree, build_site_data
 from breachgazette.retention import restore_state_backup, state_inventory
 from breachgazette.state import PrivateStateStore
-from breachgazette.state.transaction import copy_candidate, promote_candidate, state_lock
+from breachgazette.state.transaction import (
+    copy_candidate,
+    discard_candidate,
+    promote_candidate,
+    state_lock,
+)
 from breachgazette.utils import atomic_write_json, canonical_json_bytes, sha256_hex
 
 
@@ -323,7 +327,7 @@ def _migrate_locked(
             raise ValueError("state changed before identity promotion")
         promote_candidate(root, candidate)
     finally:
-        shutil.rmtree(candidate, ignore_errors=True)
+        discard_candidate(root, candidate)
     return {
         "validated": True,
         "applied": True,

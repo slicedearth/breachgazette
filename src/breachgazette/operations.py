@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from breachgazette.attempts import append_attempt, history_target
 from breachgazette.contracts import SourceHealthReport, SourceSnapshot
 from breachgazette.monitoring import (
     build_source_health_report,
@@ -18,7 +19,12 @@ from breachgazette.pipeline import ADAPTERS, _update_source_generation, update_a
 from breachgazette.publish.builder import audit_public_tree, build_site_data
 from breachgazette.retention import compact_state, state_inventory
 from breachgazette.state import PrivateStateStore
-from breachgazette.state.transaction import copy_candidate, promote_candidate, state_lock
+from breachgazette.state.transaction import (
+    copy_candidate,
+    discard_candidate,
+    promote_candidate,
+    state_lock,
+)
 from breachgazette.utils import atomic_write_json, read_json
 
 UpdateFunction = Callable[..., list[dict[str, Any]]]
@@ -44,6 +50,7 @@ def run_update_cycle(
     builder: BuildFunction = build_site_data,
     auditor: AuditFunction = audit_public_tree,
     attempt_report: Path | None = None,
+    attempt_history: Path | None = None,
 ) -> dict[str, Any]:
     with state_lock(data_root):
         return _run_update_cycle_locked(
@@ -54,6 +61,7 @@ def run_update_cycle(
             builder=builder,
             auditor=auditor,
             attempt_report=attempt_report,
+            attempt_history=attempt_history,
         )
 
 
@@ -66,8 +74,10 @@ def _run_update_cycle_locked(
     builder: BuildFunction,
     auditor: AuditFunction,
     attempt_report: Path | None,
+    attempt_history: Path | None,
 ) -> dict[str, Any]:
     root = _bounded_root(data_root)
+    history = history_target(attempt_history, root) if attempt_history is not None else None
     selected = sources or list(ADAPTERS)
     if len(set(selected)) != len(selected) or set(selected) - set(ADAPTERS):
         raise ValueError("update-cycle sources must be distinct supported identifiers")
@@ -75,6 +85,8 @@ def _run_update_cycle_locked(
         report_target = attempt_report.resolve()
         if report_target == root or root in report_target.parents:
             raise ValueError("attempt reports must be outside the authoritative data root")
+        if history is not None and (history == report_target or history in report_target.parents):
+            raise ValueError("current attempt report must be outside retained attempt history")
     started = datetime.now(UTC)
     production_store = PrivateStateStore(root)
     production_snapshots = {
@@ -142,27 +154,27 @@ def _run_update_cycle_locked(
                 _capture_attempt_sources(
                     candidate, selected, started, attempted, diagnostics, production_snapshots
                 )
-            if attempt_report is not None:
-                atomic_write_json(
-                    attempt_report,
-                    {
-                        "schema_version": "1.0",
-                        "started_at": started,
-                        "completed_at": datetime.now(UTC),
-                        "passed": succeeded,
-                        "promoted": succeeded and promote,
-                        "phase": "complete" if succeeded else phase,
-                        "sources": diagnostics,
-                        "limitations": [
-                            "Attempt status is separate from the last successfully "
-                            "published state.",
-                            "A publication failure does not mean every source retrieval failed.",
-                            "No source records, retrieval URLs or exception text are included.",
-                        ],
-                    },
-                )
+            if attempt_report is not None or history is not None:
+                report = {
+                    "schema_version": "1.0",
+                    "started_at": started,
+                    "completed_at": datetime.now(UTC),
+                    "passed": succeeded,
+                    "promoted": succeeded and promote,
+                    "phase": "complete" if succeeded else phase,
+                    "sources": diagnostics,
+                    "limitations": [
+                        "Attempt status is separate from the last successfully published state.",
+                        "A publication failure does not mean every source retrieval failed.",
+                        "No source records, retrieval URLs or exception text are included.",
+                    ],
+                }
+                if history is not None:
+                    append_attempt(history, report, source_ids=set(ADAPTERS))
+                if attempt_report is not None:
+                    atomic_write_json(attempt_report, report)
         finally:
-            shutil.rmtree(candidate, ignore_errors=True)
+            discard_candidate(root, candidate)
             shutil.rmtree(publication, ignore_errors=True)
 
 

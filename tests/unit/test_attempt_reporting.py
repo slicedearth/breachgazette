@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from breachgazette.attempts import append_attempt, history_target
 from breachgazette.contracts import SourceHealthReport, SourceSnapshot, UpdateCheckpoint
 from breachgazette.operations import attempt_summary, run_update_cycle
 from breachgazette.state import PrivateStateStore
@@ -38,6 +39,7 @@ def test_attempts_survive_failure_without_promoting_or_leaking(
     PrivateStateStore(root).write_snapshot(production_snapshot)
     before = {str(path): path.read_bytes() for path in root.rglob("*") if path.is_file()}
     report = tmp_path / "diagnostics/attempt.json"
+    history = tmp_path / "private-attempt-history"
     secret = "https://user:secret@private.example/raw"
 
     def update(*, data_root, sources):
@@ -87,6 +89,7 @@ def test_attempts_survive_failure_without_promoting_or_leaking(
         builder=build,
         auditor=audit,
         attempt_report=report,
+        attempt_history=history,
     )
     if failure == "none":
         assert run_update_cycle(**arguments)["promoted"] is False
@@ -102,6 +105,12 @@ def test_attempts_survive_failure_without_promoting_or_leaking(
     assert payload["sources"][0]["last_successful_production_update"] == "2026-01-01T00:00:00Z"
     assert payload["sources"][0]["attempt_record_count"] == (None if failure == "retrieval" else 2)
     assert secret not in report.read_text()
+    retained = list(history.glob("attempt-*.json"))
+    assert len(retained) == 1
+    first_attempt = retained[0].read_bytes()
+    assert secret.encode() not in first_attempt
+    assert "limitations" not in read_json(retained[0])
+    assert history.stat().st_mode & 0o077 == 0
     summary = attempt_summary(report)
     assert "private.example" not in summary and "secret" not in summary
     if failure != "none":
@@ -116,6 +125,75 @@ def test_attempts_survive_failure_without_promoting_or_leaking(
         assert {
             str(path): path.read_bytes() for path in root.rglob("*") if path.is_file()
         } == before
+        assert len(list(history.glob("attempt-*.json"))) == 2
+        assert retained[0].read_bytes() == first_attempt
+
+
+def test_private_history_retention_and_strict_fields(tmp_path, monkeypatch):
+    from datetime import timedelta
+
+    monkeypatch.setattr("breachgazette.attempts.MAX_ATTEMPTS", 2)
+    history = tmp_path / "history"
+    started = datetime(2026, 1, 1, tzinfo=UTC)
+    report = {
+        "schema_version": "1.0",
+        "started_at": started,
+        "completed_at": started,
+        "passed": False,
+        "promoted": False,
+        "phase": "retrieval",
+        "sources": [],
+    }
+    for day in range(3):
+        value = {
+            **report,
+            "started_at": started + timedelta(days=day),
+            "completed_at": started + timedelta(days=day),
+        }
+        append_attempt(history, value, source_ids={"washington"})
+    entries = sorted(history.iterdir())
+    assert len(entries) == 2 and "20260102" in entries[0].name
+    assert all(entry.stat().st_mode & 0o077 == 0 for entry in entries)
+    append_attempt(history, value, source_ids={"washington"})
+    assert sorted(history.iterdir()) == entries
+    with pytest.raises(ValueError):
+        append_attempt(history, {**report, "exception": "private source data"}, source_ids=set())
+    entries[0].write_text("tampered")
+    with pytest.raises(ValueError, match="checksum"):
+        append_attempt(history, report, source_ids=set())
+
+
+def test_history_rejects_state_overlap_symlinks_public_checkout_and_open_permissions(tmp_path):
+    root = tmp_path / "fixture-state"
+    root.mkdir()
+    for path in (root, root / "history", tmp_path):
+        with pytest.raises(ValueError, match="separate"):
+            history_target(path, root)
+    link = tmp_path / "link"
+    link.symlink_to(root)
+    with pytest.raises(ValueError, match="symbolic"):
+        history_target(link, root)
+    checkout = tmp_path / "checkout"
+    (checkout / "src/breachgazette").mkdir(parents=True)
+    (checkout / "pyproject.toml").touch()
+    with pytest.raises(ValueError, match="source checkout"):
+        history_target(checkout / "history", root)
+    history = tmp_path / "open-history"
+    history.mkdir(mode=0o755)
+    with pytest.raises(ValueError, match="owner-only"):
+        append_attempt(
+            history,
+            {
+                "schema_version": "1.0",
+                "started_at": datetime.now(UTC),
+                "completed_at": datetime.now(UTC),
+                "passed": False,
+                "promoted": False,
+                "phase": "retrieval",
+                "sources": [],
+            },
+            source_ids=set(),
+        )
 
 
 def test_attempt_report_cannot_mutate_authoritative_state(tmp_path: Path) -> None:

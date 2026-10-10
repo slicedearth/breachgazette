@@ -48,6 +48,7 @@ from breachgazette.retention import (
     state_inventory,
 )
 from breachgazette.state import PrivateStateStore
+from breachgazette.state.recovery import recover_generation
 from breachgazette.utils import atomic_write_json, normalize_organization_name
 
 app = typer.Typer(
@@ -282,6 +283,7 @@ def update_cycle_command(
     source: Annotated[list[str] | None, typer.Option("--source")] = None,
     promote: Annotated[bool, typer.Option("--promote")] = False,
     attempt_report: Annotated[Path | None, typer.Option("--attempt-report")] = None,
+    attempt_history: Annotated[Path | None, typer.Option("--attempt-history")] = None,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     _emit(
@@ -290,6 +292,7 @@ def update_cycle_command(
             sources=source,
             promote=promote,
             attempt_report=attempt_report,
+            attempt_history=attempt_history,
         ),
         json_output=json_output,
     )
@@ -298,6 +301,15 @@ def update_cycle_command(
 @app.command("attempt-summary")
 def attempt_summary_command(report: Annotated[Path, typer.Argument(exists=True)]) -> None:
     typer.echo(attempt_summary(report), nl=False)
+
+
+@app.command("recover-state")
+def recover_state_command(
+    data_root: Annotated[Path | None, typer.Option("--data-root")] = None,
+    apply: Annotated[bool, typer.Option("--apply")] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    _emit(recover_generation(_data_root(data_root), apply=apply), json_output=json_output)
 
 
 @app.command("ingest-fixture")

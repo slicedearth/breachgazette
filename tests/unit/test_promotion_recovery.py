@@ -7,7 +7,13 @@ import sys
 
 import pytest
 
-from breachgazette.state.transaction import copy_candidate, state_lock
+from breachgazette.state.recovery import (
+    journal_path,
+    prepare_journal,
+    recover_generation,
+    tree_checksum,
+)
+from breachgazette.state.transaction import copy_candidate, discard_candidate, state_lock
 
 CHILD = """
 import os
@@ -63,22 +69,106 @@ def test_interrupted_promotion_preserves_inspectable_generations_under_recovered
     previous = root.with_name(f".{root.name}-previous")
     assert previous.is_dir()
     assert (previous / "state/generation.json").read_bytes() == original["state/generation.json"]
-    # Inspection/recovery starts only after reacquiring the same writer lock.
-    with state_lock(root):
-        if phase < 3:
-            assert not root.exists() and candidate.is_dir()
-            if (candidate / ".git").exists():
-                assert not (previous / ".git").exists()
-                (candidate / ".git").rename(previous / ".git")
-            previous.rename(root)
-            assert {
-                str(path.relative_to(root)): path.read_bytes()
-                for path in root.rglob("*")
-                if path.is_file()
-            } == original
-            assert b'"value":"new"' in (candidate / "state/generation.json").read_bytes()
-        else:
-            # A completed new root is not overwritten merely because old state remains.
-            assert root.is_dir() and not candidate.exists()
-            assert b'"value":"new"' in (root / "state/generation.json").read_bytes()
-            assert (root / ".git/marker").read_bytes() == original[".git/marker"]
+    with pytest.raises(ValueError, match="recover-state"), state_lock(root):
+        pytest.fail("interrupted promotion allowed a new writer")
+    before = {
+        str(path.relative_to(tmp_path)): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+    inspection = recover_generation(root)
+    assert inspection["status"] == ("restore_previous" if phase < 3 else "complete")
+    assert inspection["applied"] is False
+    assert {
+        str(path.relative_to(tmp_path)): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    } == before
+    discard_candidate(root, candidate)
+    assert candidate.exists() == (phase < 3)
+    applied = recover_generation(root, apply=True)
+    assert applied["applied"] is True and not journal_path(root).exists()
+    if phase < 3:
+        assert {
+            str(path.relative_to(root)): path.read_bytes()
+            for path in root.rglob("*")
+            if path.is_file()
+        } == original
+        assert b'"value":"new"' in (candidate / "state/generation.json").read_bytes()
+    else:
+        assert b'"value":"new"' in (root / "state/generation.json").read_bytes()
+        assert (root / ".git/marker").read_bytes() == original[".git/marker"]
+        retained = tmp_path / applied["retained_previous"]
+        assert retained.is_dir() and not previous.exists()
+    assert recover_generation(root, apply=True) == {"status": "clean", "applied": False}
+
+
+@pytest.mark.parametrize("tamper", ["candidate", "previous", "metadata", "symlink"])
+def test_recovery_rejects_changed_or_ambiguous_generations(tmp_path, tamper):
+    root = tmp_path / "fixture-state"
+    root.mkdir()
+    (root / "value").write_text("old")
+    (root / ".git").mkdir()
+    candidate = copy_candidate(root)
+    (candidate / "value").write_text("new")
+    prepare_journal(root, candidate)
+    previous = root.with_name(f".{root.name}-previous")
+    root.rename(previous)
+    if tamper == "candidate":
+        (candidate / "value").write_text("different")
+    elif tamper == "previous":
+        (previous / "value").write_text("different")
+    elif tamper == "metadata":
+        (candidate / ".git").mkdir()
+    else:
+        (candidate / "link").symlink_to(previous / "value")
+    with pytest.raises(ValueError):
+        recover_generation(root, apply=True)
+    assert not root.exists() and previous.exists() and candidate.exists()
+    assert journal_path(root).exists()
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_journal_before_first_rename_can_be_cleared_without_promoting(tmp_path, existing):
+    root = tmp_path / "fixture-state"
+    if existing:
+        root.mkdir()
+    candidate = copy_candidate(root)
+    (candidate / "value").write_text("new")
+    prepare_journal(root, candidate)
+    result = recover_generation(root, apply=True)
+    assert result["status"] == ("original" if existing else "unpromoted_initial")
+    assert root.exists() == existing
+    assert candidate.exists()
+
+
+def test_recovery_rejects_unsafe_journal_and_unjournalled_previous(tmp_path):
+    root = tmp_path / "fixture-state"
+    root.mkdir()
+    candidate = copy_candidate(root)
+    prepare_journal(root, candidate)
+    path = journal_path(root)
+    path.write_text(path.read_text().replace(candidate.name, "../outside"))
+    with pytest.raises(ValueError, match="candidate"):
+        recover_generation(root, apply=True)
+    path.unlink()
+    root.rename(root.with_name(f".{root.name}-previous"))
+    with pytest.raises(ValueError, match="unjournalled"):
+        recover_generation(root, apply=True)
+
+
+def test_generation_checksum_bounds_and_includes_unmanaged_files(tmp_path, monkeypatch):
+    root = tmp_path / "fixture-state"
+    root.mkdir()
+    (root / "README").write_text("old")
+    first = tree_checksum(root)
+    (root / "README").write_text("new")
+    assert tree_checksum(root) != first
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        "breachgazette.state.recovery.load_retention_policy",
+        lambda: SimpleNamespace(maximum_state_bytes=2),
+    )
+    with pytest.raises(ValueError, match="byte bound"):
+        tree_checksum(root)

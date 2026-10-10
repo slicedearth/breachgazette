@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -35,7 +34,13 @@ from breachgazette.contracts.models import RecordProvenance
 from breachgazette.monitoring import guard_source_record_count
 from breachgazette.privacy.audit import require_public_safe
 from breachgazette.state import PrivateStateStore
-from breachgazette.state.transaction import copy_candidate, promote_candidate, state_lock
+from breachgazette.state.recovery import promotion_pending
+from breachgazette.state.transaction import (
+    copy_candidate,
+    discard_candidate,
+    promote_candidate,
+    state_lock,
+)
 
 AdapterFactory = Callable[[], Any]
 
@@ -87,6 +92,8 @@ def update_source(source_id: str, *, data_root: Path) -> dict[str, Any]:
             promote_candidate(root, candidate)
             return result
         except Exception:
+            if promotion_pending(root):
+                raise
             PrivateStateStore(root).write_checkpoint(
                 UpdateCheckpoint(
                     source_id=source_id,
@@ -98,7 +105,7 @@ def update_source(source_id: str, *, data_root: Path) -> dict[str, Any]:
             )
             raise
         finally:
-            shutil.rmtree(candidate, ignore_errors=True)
+            discard_candidate(root, candidate)
 
 
 def _update_source_generation(source_id: str, *, data_root: Path) -> dict[str, Any]:
