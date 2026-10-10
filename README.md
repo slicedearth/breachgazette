@@ -217,6 +217,13 @@ disabled until the schedule variable is deliberately enabled.
 
 ## Production static build
 
+Reviewed source changes publish automatically after the complete `main` CI gate.
+For deliberate publication, the [resumable release command](docs/operations.md#resumable-publication)
+checks exact source/state revisions, pauses collection, dispatches publication,
+verifies the live result and restores the previous schedule flag. Its default
+mode is read-only; `--apply` explicitly authorises that bounded sequence. It does
+not merge code, push commits or perform data migrations.
+
 Use `breachgazette deployment-preflight --data-root /absolute/private/state --json`
 to check offline state compatibility and publication gates without retrieving
 sources or promoting state. Legacy OAIC identity transitions require a private,

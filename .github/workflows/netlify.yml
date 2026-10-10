@@ -1,4 +1,5 @@
 name: Publish Netlify
+run-name: ${{ inputs.release_id && format('Release {0}', inputs.release_id) || 'Publish Netlify' }}
 
 on:
   workflow_call:
@@ -21,6 +22,10 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      release_id:
+        description: Optional correlation ID supplied by the resumable release command
+        required: false
+        type: string
       data_ref:
         description: Commit or tag in the configured private production-data repository
         required: true

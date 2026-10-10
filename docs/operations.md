@@ -410,6 +410,57 @@ the schedule. A failed gate leaves publication and automatic updates paused;
 never relax a gate to complete the cutover. All remote steps require operator
 approval. A local rehearsal is not an authoritative migration or deployment.
 
+### Resumable publication
+
+Ordinary source changes need no manual release sequence: merge reviewed code,
+let the complete `main` CI finish, and the publication workflow builds and checks
+the site. Scheduled collection uses the same publication gate after committing
+its verified private generation.
+
+For a deliberate publication, use the release command from a clean checkout at
+the exact protected `main` revision. It needs Node 24, authenticated `gh`, the
+locked Python environment at `.venv`, and a clean, already-authorised local copy
+of the configured private state at its current `main` commit. It does not fetch
+source records or clone private state. Keep the receipt in an existing owner-only
+directory (mode 700) outside all repositories.
+
+```bash
+node .github/scripts/release.mjs \
+  --source "$APPROVED_SOURCE_SHA" --state "$APPROVED_STATE_SHA" \
+  --data-root "$BREACHGAZETTE_DATA_ROOT" \
+  --receipt /absolute/private/receipts/release.json
+```
+
+Without `--apply`, this only checks protected-main CI, repository configuration,
+current state metadata, concurrent runs and offline compatibility. It makes no
+remote changes and writes no receipt. To carry out the reviewed sequence, add
+`--apply` to the same command. This is one approval for the specified source and
+state, pausing collection, publishing, live verification, and restoring the
+previous schedule flag. It is not approval to merge code or migrate data.
+
+The command records its checkpoints in a mode-600 receipt. If interrupted, reuse
+the same arguments and receipt. A correlation ID binds the dispatch to one run;
+an uncertain dispatch is never repeated automatically. The command waits up to
+30 minutes. A timeout can be resumed with the same receipt. A failed deployment,
+changed production input, duplicate run, rerun attempt or failed live check
+stops the sequence and leaves collection paused. Resolve the cause before
+preparing a new release; do not edit receipt fields to bypass a checkpoint.
+
+After an abrupt process termination, a sibling `.lock` directory may remain.
+Confirm that no release command is running before removing only that empty lock
+directory. Keep the receipt. If a dispatch cannot be found, inspect Actions
+before starting a new receipt to avoid a duplicate publication.
+
+This command does not change private records, commit, push, merge, alter branch
+protection or bypass environment approval. Identity migrations still need the
+reviewed mapping, restore-verified backup and explicit application described
+above. Prepare and persist that transition before invoking publication. Its
+hosted compatibility, privacy, build, provenance and live checks remain in place.
+
+The public update-status page describes its published snapshot and configured
+cadence, not live scheduler enablement. Restoring the schedule flag therefore
+does not require another site build.
+
 ### Offline publication checks
 
 Run the offline preflight before preparing a release:
