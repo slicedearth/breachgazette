@@ -403,12 +403,18 @@ class PublicationRecord(ContractModel):
     payload: dict[str, Any]
 
 
+class SearchManifestBinding(ContractModel):
+    schema_version: Literal["1.0"] = "1.0"
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class PublicationManifest(ContractModel):
     schema_version: Literal["1.0"] = "1.0"
     generated_at: datetime
     dataset_class: Literal["real_source_data", "test_fixture"]
     record_counts: dict[str, int]
     source_snapshots: list[SourceSnapshot]
+    search_manifest_binding: SearchManifestBinding | None = None
     publication_checksum: str = Field(pattern=r"^[0-9a-f]{64}$")
     publication_checksum_algorithm: Literal["sha256_canonical_json_v1"]
     publication_checksum_scope: Literal[

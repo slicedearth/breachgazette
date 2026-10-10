@@ -610,6 +610,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
             "corrections": len(events),
         },
         source_snapshots=snapshots,
+        search_manifest_binding={"schema_version": "1.0", "sha256": sha256_hex(search_manifest)},
         publication_checksum=publication_checksum,
         publication_checksum_algorithm="sha256_canonical_json_v1",
         publication_checksum_scope="publication_summary_and_search_partition_digests",

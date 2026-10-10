@@ -30,8 +30,22 @@ function readJson<T>(name: string, maxBytes = 60_000_000): T {
 }
 
 let publicationCache: Publication | undefined;
+let cacheDirectory: string | undefined;
+let searchManifestText: string | undefined;
+
+function ensureDataDirectory(): void {
+  const directory = dataDirectory();
+  if (cacheDirectory === directory) return;
+  cacheDirectory = directory;
+  publicationCache = undefined;
+  searchManifestCache = undefined;
+  searchManifestText = undefined;
+  searchPartitionCache.clear();
+  notificationCache = undefined;
+}
 
 export function getPublication(): Publication {
+  ensureDataDirectory();
   if (publicationCache) return publicationCache;
   const publication = readJson<Publication>("publication.json");
   const datasetClass = publication.manifest?.dataset_class;
@@ -45,6 +59,22 @@ export function getPublication(): Publication {
   if (!publication.quality?.passed) {
     throw new Error("Publication quality report did not pass");
   }
+  const path = join(dataDirectory(), "search-manifest.json");
+  if (statSync(path).size > 5_000_000) throw new Error("Search manifest exceeds its byte budget");
+  const bytes = readFileSync(path);
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  const manifest = validateSearchManifest(JSON.parse(text));
+  const binding = publication.manifest.search_manifest_binding;
+  if (binding != null && (
+    binding.schema_version !== "1.0" || typeof binding.sha256 !== "string" ||
+    !/^[0-9a-f]{64}$/.test(binding.sha256) ||
+    createHash("sha256").update(bytes).digest("hex") !== binding.sha256
+  )) throw new Error("Search manifest does not belong to this publication generation");
+  if (manifest.record_count !== publication.manifest.record_counts.notifications) {
+    throw new Error("Publication and search manifest counts disagree");
+  }
+  searchManifestCache = manifest;
+  searchManifestText = text;
   publicationCache = publication;
   return publicationCache;
 }
@@ -52,17 +82,19 @@ export function getPublication(): Publication {
 let searchManifestCache: SearchManifest | undefined;
 
 export function getSearchManifest(): SearchManifest {
-  if (searchManifestCache) return searchManifestCache;
-  const manifest = validateSearchManifest(
-    readJson<unknown>("search-manifest.json", 5_000_000),
-  );
-  searchManifestCache = manifest;
-  return searchManifestCache;
+  getPublication();
+  return searchManifestCache!;
+}
+
+export function getSearchManifestJSON(): string {
+  getPublication();
+  return searchManifestText!;
 }
 
 const searchPartitionCache = new Map<string, SearchPartition>();
 
 export function getSearchPartition(id: string): SearchPartition {
+  ensureDataDirectory();
   const cached = searchPartitionCache.get(id);
   if (cached) return cached;
   if (!/^[a-z0-9_-]+$/.test(id)) {
@@ -112,6 +144,7 @@ function latestSourceDate(notification: Notification): string {
 }
 
 export function getAllNotifications(): Notification[] {
+  ensureDataDirectory();
   if (notificationCache) return notificationCache;
   const manifest = getSearchManifest();
   const notifications = manifest.partitions.flatMap(

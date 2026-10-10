@@ -6,7 +6,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import { getAllNotifications, getPublication } from "../lib/data";
 import { getNotificationPage, NOTIFICATIONS_PER_PAGE } from "../lib/notifications";
 
-getPublication();
+const publication = getPublication();
 const staticPage = getNotificationPage(getAllNotifications(), 1);
 ---
 
@@ -26,7 +26,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         </div>
         <p>Filters run in this browser. Pagination changes only the visible results; exports retain every match.</p>
       </div>
-      <div data-notification-filters>
+      <div data-notification-filters data-manifest-checksum={publication.manifest.search_manifest_binding?.sha256 ?? ""}>
         <div class="filters filters--primary">
           <label>Organization or agency<input type="search" name="query" autocomplete="off" maxlength="300" placeholder="Name or source record ID" /></label>
           <label>Jurisdiction<select name="jurisdiction"><option value="">All jurisdictions</option></select></label>
@@ -134,6 +134,14 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       try {
         const response = await fetch(`${base}data/notifications/manifest.json`, { credentials: "same-origin" });
         const bytes = await boundedResponseBytes(response, 5_000_000);
+        const expectedDigest = controls.dataset.manifestChecksum;
+        if (expectedDigest) {
+          const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+            .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+          if (!/^[0-9a-f]{64}$/.test(expectedDigest) || digest !== expectedDigest) {
+            throw new Error("Search manifest belongs to a different publication.");
+          }
+        }
         loadedManifest = validateSearchManifest(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));
       } catch {
         count.textContent = "Search manifest could not be loaded. The complete static register remains available.";

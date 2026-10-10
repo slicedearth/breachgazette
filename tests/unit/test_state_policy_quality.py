@@ -703,6 +703,10 @@ def test_production_builder_emits_minimised_real_publication(
         assert metadata["bytes"] == len(encoded)
         assert metadata["sha256"] == sha256_hex(encoded)
     manifest = publication.pop("manifest")
+    assert manifest["search_manifest_binding"] == {
+        "schema_version": "1.0",
+        "sha256": sha256_hex((output / "search-manifest.json").read_bytes()),
+    }
     assert manifest["max_public_corrections"] == 250
     assert manifest["publication_checksum"] == sha256_hex(
         {

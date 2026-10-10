@@ -299,6 +299,7 @@ export type Publication = {
     generated_at: string;
     record_counts: Record<string, number>;
     source_snapshots: SourceSnapshot[];
+    search_manifest_binding?: { schema_version: "1.0"; sha256: string } | null;
     publication_checksum: string;
     publication_checksum_algorithm: "sha256_canonical_json_v1";
     publication_checksum_scope: "publication_summary_and_search_partition_digests";
