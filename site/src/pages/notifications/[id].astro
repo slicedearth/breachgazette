@@ -34,6 +34,7 @@ const recordEvents = publication.corrections.filter(
     warning={record.register_window_state !== "not_applicable" ? "This record comes from a rolling public register. Disappearance is not evidence of remediation." : undefined}
   />
   <section class="section shell">
+    <div class="record-slip"><p><span class="eyebrow">Source record</span><code>{record.source_record_id}</code></p><a href={`${import.meta.env.BASE_URL}latest/`}>Back to notifications <span aria-hidden="true">↗</span></a></div>
     <DefinitionGrid items={[
       { term: "Regulator or source", description: record.regulator },
       { term: "Jurisdiction", description: record.jurisdiction },
@@ -47,11 +48,14 @@ const recordEvents = publication.corrections.filter(
       { term: "First locally observed", description: date(record.local_first_observed_time) },
       { term: "Last locally observed", description: date(record.local_last_observed_time) },
     ]} />
+    <div class="record-notes">
     <div class="prose">
       <h2>Source dates</h2>
       <ul>{record.dates.map((item) => <li><strong>{label(item.meaning)}:</strong> {date(item.normalized_date)} <small>({item.raw_value ?? label(item.state)})</small></li>)}</ul>
       <h2>Limitations</h2>
       <ul>{[...policy.limitations, ...record.limitations].map((item) => <li>{item}</li>)}</ul>
+    </div>
+    <div class="prose">
       <h2>Correction path</h2>
       <p>{policy.correction_process}</p>
       <h2>Recent observed record history</h2>
@@ -69,6 +73,7 @@ const recordEvents = publication.corrections.filter(
       ) : (
         <p>No event for this record appears in the bounded recent public correction window.</p>
       )}
+    </div>
     </div>
     <SourceNote href={record.source_detail_url ?? record.source_url} />
   </section>

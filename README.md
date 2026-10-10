@@ -1,13 +1,12 @@
 # Breach Gazette
 
-**Public breach notifications, connected and explained.**
+**The public record, source by source.**
 
-Breach Gazette is a provenance-first public data platform for official
-Australian, French, Netherlands, United Kingdom, and United States breach-notification
-statistics, public notification registers, and regulatory actions. It preserves the
-source-specific difference between aggregate statistics, anonymized
-notification rows, named notifications, investigations, determinations, court
-proceedings, and judgments.
+Breach Gazette brings together official breach notices, reporting statistics and
+regulatory actions from Australia, France, the Netherlands, the United Kingdom
+and the United States. Every record keeps its source, reporting rules and
+limitations. Named notices, anonymous reports, aggregate figures and legal
+actions remain separate.
 
 Breach Gazette does not independently verify the underlying events. It does not
 score organizations, identify victims, retrieve notification letters, or turn
@@ -23,7 +22,8 @@ an allegation into a finding.
   latest published records in groups of 50.
 - Browser-local filters search the complete bounded publication, paginate all
   matches in groups of 50, preserve filter and page state in the URL fragment,
-  and export every match rather than only the visible page.
+  and export every match rather than only the visible page. Numbered links and
+  direct page entry make larger result sets navigable on desktop and mobile.
 - Source-health views use the reviewed public source names and preserve
   acronyms such as NSW, MNDB, OAIC, NDB, and HHS.
 - Jurisdiction and coverage views expose source units, periods, thresholds,
@@ -135,6 +135,10 @@ official Playwright container. The browser job runs in parallel with the
 deterministic verification job, avoids reinstalling browser system packages on
 the GitHub runner, and does not launch incompatible bundles on older macOS
 releases.
+
+The masthead emblem and notice-carrier illustration live in `site/assets/`.
+Run `npm run brand` from `site/` to render the web images, icons and social card.
+The site uses system fonts and serves all artwork locally.
 
 Ordinary tests use only test-specific fixtures and injected transports. A
 fixture can be ingested only into a data-root directory whose final name

@@ -19,10 +19,11 @@ const label = position === "top"
   : "Notification pages below results";
 ---
 
+<div id={position === "top" ? "notification-results" : undefined}></div>
 <nav
-  id={position === "top" ? "notification-results" : undefined}
   class:list={["pagination", `pagination--${position}`]}
   aria-label={label}
+  hidden={pageCount <= 1}
 >
   {currentPage > 1
     ? (
@@ -93,4 +94,31 @@ const label = position === "top"
         <span aria-hidden="true">→</span>
       </span>
     )}
+  {pageCount > 1 && (
+    <div class="pagination__jump-slot" data-static-page-jump data-current-page={currentPage} data-page-count={pageCount} data-base={base}></div>
+  )}
 </nav>
+
+<script>
+  import { enhanceStaticPageJumps, submitPageJump } from "../lib/pageJump";
+  enhanceStaticPageJumps();
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element) || !event.target.closest("[data-page-jump] button")) return;
+    const wrapper = event.target.closest<HTMLElement>("[data-page-jump]");
+    if (wrapper) submitPageJump(wrapper);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || !(event.target instanceof HTMLInputElement)) return;
+    const wrapper = event.target.closest<HTMLElement>("[data-page-jump]");
+    if (wrapper) { event.preventDefault(); submitPageJump(wrapper); }
+  });
+  document.addEventListener("notification-page-jump", (event) => {
+    if (!(event instanceof CustomEvent) || !(event.target instanceof Element)) return;
+    const slot = event.target.closest<HTMLElement>("[data-static-page-jump]");
+    if (!slot || !Number.isSafeInteger(event.detail)) return;
+    const page = event.detail as number;
+    if (page < 1 || page > Number(slot.dataset.pageCount)) return;
+    const base = slot.dataset.base ?? "/";
+    window.location.assign(page === 1 ? `${base}latest/#notification-results` : `${base}latest/pages/${page}/#notification-results`);
+  });
+</script>

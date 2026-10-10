@@ -11,7 +11,7 @@ interface Props {
 const {
   title,
   description,
-  section = "Observatory",
+  section = "The public record",
   robots = "index,follow,max-image-preview:large",
 } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
@@ -77,17 +77,13 @@ const isJurisdiction = [
     <header class="site-header">
       <div class="shell masthead">
         <a class="brand" href={import.meta.env.BASE_URL}>
-          <span aria-hidden="true" class="brand-mark">
-            <span class="mark-spine"></span>
-            <span class="mark-register mark-register-one"></span>
-            <span class="mark-register mark-register-two"></span>
-            <span class="mark-register mark-register-three"></span>
-          </span>
+          <img class="brand-mark" src={`${base}gazette-emblem.png`} width="80" height="80" alt="" />
           <span class="brand-copy">
-            <span class="brand-title">Breach Gazette</span>
-            <small>Public notification and regulatory record</small>
+            <span class="brand-title">Breach <span>Gazette</span></span>
+            <small>The public record, source by source.</small>
           </span>
         </a>
+        <p class="masthead-note"><span>Independent index</span>Breach notifications<br />&amp; the sources behind them</p>
         <button
           class="nav-toggle"
           type="button"
@@ -103,24 +99,24 @@ const isJurisdiction = [
           </span>
         </button>
         <nav id="primary-navigation" aria-label="Primary">
-          <a href={`${base}jurisdictions/`} aria-current={isJurisdiction ? "page" : undefined}>Jurisdictions</a>
-          <a href={`${base}latest/`} aria-current={isCurrent("latest/") ? "page" : undefined}>Notifications</a>
-          <a href={`${base}source-coverage/`} aria-current={isCurrent("source-coverage/") ? "page" : undefined}>Compare sources</a>
-          <a href={`${base}sources/`} aria-current={isCurrent("sources/") ? "page" : undefined}>Sources</a>
-          <a href={`${base}methodology/`} aria-current={isCurrent("methodology/") ? "page" : undefined}>Methodology</a>
+          <a href={`${base}latest/`} aria-current={isCurrent("latest/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">01</span> Notifications</a>
+          <a href={`${base}jurisdictions/`} aria-current={isJurisdiction ? "page" : undefined}><span class="nav-index" aria-hidden="true">02</span> Jurisdictions</a>
+          <a href={`${base}source-coverage/`} aria-current={isCurrent("source-coverage/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">03</span> Compare sources</a>
+          <a href={`${base}sources/`} aria-current={isCurrent("sources/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">04</span> Sources</a>
+          <a href={`${base}methodology/`} aria-current={isCurrent("methodology/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">05</span> Methodology</a>
         </nav>
       </div>
     </header>
     <main id="main" tabindex="-1">
-      <div class="shell page-kicker"><span>{section}</span></div>
+      <div class="shell page-kicker"><span>{section}</span><span class="page-kicker__note" aria-hidden="true">Read the notice. Keep the context.</span></div>
       <slot />
     </main>
     <footer>
       <div class="shell footer-grid">
-        <p>
-          Breach Gazette reproduces or derives information from official public sources and
-          does not independently verify underlying events.
-        </p>
+        <div class="footer-colophon">
+          <p class="footer-title"><img src={`${base}gazette-emblem.png`} width="48" height="48" alt="" />Breach Gazette<span aria-hidden="true">.</span></p>
+          <p>Official sources, with their limits in view. Breach Gazette does not independently verify the events they report.</p>
+        </div>
         <nav aria-label="Footer">
           <a href={`${import.meta.env.BASE_URL}privacy/`}>Privacy</a>
           <a href={`${import.meta.env.BASE_URL}security/`}>Security</a>

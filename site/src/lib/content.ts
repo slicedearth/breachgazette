@@ -1,11 +1,11 @@
 export const informationPages = {
   methodology: {
     title: "Methodology",
-    intro: "How source semantics, date meanings, organization roles, candidate relationships, and corrections remain explicit.",
+    intro: "How records get here, what their dates and names mean, and what the sources cannot tell us.",
     sections: [
-      ["Source before synthesis", "Every value retains its regulator, reporting scheme, publication level, threshold, coverage type, source role, revision, and source link. Notification counts are not assumed to equal unique incidents."],
-      ["Aggregate versus record", "Aggregate statistics and anonymized notification summaries contain no named organizations. Named notifications and regulatory actions use separate contracts and views."],
-      ["Time and change", "Occurrence, awareness, submission, publication, and observation dates retain separate meanings. New source snapshots produce deterministic change events rather than rewriting history silently."],
+      ["Start with the source", "Each record includes its regulator, reporting scheme, threshold, coverage, named role, revision and source link. A notification count is not necessarily a count of unique incidents."],
+      ["Four kinds of record", "Statistics and anonymous report summaries contain no named organisations. Named notifications and regulator actions have their own record types and views. They are not added together as a breach total."],
+      ["Dates are not interchangeable", "When something happened, when it was discovered, when it was reported and when it was published can all differ. Breach Gazette also records when it observed a source. Changes to collected records are recorded separately."],
       ["Chronology exclusions", "The reviewed California rule excludes an occurrence date from normalised uses when it follows regulator submission, while retaining the raw source value. Other sources do not inherit this rule."],
       ["Candidate date evidence", "Candidates require an exact organisation-name match, different sources, and an identical published calendar date. Date meanings may differ. This is not interval matching or proof of one incident."],
       ["Cross-country comparisons", "Breach Gazette compares like-for-like measures only when thresholds, periods, population scopes, and units are displayed. It does not publish a generic country ranking."],
@@ -13,48 +13,48 @@ export const informationPages = {
   },
   "entity-resolution": {
     title: "Entity-resolution methodology",
-    intro: "Organization identities are joined only through exact normalized names or reviewed aliases.",
+    intro: "How organisation names are matched, and why similar names are often left apart.",
     sections: [
-      ["Conservative resolution", "Normalization is deterministic and limited to spacing, case, punctuation, and reviewed legal suffix handling. Similarity creates private proposals only and never creates an identity."],
-      ["Source roles remain", "A notifying entity, public-sector agency, covered entity, business associate, and respondent are distinct roles even when they resolve to one organization profile."],
+      ["Exact names and reviewed aliases", "Automatic matching is limited to consistent changes in spacing, case, punctuation and reviewed legal suffixes. Similar names may prompt a private review, but similarity alone never joins identities."],
+      ["A name is not a role", "A notifying entity, public-sector agency, covered entity, business associate and respondent are different roles. Those distinctions remain even when the records share an organisation profile."],
       ["Reviewed decisions", "Approved or rejected alias decisions retain a stable ID, supporting source set, evidence, date, and review note. The current reviewed alias mapping applies globally, not only to the supporting sources. Chains and cycles are rejected."],
       ["What is not inferred", "Parent and subsidiary relationships, brands, renamed companies, and near-matching names remain separate without reviewed evidence."],
     ],
   },
   "data-quality": {
     title: "Data quality",
-    intro: "Publication is fail-closed when required real data, source attribution, legal status, privacy safety, or source schema cannot be established.",
+    intro: "Checks that must pass before publication, and the limits of those checks.",
     sections: [
-      ["Automated gates", "Required sources must be present and non-empty, snapshots fresh, record-count changes within reviewed bounds, identifiers deterministic, regulatory statuses explicit, and public fields privacy-safe."],
-      ["Limits of validation", "A passing report validates the pipeline contract and published representation. It does not establish that an official source is complete or that an underlying event occurred as reported."],
+      ["When publication stops", "Publication is blocked if a required source is missing, empty or too old, if record-count changes exceed reviewed limits, or if identifiers, source attribution or legal status cannot be validated. Privacy checks must pass too."],
+      ["What a pass means", "A passing report means the collected data and public output met the project’s checks. It does not establish that an official source is complete or that an event occurred as reported."],
     ],
   },
   "correction-process": {
     title: "Correction process",
-    intro: "Corrections preserve both official-source authority and the project’s temporal audit trail.",
+    intro: "If a record is wrong, the correction should be traceable to its source.",
     sections: [
       ["Report", "Use the repository’s private security channel for sensitive concerns. For public data corrections, provide the official source URL, record identifier, and the field believed to be represented incorrectly."],
       ["Review", "A correction is checked against the current official source and source policy. Curated aliases and regulatory manifests require explicit review."],
-      ["Publish", "Source changes create deterministic version and change records. Breach Gazette does not silently rewrite observed history."],
+      ["Publish", "Changes receive version and observation records, so readers can follow what changed. Earlier observations are not silently rewritten."],
     ],
   },
   privacy: {
     title: "Privacy",
-    intro: "Breach Gazette publishes organization-level official data while excluding victim, contact, credential, and narrative material.",
+    intro: "This is a register of official reporting, not a search tool for exposed personal information.",
     sections: [
-      ["No visitor profiling", "There are no accounts, cookies, analytics, remote fonts, query telemetry, or unsolicited polling. Filters execute locally against static data."],
-      ["Search requests", "Literal search fragments are not sent in HTTP requests. Requests for source/year partitions can reveal access patterns in hosting logs. Bloom values are derived indexes over public records, not encryption or a confidentiality guarantee."],
-      ["Minimised records", "The public output excludes personal emails, phone numbers, street addresses, identifiers, credentials, complete breach notices, complete decisions, free-text narratives, and CNIL raw row combinations."],
+      ["What the site does not collect", "There are no accounts, cookies, analytics, remote fonts, query telemetry or background polling. Search and filters run in your browser against static files."],
+      ["What the host can see", "Search terms in the address fragment are not sent in HTTP requests. Requests for source and year data files can still reveal access patterns in hosting logs. The search indexes are derived from public records; they are not encryption or a confidentiality guarantee."],
+      ["What is left out", "Public files exclude personal emails, phone numbers, street addresses, personal identifiers, credentials, full breach notices, full decisions, free-text narratives and raw combinations of CNIL row values."],
       ["Private state", "Raw retrievals, caches, comparison state, and complete source snapshots remain in a configured private data root outside the repository and deployed site."],
     ],
   },
   security: {
     title: "Security",
-    intro: "The platform treats official source content as hostile and keeps its public deployment static.",
+    intro: "The public site serves static files. Source material still needs checking, even when it comes from a regulator.",
     sections: [
-      ["Fixed source clients", "Clients use allowlisted HTTPS origins and paths, exact schemas, bounded pages and bytes, strict timeouts, redirect validation, and explicit content types."],
-      ["Safe publication", "Text is escaped, URLs are validated, privacy audits run at multiple boundaries, and the site uses a restrictive content security policy and no-referrer behavior."],
-      ["No submission surface", "There is no public form, victim search, breach-letter retrieval, runtime database, or application server."],
+      ["Limited retrieval", "Each source client has approved HTTPS addresses, expected data structures, limits on pages and bytes, and timeouts. Redirects and content types are checked before data is accepted."],
+      ["Publication checks", "Text is escaped, links are validated and privacy audits run before publication. A restrictive content security policy limits what the page can load, and links do not send referrer information."],
+      ["Static delivery", "There is no public submission form, victim search, breach-letter retrieval, runtime database or application server."],
     ],
   },
   "legal-and-licensing": {
@@ -68,16 +68,16 @@ export const informationPages = {
   },
   limitations: {
     title: "Limitations",
-    intro: "Breach Gazette explains published evidence; it is not a complete breach census or a security rating.",
+    intro: "A record can tell you what was reported. It cannot tell you everything that happened.",
     sections: [
-      ["Incomplete by design", "Official registers have different thresholds, windows, revision practices, and named-entity roles. Some records can disappear from rolling public windows."],
+      ["Not a complete census", "Official registers have different reporting thresholds, publication windows, revision practices and named roles. Records can disappear from rolling public windows. This site is not a security rating or a complete list of breaches."],
       ["No independent verification", "Breach Gazette does not independently verify events, causation, population counts, remediation, or compliance."],
       ["Candidate links", "Cross-source links begin as evidence-backed candidates. Reviewed confirmations still preserve every source record and do not establish legal or factual identity beyond the displayed evidence."],
     ],
   },
   "official-response-resources": {
     title: "Official response resources",
-    intro: "For an active incident or suspected exposure, use authoritative organizational and government guidance.",
+    intro: "For an active incident or suspected exposure, go to the organisation concerned and the relevant official guidance.",
     sections: [
       ["Australia", "Contact the affected organization through a verified official channel. For identity and cyber guidance, consult the Australian Cyber Security Centre and IDCARE directly."],
       ["United States", "Contact the notifying organization through its verified official site. Use the relevant state attorney general, HHS OCR, or federal identity-theft resources for authoritative next steps."],

@@ -534,7 +534,7 @@ def build_site_data(*, data_root: Path, output: Path) -> dict[str, Any]:
     summary_payload = {
         "schema_version": "1.0",
         "generated_at": generated_at,
-        "tagline": "Public breach notifications, connected and explained.",
+        "tagline": "Official breach notices. Source by source.",
         "disclaimer": (
             "Breach Gazette reproduces or derives information from official public sources "
             "and does not independently verify the underlying events."

@@ -1,7 +1,11 @@
+const acronyms = new Set(["ap", "cnil", "csv", "dpc", "hhs", "ico", "id", "ipc", "mndb", "ndb", "nsw", "oaic", "uk", "us"]);
+
 export function label(value: string): string {
   return value
     .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    .replace(/\b\w+\b/g, (word) => acronyms.has(word.toLowerCase())
+      ? word.toUpperCase()
+      : word[0]!.toUpperCase() + word.slice(1));
 }
 
 export function date(value: string | null | undefined): string {

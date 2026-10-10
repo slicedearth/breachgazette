@@ -81,7 +81,8 @@ for (const entry of ["input", "hash"] as const) {
       );
       await expect(page.locator("[data-export-results]")).toBeDisabled();
       await expect(results).not.toHaveAttribute("aria-busy", "true");
-      await expect(results.getByRole("navigation", { name: "Notification pages above results" })).toBeVisible();
+      await expect(results.locator(".notification-table tbody tr")).toHaveCount(3);
+      await expect(results.locator(".pagination:visible")).toHaveCount(0);
       await expect(results.locator(".directory-summary")).toContainText("complete published register");
       await page.evaluate(() => {
         location.hash = "query=%C4%B0STANBUL&date_from=2025-12-01&date_to=2026-01-31";

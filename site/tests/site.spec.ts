@@ -3,6 +3,30 @@ import AxeBuilder from "@axe-core/playwright";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
+test("front page keeps its record index separate from incident claims", async ({ page, request }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("When a breach becomes public.");
+  const index = page.getByRole("complementary", { name: "Four kinds of record." });
+  await expect(index.getByRole("link")).toHaveCount(4);
+  await expect(index).toContainText("not a count of unique breaches");
+  await expect(page.locator(".front-page__illustration img")).toBeVisible();
+  const emblem = await request.get("/gazette-emblem.png");
+  expect(emblem.ok()).toBe(true);
+  expect(emblem.headers()["content-type"]).toContain("image/png");
+});
+
+test("single-page registers omit redundant navigation and keep source acronyms", async ({ page }) => {
+  await page.goto("/latest/");
+  await expect(page.locator(".notification-table tbody tr")).toHaveCount(3);
+  await expect(page.locator(".pagination:visible")).toHaveCount(0);
+  await expect(page.getByLabel("Jump to page")).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Source", exact: true })).toContainText("NSW");
+  await expect(page.getByRole("combobox", { name: "Source", exact: true })).not.toContainText("Nsw");
+  await page.getByLabel("Organization or agency").fill("Example");
+  await expect(page.locator("[data-result-count]")).toContainText("3 matching");
+  await expect(page.locator(".pagination:visible")).toHaveCount(0);
+});
+
 test("Australian landing separates aggregate records from incidents", async ({ page }) => {
   await page.goto("/australia/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Australia");
@@ -19,6 +43,8 @@ test("NSW register displays its rolling-window warning", async ({ page }) => {
 test("source health exposes freshness without claiming factual completeness", async ({ page }) => {
   await page.goto("/source-health/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Update status");
+  await expect(page.getByText(/not whether the scheduler is currently running or paused/)).toBeVisible();
+  await expect(page.getByText(/The active schedule|Collection mode is/)).toHaveCount(0);
   await expect(page.getByText(/does not establish that an official source is factually complete/i)).toBeVisible();
   const table = page.locator('.table-wrap[aria-label="Source health table"] table');
   await expect(table).toContainText("Healthy");
@@ -467,6 +493,9 @@ for (const viewportWidth of [320, 390, 768, 1440]) {
                 const style = getComputedStyle(cell);
                 return {
                   cellWidth: cell.getBoundingClientRect().width,
+                  notificationCard: cell.closest("table")?.classList.contains("notification-table") ?? false,
+                  rowHeading: cell.tagName === "TH",
+                  contentFits: cell.scrollWidth <= cell.clientWidth,
                   gridColumnCount: style.gridTemplateColumns.trim().split(/\s+/)
                     .length,
                   overflowWrap: style.overflowWrap,
@@ -495,10 +524,11 @@ for (const viewportWidth of [320, 390, 768, 1440]) {
         expect(
           tableRegions.every((region) =>
             region.cellStyles.every(
-              (style) => Math.abs(style.rowWidth - style.cellWidth) <= 2,
+              (style) => Math.abs(style.rowWidth - style.cellWidth *
+                (style.notificationCard && !style.rowHeading ? 2 : 1)) <= 2 && style.contentFits,
             ),
           ),
-          `${path} retained a desktop column width on mobile at ${width}px`,
+          `${path} did not use the expected full-width or two-column mobile record layout at ${width}px`,
         ).toBe(true);
         expect(
           tableRegions.every((region) =>
@@ -514,7 +544,7 @@ for (const viewportWidth of [320, 390, 768, 1440]) {
         expect(
           tableRegions.every((region) =>
             region.cellStyles.every((style) =>
-              width <= 480
+              width <= 480 || style.notificationCard
                 ? style.gridColumnCount === 1
                 : style.gridColumnCount === 2,
             ),
@@ -693,6 +723,21 @@ test("filtered notification pagination preserves URL state and every match", asy
     "Showing 51–55 on filtered page 2 of 2",
   );
 
+  const bottom = page.getByRole("navigation", { name: "Filtered notification pages below results" });
+  const jump = bottom.getByLabel("Jump to page");
+  await jump.fill("3");
+  await bottom.getByRole("button", { name: "Go", exact: true }).click();
+  await expect(page).toHaveURL(/#source=washington&page=2$/);
+  await jump.fill("1.5");
+  await jump.press("Enter");
+  await expect(page).toHaveURL(/#source=washington&page=2$/);
+  await jump.fill("1");
+  await jump.press("Enter");
+  await expect(page).toHaveURL(/#source=washington$/);
+  await expect(page.locator("[data-results] tbody tr")).toHaveCount(50);
+  await page.goBack();
+  await expect(page).toHaveURL(/#source=washington&page=2$/);
+
   await page.reload();
   await expect(page.locator("[data-results] tbody tr")).toHaveCount(5);
   await expect(page.locator('[name="source"]')).toHaveValue("washington");
@@ -860,6 +905,15 @@ test("complete-dataset filtering remains bounded at 10,000 records", async ({ pa
   }));
   expect(paginationWidths.scrollWidth).toBeLessThanOrEqual(paginationWidths.clientWidth);
 
+  await topPagination.getByLabel("Jump to page").fill("150");
+  await topPagination.getByRole("button", { name: "Go", exact: true }).click();
+  await expect(page).toHaveURL(/#source=scale&sort=organization&page=150$/);
+  await expect(page.locator("[data-results] tbody tr").first()).toContainText("Scale organization 07451");
+  await expect(page.locator("[data-result-count]")).toBeFocused();
+  await topPagination.getByLabel("Jump to page").fill("1");
+  await topPagination.getByLabel("Jump to page").press("Enter");
+  await expect(topPagination.locator(".pagination__status")).toHaveText("Page 1 of 200");
+
   await mobilePages.getByRole("link", {
     name: "Go to filtered notification page 4",
     exact: true,
@@ -1007,12 +1061,13 @@ test("publication identity and source corrections are readable and reproducible"
 }) => {
   await page.goto("/");
   const stamp = page.getByLabel("Current publication");
-  await expect(stamp).toContainText("Verified 1 Jan 2026");
+  await expect(stamp).toContainText("Published 1 Jan 2026");
+  await expect(stamp).not.toContainText("Verified");
   await expect(stamp.locator("code").first()).toHaveText("ffffffffffff");
   await expect(stamp.locator("code").nth(1)).toHaveText("000000000000");
   await expect(stamp.getByRole("link", { name: "Review update status" })).toBeVisible();
   await expect(page.getByRole("heading", {
-    name: "What changed in the published source records",
+    name: "Since the last observation",
   })).toBeVisible();
   await expect(page.getByRole("heading", { name: "First observed" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Corrected" })).toBeVisible();

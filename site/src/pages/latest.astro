@@ -14,31 +14,31 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
   <Hero
     eyebrow="Named source records"
     title="Latest public notifications"
-    intro="Filter the complete bounded published notification dataset locally. Search terms stay in this browser; loading data partitions still creates requests to the site host."
+    intro="Search by name, source or date. Your search terms stay in this browser. Loading the relevant records still makes requests to the site host."
     warning="A notification is not automatically a unique incident. The source role of the named entity is preserved."
   />
   <section class="section shell">
     <div class="search-panel">
       <div class="search-panel__heading">
         <div>
-          <span class="eyebrow">Local register search</span>
-          <h2>Find a published source record</h2>
+          <span class="eyebrow">Search the register</span>
+          <h2>Find a notice</h2>
         </div>
-        <p>Filters run in this browser. Pagination changes only the visible results; exports retain every match.</p>
+        <p>Search across every published record. Export all matches, not just this page.</p>
       </div>
       <div data-notification-filters data-manifest-checksum={publication.manifest.search_manifest_binding?.sha256 ?? ""}>
         <div class="filters filters--primary">
           <label>Organization or agency<input type="search" name="query" autocomplete="off" maxlength="300" placeholder="Name or source record ID" /></label>
           <label>Jurisdiction<select name="jurisdiction"><option value="">All jurisdictions</option></select></label>
-          <label>Regulator<select name="regulator"><option value="">All regulators</option></select></label>
           <label>Source<select name="source"><option value="">All sources</option></select></label>
         </div>
         <details class="advanced-filters" open data-advanced-filters>
           <summary>
             <span>Advanced filters</span>
-            <span class="advanced-filters__count" data-advanced-filter-count>8 available</span>
+            <span class="advanced-filters__count" data-advanced-filter-count>9 available</span>
           </summary>
           <div class="filters filters--advanced">
+            <label>Regulator<select name="regulator"><option value="">All regulators</option></select></label>
             <label>Source date from<input type="date" name="date_from" /></label>
             <label>Source date to<input type="date" name="date_to" /></label>
             <label>Breach cause<select name="cause"><option value="">All published causes</option></select></label>
@@ -59,7 +59,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         <button type="button" data-copy-search disabled>Copy search link</button>
         <button class="button-secondary" type="button" data-reset-filters disabled>Clear filters</button>
         <span class="table-note" data-export-status>Apply a filter to enable export.</span>
-        <span class="table-note" data-share-status>Search-link filters stay in the URL fragment and are not sent in HTTP requests.</span>
+        <span class="table-note" data-share-status>Share links keep filters in the address fragment.</span>
       </div>
     </div>
     <p aria-live="polite" tabindex="-1" data-result-count>Loading bounded dataset…</p>
@@ -109,6 +109,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
     import { label, date } from "../lib/format";
     import { matchesPartition, matchesRecord, snapshotFilters } from "../lib/search";
     import { notificationCsv } from "../lib/searchExport";
+    import { createPageJump, enhanceStaticPageJumps } from "../lib/pageJump";
     import { boundedResponseBytes, validateSearchManifest, validateSearchPartition } from "../lib/searchValidation";
     import {
       getNotificationPaginationItems,
@@ -541,6 +542,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
       ) => {
         const navigation = document.createElement("nav");
         navigation.className = `pagination pagination--${position}`;
+        navigation.hidden = pageCount <= 1;
         navigation.setAttribute(
           "aria-label",
           position === "top"
@@ -568,6 +570,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           "Next",
         );
         navigation.append(previous, status, desktopPages, mobilePages, next);
+        if (pageCount > 1) navigation.append(createPageJump(currentPage, pageCount));
         return navigation;
       };
       const renderFilteredFacets = (records: Notification[]) => {
@@ -711,6 +714,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           exportButton.disabled = true;
           exportStatus.textContent = "Apply a filter to enable export.";
           results.replaceChildren(...[...initialResults.childNodes].map((node) => node.cloneNode(true)));
+          enhanceStaticPageJumps(results);
           results.removeAttribute("aria-busy");
           count.textContent =
             `${manifest.record_count.toLocaleString()} published source records. ` +
@@ -730,6 +734,7 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
           results.replaceChildren(
             ...[...initialResults.childNodes].map((node) => node.cloneNode(true)),
           );
+          enhanceStaticPageJumps(results);
           results.removeAttribute("aria-busy");
           count.textContent = "Source date from must be on or before source date to.";
           return;
@@ -831,14 +836,10 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         void render();
         control.focus();
       });
-      results.addEventListener("click", (event) => {
-        if (!(event.target instanceof Element)) return;
-        const link = event.target.closest<HTMLAnchorElement>("a[data-filter-page]");
-        if (!link || !results.contains(link)) return;
-        event.preventDefault();
+      const goToFilteredPage = (page: number) => {
         if (results.hasAttribute("aria-busy") || !filteredRecords.length) return;
-        const page = Number.parseInt(link.dataset.filterPage ?? "1", 10);
-        if (!Number.isFinite(page) || page < 1) return;
+        const pageCount = Math.ceil(filteredRecords.length / NOTIFICATIONS_PER_PAGE);
+        if (!Number.isSafeInteger(page) || page < 1 || page > pageCount) return;
         currentPage = page;
         syncHashState("push");
         renderFilteredPage();
@@ -846,6 +847,18 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         document.querySelector<HTMLElement>("[data-result-count]")?.scrollIntoView({
           block: "start",
         });
+      };
+      results.addEventListener("click", (event) => {
+        if (!(event.target instanceof Element)) return;
+        const link = event.target.closest<HTMLAnchorElement>("a[data-filter-page]");
+        if (!link || !results.contains(link)) return;
+        event.preventDefault();
+        goToFilteredPage(Number(link.dataset.filterPage));
+      });
+      results.addEventListener("notification-page-jump", (event) => {
+        if (!(event instanceof CustomEvent) || !(event.target instanceof Element) ||
+          event.target.closest("[data-static-page-jump]")) return;
+        goToFilteredPage(event.detail as number);
       });
       window.addEventListener("hashchange", () => {
         const restoreFocus = results.contains(document.activeElement);
