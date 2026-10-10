@@ -9,7 +9,6 @@ const publication = getPublication();
 const sources = publication.source_health.sources;
 const sourceName = (sourceId: string) =>
   publication.policies[sourceId]?.name ?? label(sourceId);
-const collectionMode = publication.source_health.collection_mode ?? "manual";
 const snapshots = new Map(
   publication.manifest.source_snapshots.map((snapshot) => [snapshot.source_id, snapshot]),
 );
@@ -17,20 +16,18 @@ const healthHistory = publication.source_health_history.snapshots;
 ---
 
 <BaseLayout title="Update status" description="Freshness and update state for each implemented official source.">
-  <SourceInformationNav />
   <Hero
     eyebrow="Collection status"
     title="Update status"
-    intro="Each status reflects bounded retrieval freshness, contract validation, record-count guards, and the latest update checkpoint."
+    intro="When each source was last collected, how old its snapshot is and whether the update passed its checks. These results describe the edition you are reading."
     warning="Healthy means the pipeline completed its checks. It does not establish that an official source is factually complete."
   />
+  <SourceInformationNav />
   <section class="section shell">
     <p class="notice">
       {sources.filter((source) => source.status === "healthy").length} of {sources.length} implemented sources are healthy.
-      Collection mode is <strong>{collectionMode}</strong>.
-      {collectionMode === "scheduled"
-        ? <> The active schedule is <code>{publication.source_health.schedule_utc}</code> in UTC.</>
-        : <> The reviewed schedule <code>{publication.source_health.schedule_utc}</code> is not active.</>}
+      The configured collection schedule is <code>{publication.source_health.schedule_utc}</code> (UTC).
+      This page describes the published snapshot, not whether the scheduler is currently running or paused.
     </p>
     <div class="table-wrap" tabindex="0" aria-label="Source health table">
       <table>
@@ -54,10 +51,10 @@ const healthHistory = publication.source_health_history.snapshots;
       </table>
     </div>
     <div class="section-head">
-      <h2>Bounded source-health history</h2>
+      <h2>Recent collection history</h2>
       <p>
         Showing {healthHistory.length.toLocaleString()} of at most{" "}
-        {publication.source_health_history.maximum_snapshots.toLocaleString()} sanitized
+        {publication.source_health_history.maximum_snapshots.toLocaleString()} retained
         snapshots. Private checksums and diagnostic reasons are excluded.
       </p>
     </div>

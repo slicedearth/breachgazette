@@ -8,30 +8,35 @@ const jurisdictions = [
   {
     href: "australia/",
     country: "Australia",
+    code: "AU",
     model: "Aggregates, public registers, and legal-status events",
     description: "OAIC national statistics and regulatory actions alongside NSW aggregate and rolling-register publications.",
   },
   {
     href: "united-states/",
     country: "United States",
+    code: "US",
     model: "Named state notification records",
     description: "Washington, California, and Massachusetts records with each state's reporting threshold, role, and public window kept separate.",
   },
   {
     href: "france/",
     country: "France",
+    code: "FR",
     model: "Anonymized notification summaries",
     description: "CNIL notification-row counts published only as grouped, privacy-minimised metrics without organization inference.",
   },
   {
     href: "united-kingdom/",
     country: "United Kingdom",
+    code: "UK",
     model: "Deduplicated anonymized report summaries",
     description: "ICO report-reference counts and source-labelled characteristics, with raw row combinations excluded from publication.",
   },
   {
     href: "netherlands/",
     country: "Netherlands",
+    code: "NL",
     model: "Annual national notification aggregates",
     description: "AP annual notification, cyberattack-cause, and account-takeover figures preserved as separate, non-additive dimensions.",
   },
@@ -46,19 +51,19 @@ const jurisdictions = [
     warning="A larger count can reflect more notification rows, a different legal threshold, or repeated reports. It does not necessarily mean more unique incidents."
   />
   <section class="section shell">
-    <div class="grid">
+    <div class="jurisdiction-index">
       {jurisdictions.map((jurisdiction) => (
-        <article class="card">
-          <span class="pill">{jurisdiction.model}</span>
-          <h2>
-            <a href={`${import.meta.env.BASE_URL}${jurisdiction.href}`}>{jurisdiction.country}</a>
-          </h2>
-          <p>{jurisdiction.description}</p>
-          <small>
+        <article>
+          <span class="jurisdiction-index__code" aria-hidden="true">{jurisdiction.code}</span>
+          <div class="jurisdiction-index__title">
+            <h2><a href={`${import.meta.env.BASE_URL}${jurisdiction.href}`}>{jurisdiction.country}</a></h2>
+            <small>
             {Object.values(publication.policies).filter(
               (policy) => policy.implemented && policy.country === jurisdiction.country,
-            ).length.toLocaleString()} implemented official sources
-          </small>
+            ).length.toLocaleString()} supported official sources
+            </small>
+          </div>
+          <div class="jurisdiction-index__description"><h3>{jurisdiction.model}</h3><p>{jurisdiction.description}</p></div>
         </article>
       ))}
     </div>

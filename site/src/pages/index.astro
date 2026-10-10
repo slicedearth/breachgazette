@@ -1,5 +1,4 @@
 ---
-import Hero from "../components/Hero.astro";
 import NotificationTable from "../components/NotificationTable.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { getSourceRevision } from "../lib/build";
@@ -8,126 +7,87 @@ import { compactNumber, date } from "../lib/format";
 
 const publication = getPublication();
 const notifications = getAllNotifications();
-const publicationChecksum = publication.manifest.publication_checksum;
+const checksum = publication.manifest.publication_checksum;
 const sourceRevision = getSourceRevision();
+const base = import.meta.env.BASE_URL;
 const metrics = [
-  ["Public notifications", publication.stats.public_notifications ?? 0],
-  ["Anonymous notification rows", publication.stats.anonymized_notification_rows ?? 0],
-  ["Aggregate metrics", publication.stats.aggregate_metrics ?? 0],
-  ["Regulatory actions", publication.stats.regulatory_actions ?? 0],
-  ["Healthy sources", publication.source_health.sources.filter((source) => source.status === "healthy").length],
-];
+  ["Public notifications", publication.stats.public_notifications ?? 0, "latest/"],
+  ["Anonymous notification rows", publication.stats.anonymized_notification_rows ?? 0, "jurisdictions/"],
+  ["Aggregate metrics", publication.stats.aggregate_metrics ?? 0, "australia/"],
+  ["Regulatory actions", publication.stats.regulatory_actions ?? 0, "australia/regulatory-actions/"],
+] as const;
+const changes = [
+  ["First observed", publication.update_digest.counts.records_first_observed, "Not present in the previous comparable snapshot."],
+  ["Corrected", publication.update_digest.counts.records_corrected, "Source-backed fields have changed."],
+  ["Absent from a complete snapshot", publication.update_digest.counts.records_absent_from_complete_snapshot, "No longer listed. This is not evidence of remediation."],
+  ["Sources recovered", publication.update_digest.counts.sources_recovered, "Collection passed after an earlier recorded problem."],
+] as const;
 ---
 
-<BaseLayout title="Overview" description={publication.tagline}>
-  <Hero
-    eyebrow="Official public-source intelligence"
-    title="Public breach notifications, connected and explained."
-    intro="Breach Gazette separates aggregate reporting, anonymized notification rows, named public notifications, and legal-status events so each record keeps the meaning, threshold, role, and limitations of its official source."
-  />
-  <aside class="publication-stamp shell" aria-label="Current publication">
-    <div>
-      <span class="eyebrow">Current publication</span>
-      <strong>Verified {date(publication.generated_at)}</strong>
+<BaseLayout title="The public record" description="Search official breach notifications, compare reporting rules and follow regulator actions. Every record keeps its source and its limits." section="Front page">
+  <header class="front-page shell">
+    <div class="front-page__lead">
+      <p class="eyebrow front-page__overline"><span>Official notices</span><span>Open to scrutiny</span></p>
+      <h1>When a breach<br /> becomes <em>public.</em></h1>
+      <p class="lede">Official notices are scattered across registers, reports and regulator websites. Read them here, with the source attached and the differences kept in view.</p>
+      <div class="front-page__actions">
+        <a class="action-link" href={`${base}latest/`}>Search the notifications <span aria-hidden="true">↗</span></a>
+        <a href={`${base}methodology/`}>How to read the record</a>
+      </div>
     </div>
-    <p>
-      Publication checksum
-      <code title={publicationChecksum}>{publicationChecksum.slice(0, 12)}</code>
-    </p>
-    <p>
-      Source revision
-      <code title={sourceRevision}>{sourceRevision.slice(0, 12)}</code>
-    </p>
-    <a href={`${import.meta.env.BASE_URL}source-health/`}>Review update status</a>
+    <figure class="front-page__illustration">
+      <img src={`${base}notice-carrier.png`} width="640" height="640" alt="" fetchpriority="high" />
+      <figcaption><span aria-hidden="true">↳</span> Every entry starts with a source.<br /><a href={`${base}sources/`}>Meet the sources</a></figcaption>
+    </figure>
+  </header>
+    <aside class="edition-index shell" aria-labelledby="edition-index-title">
+      <div class="edition-index__heading"><h2 id="edition-index-title">Four kinds of record.</h2><span>A register, not a ranking.</span></div>
+      <dl>
+        {metrics.map(([name, value, href], index) => (
+          <div>
+            <dt><span aria-hidden="true">0{index + 1}</span><a href={`${base}${href}`}>{name}</a></dt>
+            <dd>{compactNumber(value)}</dd>
+          </div>
+        ))}
+      </dl>
+      <p>These are source records, not a count of unique breaches. Different rules produce different kinds of evidence.</p>
+    </aside>
+  <aside class="publication-stamp shell" aria-label="Current publication">
+    <div><span class="eyebrow">This edition</span><strong>Published {date(publication.generated_at)}</strong></div>
+    <p>Publication checksum <code title={checksum}>{checksum.slice(0, 12)}</code></p>
+    <p>Source revision <code title={sourceRevision}>{sourceRevision.slice(0, 12)}</code></p>
+    <a href={`${base}source-health/`}>Review update status</a>
   </aside>
+  <section class="section shell" aria-labelledby="latest">
+    <div class="section-head">
+      <div><span class="eyebrow">01 / The notices</span><h2 id="latest">Latest public notifications</h2></div>
+      <a href={`${base}latest/`}>Search all published records <span aria-hidden="true">↗</span></a>
+    </div>
+    <p class="section-intro">The name on a notice may be the notifying organisation, not the affected organisation. Each record shows the role given by its source.</p>
+    <NotificationTable records={notifications} limit={12} />
+  </section>
   <section class="section shell" aria-labelledby="latest-update">
     <div class="section-head">
-      <div>
-        <span class="eyebrow">Latest retained observation batch</span>
-        <h2 id="latest-update">What changed in the published source records</h2>
-      </div>
-      <p>
-        {publication.update_digest.observed_at
-          ? <>Observed {date(publication.update_digest.observed_at)}. </>
-          : null}
-        Counts describe source-record changes, not newly confirmed incidents.
-      </p>
+      <div><span class="eyebrow">02 / The changes</span><h2 id="latest-update">Since the last observation</h2></div>
+      <p>{publication.update_digest.observed_at ? <>Observed {date(publication.update_digest.observed_at)}. </> : null}Source-record changes, not newly confirmed incidents.</p>
     </div>
-    <div class="grid">
-      <article class="card">
-        <div class="metric">{compactNumber(publication.update_digest.counts.records_first_observed)}</div>
-        <h3>First observed</h3>
-        <p>Records not present in the previous comparable retained snapshot.</p>
-      </article>
-      <article class="card">
-        <div class="metric">{compactNumber(publication.update_digest.counts.records_corrected)}</div>
-        <h3>Corrected</h3>
-        <p>Normalized records whose source-backed fields changed.</p>
-      </article>
-      <article class="card">
-        <div class="metric">{compactNumber(publication.update_digest.counts.records_absent_from_complete_snapshot)}</div>
-        <h3>Absent from a complete snapshot</h3>
-        <p>Source-status changes only; absence is not evidence of remediation.</p>
-      </article>
-      <article class="card">
-        <div class="metric">{compactNumber(publication.update_digest.counts.sources_recovered)}</div>
-        <h3>Sources recovered</h3>
-        <p>Retrievals that returned to healthy after a retained non-healthy state.</p>
-      </article>
-    </div>
-    <p><a href={`${import.meta.env.BASE_URL}corrections/`}>Review recent record-linked corrections and interpretation boundaries</a></p>
-  </section>
-  <section class="section shell" aria-labelledby="at-a-glance">
-    <div class="section-head">
-      <h2 id="at-a-glance">At a glance</h2>
-      <p>Counts describe published source records, not unique real-world incidents.</p>
-    </div>
-    <div class="grid">
-      {metrics.map(([name, value]) => (
-        <article class="card">
-          <div class="metric">{compactNumber(Number(value))}</div>
-          <h3>{name === "Healthy sources" ? <a href={`${import.meta.env.BASE_URL}source-health/`}>{name}</a> : name}</h3>
-        </article>
+    <div class="change-ledger">
+      {changes.map(([name, value, description]) => (
+        <article><strong class="metric">{compactNumber(value)}</strong><h3>{name}</h3><p>{description}</p></article>
       ))}
     </div>
+    <p><a href={`${base}corrections/`}>Read the correction history</a></p>
   </section>
   <section class="section shell" aria-labelledby="four-views">
     <div class="section-head">
-      <h2 id="four-views">Four evidence layers</h2>
-      <p>Deliberately separate views prevent source statistics from becoming accusations.</p>
+      <div><span class="eyebrow">03 / A reader’s guide</span><h2 id="four-views">Not every record is a breach notice.</h2></div>
+      <p>The register keeps four kinds of information apart. None should be read as a measure of an organisation’s security.</p>
     </div>
-    <div class="grid">
-      <article class="card">
-        <span class="pill">Aggregate</span>
-        <h3>Reporting patterns</h3>
-        <p>The OAIC received these numbers of notifications. The statistics name no organization and never become incident records.</p>
-        <a href={`${import.meta.env.BASE_URL}australia/`}>Explore Australian statistics</a>
-      </article>
-      <article class="card">
-        <span class="pill">Anonymous</span>
-        <h3>Notification-row patterns</h3>
-        <p>French and UK regulators publish report-level facts without organization names. Breach Gazette exposes grouped counts only and never sends those rows into entity resolution.</p>
-        <a href={`${import.meta.env.BASE_URL}jurisdictions/`}>Explore anonymized notification patterns</a>
-      </article>
-      <article class="card">
-        <span class="pill">Notification</span>
-        <h3>Public register records</h3>
-        <p>The notifying entity or agency is shown in its source-defined role. That role may differ from the affected entity.</p>
-        <a href={`${import.meta.env.BASE_URL}latest/`}>Review public notifications</a>
-      </article>
-      <article class="card">
-        <span class="pill">Legal status</span>
-        <h3>Regulatory timeline</h3>
-        <p>Inquiries, investigations, allegations, orders, and findings retain exact status. A filing is never rendered as a finding.</p>
-        <a href={`${import.meta.env.BASE_URL}australia/regulatory-actions/`}>Review OAIC actions</a>
-      </article>
+    <div class="reading-guide">
+      <article><span class="guide-number" aria-hidden="true">I.</span><h3>Named notifications</h3><p>Public notices name an organisation or agency. Its role, reporting threshold and source date matter.</p><a href={`${base}latest/`}>Read the notices</a></article>
+      <article><span class="guide-number" aria-hidden="true">II.</span><h3>Anonymous reports</h3><p>French and UK reporting data appears as grouped counts. It is not used to identify organisations or link incidents.</p><a href={`${base}jurisdictions/`}>Browse the country views</a></article>
+      <article><span class="guide-number" aria-hidden="true">III.</span><h3>Published statistics</h3><p>Regulators report totals for particular periods and populations. These figures do not become named incident records.</p><a href={`${base}source-coverage/`}>Compare the measures</a></article>
+      <article><span class="guide-number" aria-hidden="true">IV.</span><h3>Regulator actions</h3><p>An investigation is not a finding. Allegations, undertakings, orders and decisions retain their stated legal status.</p><a href={`${base}australia/regulatory-actions/`}>Follow OAIC actions</a></article>
     </div>
-  </section>
-  <section class="section shell" aria-labelledby="latest">
-    <div class="section-head">
-      <h2 id="latest">Latest public notifications</h2>
-      <a href={`${import.meta.env.BASE_URL}latest/`}>Search all published records</a>
-    </div>
-    <NotificationTable records={notifications} limit={12} />
   </section>
 </BaseLayout>

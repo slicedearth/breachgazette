@@ -8,20 +8,25 @@ import { label } from "../../lib/format";
 const publication = getPublication();
 const policies = Object.values(publication.policies).sort((a, b) => a.name.localeCompare(b.name));
 const healthBySource = new Map(publication.source_health.sources.map((source) => [source.source_id, source]));
+const groups = [
+  { title: "Supported sources", intro: "Each has its own collection rules and publication limits.", policies: policies.filter((policy) => policy.implemented) },
+  { title: "Reviewed, not collected", intro: "Access, export or reuse issues need to be resolved before these can be included.", policies: policies.filter((policy) => !policy.implemented) },
+];
 ---
 
 <BaseLayout title="Source policies" description="Official source policies, thresholds, windows, licences, and limitations.">
-  <SourceInformationNav />
   <Hero
-    eyebrow="Provenance directory"
+    eyebrow="The source directory"
     title="Source policies"
-    intro="Each policy defines what one row means, who can appear, what threshold applies, how long records remain visible, and which publication rights were reviewed."
+    intro="What each source publishes, who it names, how long records stay available and what we can reproduce. Open a source for its reporting rules and limits."
   />
-  <section class="section shell">
+  <SourceInformationNav />
+  {groups.filter((group) => group.policies.length).map((group) => <section class="section shell">
+    <div class="section-head"><h2>{group.title}</h2><p>{group.intro}</p></div>
     <div class="grid source-directory">
-      {policies.map((policy) => (
+      {group.policies.map((policy, index) => (
         <article class="card source-card">
-          <span class="pill">{policy.implemented ? label(healthBySource.get(policy.source_id)?.status ?? "not monitored") : "Deferred"}</span>
+          <div class="source-card__heading"><span class="source-card__number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><span class="pill">{policy.implemented ? label(healthBySource.get(policy.source_id)?.status ?? "not monitored") : "Deferred"}</span></div>
           <h2><a href={`${import.meta.env.BASE_URL}sources/${policy.source_id}/`}>{policy.name}</a></h2>
           <p><strong>{policy.jurisdiction}</strong> · {label(policy.publication_level)}</p>
           <p class="source-card__threshold">{policy.source_threshold}</p>
@@ -29,5 +34,5 @@ const healthBySource = new Map(publication.source_health.sources.map((source) =>
         </article>
       ))}
     </div>
-  </section>
+  </section>)}
 </BaseLayout>
