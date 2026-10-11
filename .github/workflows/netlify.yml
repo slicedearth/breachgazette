@@ -4,6 +4,10 @@ run-name: ${{ inputs.release_id && format('Release {0}', inputs.release_id) || '
 on:
   workflow_call:
     inputs:
+      expected_source:
+        description: Optional exact approved source commit
+        required: false
+        type: string
       data_ref:
         description: Private production-data branch, tag, or commit to publish
         required: false
@@ -22,6 +26,10 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      expected_source:
+        description: Exact approved source commit, required when release_id is supplied
+        required: false
+        type: string
       release_id:
         description: Optional correlation ID supplied by the resumable release command
         required: false
@@ -64,6 +72,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PUBLICATION_TRIGGER_RUN: ${{ github.event.workflow_run.id }}
+          PUBLICATION_EXPECTED_SOURCE: ${{ inputs.expected_source }}
+          PUBLICATION_RELEASE_ID: ${{ inputs.release_id }}
         run: node .github/scripts/publication-policy.mjs
       - name: Resolve private production-data revision
         id: data-ref
@@ -113,6 +123,7 @@ jobs:
           source_revision="$(git rev-parse HEAD)"
           data_revision="$(git -C .private-production-data rev-parse HEAD)"
           echo "source_revision=$source_revision" >> "$GITHUB_OUTPUT"
+          echo "data_revision=$data_revision" >> "$GITHUB_OUTPUT"
           echo "## Breach Gazette production inputs" >> "$GITHUB_STEP_SUMMARY"
           echo "- Source revision: \`$source_revision\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Private data revision: \`$data_revision\`" >> "$GITHUB_STEP_SUMMARY"
@@ -192,6 +203,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PUBLICATION_TRIGGER_RUN: ${{ github.event.workflow_run.id }}
+          PUBLICATION_EXPECTED_SOURCE: ${{ inputs.expected_source }}
+          PUBLICATION_RELEASE_ID: ${{ inputs.release_id }}
         run: node .github/scripts/publication-policy.mjs
       - name: Deploy audited static tree
         id: deploy
@@ -258,6 +271,7 @@ jobs:
         run: |
           jq -n \
             --arg source_revision "${{ steps.revisions.outputs.source_revision }}" \
+            --arg data_revision "${{ steps.revisions.outputs.data_revision }}" \
             --arg publication_checksum "${{ steps.publication.outputs.checksum }}" \
             --arg archive_sha256 "${{ steps.package.outputs.archive_sha256 }}" \
             --arg deploy_id "${{ steps.deploy.outputs.deploy_id }}" \
@@ -267,12 +281,13 @@ jobs:
             --arg run_id "$GITHUB_RUN_ID" \
             --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
             '{
-              schema_version: "1.0",
+              schema_version: "1.1",
               subject: {
                 name: "breachgazette-site.zip",
                 sha256: $archive_sha256
               },
               source_revision: $source_revision,
+              data_revision: $data_revision,
               publication_checksum: $publication_checksum,
               deployment: {
                 id: $deploy_id,

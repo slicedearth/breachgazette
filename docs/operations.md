@@ -446,6 +446,31 @@ changed production input, duplicate run, rerun attempt or failed live check
 stops the sequence and leaves collection paused. Resolve the cause before
 preparing a new release; do not edit receipt fields to bypass a checkpoint.
 
+Controller dispatches include the approved source SHA as `expected_source`.
+Both workflow source gates enforce it, including the gate before private-state
+access. A dispatch with `release_id` but no valid `expected_source` is rejected.
+Ordinary manual dispatches without `release_id` may omit this optional input and
+continue to use the current protected main and successful-CI policy. Supplying an
+expected source opts those callers into the same exact-source check.
+
+Before accepting live content, the command reads the recorded run's deployment
+artifact and verifies its archive digest, run ID, attempt, source, private-state
+revision and publication checksum. The expected checksum is saved before the
+first live check, never learned from the live site. It must match both before
+verification and before restoring collection. The artifact metadata must remain
+available, unexpired and unchanged on resume, even when its validated evidence is
+already saved. Missing, malformed, expired or inconsistent provenance leaves
+collection paused. Artifacts are retained for 30 days and downloads are bounded
+to 128 MiB. Older provenance without a state binding, or an older verified receipt
+without provenance, requires operator review; it is not accepted automatically.
+
+Receipt contents are synchronised before atomic replacement, and the parent
+directory is synchronised afterwards. Any synchronisation error stops the
+command before its next remote action. This requires a local POSIX filesystem
+with working file and directory `fsync`; do not use a network or synchronised
+folder that does not honour those operations. Filesystem and hardware guarantees
+still determine power-loss durability. Keep independent backups of receipts.
+
 After an abrupt process termination, a sibling `.lock` directory may remain.
 Confirm that no release command is running before removing only that empty lock
 directory. Keep the receipt. If a dispatch cannot be found, inspect Actions

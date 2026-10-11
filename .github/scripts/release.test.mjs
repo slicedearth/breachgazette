@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, fsyncSync, mkdtempSync, openSync, readFileSync, renameSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { advance, receiptPath, requireRun, saveReceipt, validateReceipt, verifyLive } from "./release.mjs";
+import { advance, dispatchRelease, receiptPath, requireRun, saveReceipt, validateReceipt, verifyLive } from "./release.mjs";
 import { REPOSITORY } from "./publication-policy.mjs";
 
 function harness(wasEnabled = true) {
@@ -22,7 +22,11 @@ function harness(wasEnabled = true) {
     save: (r) => saved.push(structuredClone(r)),
     setEnabled: async (enabled) => { writes.push(["flag", enabled]); snapshot.enabled = enabled; },
     dispatch: async (...args) => writes.push(["dispatch", ...args]),
-    runs: async () => [run], run: async () => run, verifyLive: async () => ({ checksum: "c".repeat(64) }),
+    runs: async () => [run], run: async () => run,
+    provenance: async () => ({ version: "1.1", runId: 42, runAttempt: 1, source: receipt.source, state: receipt.state,
+      workflowRef: `${REPOSITORY}/.github/workflows/netlify.yml@refs/heads/main`,
+      artifactId: 73, artifactDigest: `sha256:${"e".repeat(64)}`, archiveSha256: "f".repeat(64), checksum: "c".repeat(64) }),
+    verifyLive: async () => ({ checksum: "c".repeat(64) }),
     now: () => "2026-01-01T00:00:00Z" };
   return { receipt, snapshot, run, io, writes, saved };
 }
@@ -89,6 +93,21 @@ test("uncertain dispatch is not duplicated, including when no run is visible", a
   assert.equal(h.writes.filter(([action]) => action === "dispatch").length, 1);
 });
 
+test("dispatch after the last stable inspection retains the approved immutable source", async () => {
+  const h = harness(); await reach(h, "paused");
+  let payload;
+  h.io.dispatch = (...args) => {
+    h.snapshot.source = "d".repeat(40);
+    return dispatchRelease(...args, (_path, body) => { payload = body; });
+  };
+  await advance(h.receipt, h.io);
+  assert.equal(payload.inputs.expected_source, h.receipt.source);
+  assert.equal(payload.inputs.data_ref, h.receipt.state);
+  assert.equal(h.saved.at(-1).stage, "dispatching");
+  await assert.rejects(advance(h.receipt, h.io), /inputs changed/);
+  assert.equal(h.snapshot.enabled, false);
+});
+
 test("duplicate correlated runs require manual review", async () => {
   const h = harness(); await reach(h, "dispatching"); h.io.runs = async () => [h.run, h.run];
   await assert.rejects(advance(h.receipt, h.io), /Multiple runs/);
@@ -115,6 +134,68 @@ test("live identity changes and unexpected schedule enablement block restoration
   await assert.rejects(advance(h.receipt, h.io), /publication changed/);
   const paused = harness(false); await reach(paused, "verified"); paused.snapshot.enabled = true;
   await assert.rejects(advance(paused.receipt, paused.io), /setting changed/);
+});
+
+test("interruption before first live verification retains run provenance, not the replacement live checksum", async () => {
+  const h = harness(); await reach(h, "waiting");
+  assert.equal(h.receipt.provenance, undefined);
+  h.io.verifyLive = async (source, checksum) => {
+    assert.equal(source, h.receipt.source);
+    assert.equal(checksum, "c".repeat(64));
+    return { checksum: "d".repeat(64) };
+  };
+  await assert.rejects(advance(h.receipt, h.io), /publication changed/);
+  assert.equal(h.receipt.stage, "waiting");
+  assert.equal(h.receipt.checksum, undefined);
+  assert.equal(h.receipt.provenance.checksum, "c".repeat(64));
+  const checkpoint = structuredClone(h.receipt);
+  const writes = structuredClone(h.writes);
+  h.receipt = validateReceipt(JSON.parse(JSON.stringify(checkpoint)), checkpoint.source, checkpoint.state);
+  for (let i = 0; i < 2; i++) {
+    await assert.rejects(advance(h.receipt, h.io), /publication changed/);
+    assert.deepEqual(h.receipt, checkpoint);
+    assert.deepEqual(h.writes, writes);
+    assert.equal(h.snapshot.enabled, false);
+  }
+  h.io.verifyLive = async () => ({ checksum: "c".repeat(64) });
+  await reach(h, "complete");
+});
+
+for (const stage of ["waiting", "verified"]) test(`unavailable provenance at ${stage} never restores collection`, async () => {
+  const h = harness(); await reach(h, stage);
+  const checkpoint = structuredClone(h.receipt);
+  h.io.provenance = async () => { throw new Error("provenance unavailable"); };
+  await assert.rejects(advance(h.receipt, h.io), /provenance unavailable/);
+  assert.deepEqual(h.receipt, checkpoint);
+  assert.equal(h.snapshot.enabled, false);
+});
+
+for (const [field, value] of Object.entries({ runId: 99, runAttempt: 2, source: "d".repeat(40), state: "d".repeat(40),
+  checksum: "invalid", artifactId: -1, artifactDigest: "invalid", version: "1.0" })) {
+  test(`wrong provenance ${field} cannot verify or restore collection`, async () => {
+    const h = harness(); await reach(h, "waiting");
+    const evidence = await h.io.provenance(); evidence[field] = value;
+    h.io.provenance = async () => evidence;
+    h.io.verifyLive = async () => { assert.fail("must reject before reading live publication"); };
+    await assert.rejects(advance(h.receipt, h.io), /provenance does not match/);
+    assert.equal(h.receipt.stage, "waiting");
+    assert.equal(h.receipt.provenance, undefined);
+    assert.equal(h.snapshot.enabled, false);
+  });
+}
+
+test("receipt without recorded provenance cannot resume as verified", async () => {
+  const h = harness(); await reach(h, "verified");
+  delete h.receipt.provenance;
+  assert.throws(() => validateReceipt(h.receipt, h.receipt.source, h.receipt.state), /provenance/);
+});
+
+test("failed checkpoint persistence prevents dispatch and does not advance in-memory intent", async () => {
+  const h = harness(); await reach(h, "paused");
+  h.io.save = () => { throw new Error("sync failed"); };
+  await assert.rejects(advance(h.receipt, h.io), /sync failed/);
+  assert.equal(h.receipt.stage, "paused");
+  assert.deepEqual(h.writes, [["flag", false]]);
 });
 
 test("lost restoration response resumes without another deployment", async () => {
@@ -154,6 +235,25 @@ test("receipt storage is owner-only and rejects public, symlinked and oversized 
   assert.throws(() => receiptPath(resolve("release.json")));
 });
 
+test("receipt contents and rename directory are synchronised in order", () => {
+  const directory = mkdtempSync(join(realTmp(), "breachgazette-receipt-sync-"));
+  const path = join(directory, "release.json");
+  const events = [];
+  const operations = { openSync, writeFileSync, fsyncSync, closeSync, renameSync };
+  const wrapped = Object.fromEntries(Object.entries(operations).map(([name, call]) =>
+    [name, (...args) => { events.push(name); return call(...args); }]));
+  saveReceipt(path, harness().receipt, wrapped);
+  assert.deepEqual(events, ["openSync", "writeFileSync", "fsyncSync", "closeSync", "renameSync", "openSync", "fsyncSync", "closeSync"]);
+  const original = readFileSync(path, "utf8");
+  assert.throws(() => saveReceipt(path, { ...harness().receipt, stage: "pausing" },
+    { ...operations, fsyncSync: () => { throw new Error("sync unavailable"); } }), /sync unavailable/);
+  assert.equal(readFileSync(path, "utf8"), original);
+  let syncs = 0;
+  assert.throws(() => saveReceipt(path, { ...harness().receipt, stage: "pausing" },
+    { ...operations, fsyncSync: (fd) => { if (++syncs === 2) throw new Error("directory sync unavailable"); fsyncSync(fd); } }), /directory sync unavailable/);
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).stage, "pausing", "installed intent survives a reported directory-sync error");
+});
+
 function realTmp() { return process.platform === "darwin" ? "/private/tmp" : tmpdir(); }
 
 function liveFixture() {
@@ -170,16 +270,18 @@ function liveFixture() {
 
 test("live verifier binds source, nonempty counts, exact search bytes and security headers", async () => {
   const f = liveFixture();
-  assert.deepEqual(await verifyLive("https://breachgazette.example", f.source, f.get), { checksum: "c".repeat(64) });
+  assert.deepEqual(await verifyLive("https://breachgazette.example", f.source, "c".repeat(64), f.get), { checksum: "c".repeat(64) });
   f.identity.source_revision = "b".repeat(40);
-  await assert.rejects(verifyLive("https://breachgazette.example", f.source, f.get), /does not match/);
+  await assert.rejects(verifyLive("https://breachgazette.example", f.source, "c".repeat(64), f.get), /does not match/);
 });
 
-for (const failure of ["count", "digest", "binding", "header", "origin"]) test(`live ${failure} mismatch fails closed`, async () => {
+for (const failure of ["count", "digest", "binding", "header", "origin", "checksum", "missing expected checksum"]) test(`live ${failure} mismatch fails closed`, async () => {
   const f = liveFixture();
   if (failure === "count") f.identity.record_counts.notifications = 0;
   if (failure === "digest") f.identity.search_manifest_binding.sha256 = "d".repeat(64);
   if (failure === "binding") f.identity.search_manifest_binding.schema_version = "0";
   if (failure === "header") f.headers.delete("referrer-policy");
-  await assert.rejects(verifyLive(failure === "origin" ? "http://localhost" : "https://breachgazette.example", f.source, f.get));
+  if (failure === "checksum") f.identity.publication_checksum = "d".repeat(64);
+  await assert.rejects(verifyLive(failure === "origin" ? "http://localhost" : "https://breachgazette.example", f.source,
+    failure === "missing expected checksum" ? undefined : "c".repeat(64), f.get));
 });

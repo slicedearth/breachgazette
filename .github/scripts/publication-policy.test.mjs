@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { REPOSITORY, requireTrustedPublication } from "./publication-policy.mjs";
+import { REPOSITORY, requireExpectedSource, requireTrustedPublication, verifyPublication } from "./publication-policy.mjs";
+import { api as requestApi, dispatchRelease } from "./release.mjs";
 
 function evidence(event = "workflow_dispatch") {
   const revision = "a".repeat(40);
@@ -48,3 +49,50 @@ for (const [name, mutate] of Object.entries(rejected)) {
     assert.throws(() => requireTrustedPublication(value), /Publication requires/);
   });
 }
+
+test("dispatch adapter carries approved source and rejects a later main with successful CI", () => {
+  const approved = evidence();
+  const later = evidence();
+  later.revision = later.branch.commit.sha = later.runs[0].head_sha = "b".repeat(40);
+  assert.equal(requireTrustedPublication(later), 42);
+  let payload;
+  dispatchRelease("12345678-1234-4123-8123-123456789abc", approved.revision, "c".repeat(40),
+    (path, body, method) => {
+      assert.equal(path, `repos/${REPOSITORY}/actions/workflows/netlify.yml/dispatches`);
+      assert.equal(method, "POST");
+      requestApi(path, body, method, (program, args, options) => {
+        assert.equal(program, "gh");
+        assert.deepEqual(args, ["api", path, "--method", "POST", "--input", "-"]);
+        payload = JSON.parse(options.input);
+        return "";
+      });
+    });
+  assert.deepEqual(payload, { ref: "main", inputs: { expected_source: approved.revision,
+    data_ref: "c".repeat(40), release_id: "12345678-1234-4123-8123-123456789abc" } });
+  const env = { GITHUB_REPOSITORY: REPOSITORY, GITHUB_REF: "refs/heads/main", GITHUB_EVENT_NAME: "workflow_dispatch",
+    PUBLICATION_EXPECTED_SOURCE: payload.inputs.expected_source, PUBLICATION_RELEASE_ID: payload.inputs.release_id };
+  let reads = 0;
+  const api = (path) => {
+    reads++;
+    if (path.endsWith("branches/main")) return later.branch;
+    if (path.endsWith("workflows/ci.yml")) return later.workflow;
+    if (path.includes("/runs?")) return { workflow_runs: later.runs };
+    assert.fail("Unexpected API access");
+  };
+  assert.throws(() => verifyPublication(env, api, () => later.revision), /approved release revision/);
+  assert.equal(reads, 0, "source binding fails before any API access");
+  later.revision = later.branch.commit.sha = later.runs[0].head_sha = approved.revision;
+  assert.doesNotThrow(() => verifyPublication(env, api, () => later.revision));
+  assert.equal(reads, 3, "matching source must still pass the existing main and CI gates");
+  later.runs[0].conclusion = "failure";
+  assert.throws(() => verifyPublication(env, api, () => later.revision), /latest successful/);
+});
+
+test("correlated releases require an exact source while ordinary manual calls remain compatible", () => {
+  for (const source of ["", "main", "a".repeat(39), "b".repeat(40)]) {
+    assert.throws(() => requireExpectedSource("a".repeat(40), source, "release-id"), /approved release/);
+  }
+  assert.doesNotThrow(() => requireExpectedSource("a".repeat(40)));
+  assert.doesNotThrow(() => requireExpectedSource("a".repeat(40), "a".repeat(40)));
+  assert.throws(() => requireExpectedSource("a".repeat(40), "b".repeat(40)), /approved release/);
+});
