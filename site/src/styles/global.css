@@ -657,13 +657,13 @@ footer { margin-top: 3rem; padding-block: 2.5rem; color: var(--ink); background:
 .edition-index h2 { font: italic 1.65rem/1.1 Georgia, serif; margin: 0; letter-spacing: -.02em; }
 .edition-index__heading > span { color: #cfd3c7; font-size: .75rem; }
 .edition-index dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem; margin: 0; }
-.edition-index dl > div { display: flex; flex-direction: column; gap: .8rem; padding: 1rem 0 .5rem; border-top: 1px solid #657064; }
+.edition-index dl > div { display: flex; flex-direction: column; gap: .8rem; padding: 1rem 0 .5rem; border-top: 1px solid #657064; container-type: inline-size; }
 .edition-index dt { display: flex; gap: .6rem; font-size: .8rem; line-height: 1.4; }
 .edition-index dt span { color: #c1c8b9; font: .6rem ui-monospace, monospace; }
 .edition-index a { text-decoration-color: #bbbd98; }
 .edition-index a:hover { color: #ecbc83; }
 .edition-index a:focus-visible { outline-color: #ecbc83; }
-.edition-index dd { margin: 0; font: 3.2rem/.95 Georgia, serif; letter-spacing: -.05em; white-space: nowrap; }
+.edition-index dd { margin: 0; font: clamp(1.5rem, 25cqi, 3.2rem)/.95 Georgia, serif; letter-spacing: -.05em; white-space: nowrap; }
 .edition-index > p { font-size: .76rem; line-height: 1.65; color: #cfd3c7; border-top: 1px solid #657064; padding-top: 1rem; }
 .edition-index > p strong { display: block; color: var(--paper); font-weight: 600; margin-bottom: .2rem; }
 .change-ledger { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-block: 1rem; border-block: 1px solid var(--line); }
