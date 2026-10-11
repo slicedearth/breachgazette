@@ -1,0 +1,19 @@
+schema_version: "1.0"
+source_id: united_kingdom_ico_regulatory
+reviewed_at: "2026-10-11"
+entries:
+  - event_id: united-kingdom-ico-regulatory-south-staffordshire-2026-05-07
+    matter_id: uk-ico-south-staffordshire
+    entity: South Staffordshire Plc and South Staffordshire Water Plc
+    official_url: https://ico.org.uk/action-weve-taken/enforcement/2026/05/south-staffordshire-plc-and-south-staffordshire-water-plc/
+    expected_markers:
+      - South Staffordshire
+      - 7 May 2026
+      - Monetary penalties
+      - £963,900
+    source_title: South Staffordshire Plc and South Staffordshire Water Plc
+    publication_date: "2026-05-07"
+    event_date: "2026-05-07"
+    legal_status: administrative_fine
+    status_wording: Regulator-issued monetary penalty
+    summary: The ICO imposed a £963,900 fine on the two named companies following a cyber incident. The decision concerns the data-security requirements in Articles 5(1)(f) and 32(1) of the UK GDPR; it is an administrative outcome, not a court judgment.

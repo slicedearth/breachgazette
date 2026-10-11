@@ -1124,7 +1124,7 @@ test("publication identity and source corrections are readable and reproducible"
     publication_checksum: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     publication_checksum_algorithm: "sha256_canonical_json_v1",
     publication_checksum_scope: "publication_summary_and_search_partition_digests",
-    record_counts: { notifications: 3, corrections: 1 },
+    record_counts: { notifications: 3, corrections: 1, aggregate_metrics: 13, regulatory_actions: 4 },
     published_corrections: 1,
     max_public_corrections: 250,
     update_digest: {

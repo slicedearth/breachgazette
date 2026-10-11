@@ -85,6 +85,7 @@ class LegalStatus(StrEnum):
     CIVIL_PROCEEDING_ALLEGATION = "civil_proceeding_allegation"
     COURT_JUDGMENT = "court_judgment"
     CIVIL_PENALTY_ORDER = "civil_penalty_order"
+    ADMINISTRATIVE_FINE = "administrative_fine"
     MATTER_CLOSED = "matter_closed"
     OUTCOME_NO_ADVERSE_FINDING = "outcome_no_adverse_finding"
     STATUS_UNKNOWN = "status_unknown"

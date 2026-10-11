@@ -3,7 +3,7 @@ import Hero from "../../components/Hero.astro";
 import SourceNote from "../../components/SourceNote.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getPublication } from "../../lib/data";
-import { date, label } from "../../lib/format";
+import { label } from "../../lib/format";
 
 const publication = getPublication();
 const records = publication.aggregates.filter((record) => record.source_id === "oaic_ndb");
@@ -17,19 +17,23 @@ const dimensions = [...new Set(records.map((record) => record.dimension))];
     title="Australia’s NDB reporting patterns"
     intro="The OAIC received these notifications under the Notifiable Data Breaches scheme. Values are aggregate reporting measures, not named incidents."
   />
+  <nav class="shell record-links" aria-label="Australian records">
+    <a href={`${import.meta.env.BASE_URL}australia/regulatory-actions/`}>Regulatory actions</a>
+    <a href={`${import.meta.env.BASE_URL}australia/nsw/`}>NSW aggregate metrics</a>
+    <a href={`${import.meta.env.BASE_URL}australia/public-notifications/`}>NSW public notifications</a>
+    <a href={`${import.meta.env.BASE_URL}aggregates/oaic_ndb/`}>Browse all national metrics by page</a>
+  </nav>
   <section class="section shell">
-    <div class="section-head"><h2>Reporting-period measures</h2><p>{records.length} source cells across {dimensions.length} reviewed dimensions.</p></div>
+    <div class="section-head"><h2>National measures by dimension</h2><p>{records.length} source cells across {dimensions.length} reviewed dimensions.</p></div>
+    <p>This index counts published metric cells, not breaches. <a href={`${import.meta.env.BASE_URL}aggregates/oaic_ndb/`}>Read every national metric, with its reporting period and population.</a></p>
     <div class="table-wrap" tabindex="0" aria-label="OAIC aggregate metrics table">
-      <table aria-label="OAIC aggregate metrics">
-        <thead><tr><th>Dimension</th><th>Category</th><th>Value</th><th>Period</th><th>Population scope</th></tr></thead>
+      <table aria-label="OAIC aggregate metrics by dimension">
+        <thead><tr><th scope="col">Dimension</th><th scope="col">Published metric cells</th></tr></thead>
         <tbody>
-          {records.slice(0, 250).map((record) => (
+          {dimensions.sort().map((dimension) => (
             <tr>
-              <td data-label="Dimension">{label(record.dimension)}</td>
-              <th scope="row" data-label="Category">{record.parent_category ? `${record.parent_category}: ` : ""}{record.category}</th>
-              <td data-label="Value">{record.value.value ?? label(record.value.state)}{record.unit === "percent" ? "%" : ""}</td>
-              <td data-label="Period">{date(record.reporting_period_start)} to {date(record.reporting_period_end)}</td>
-              <td data-label="Population scope">{record.population_scope}</td>
+              <th scope="row" data-label="Dimension">{label(dimension)}</th>
+              <td data-label="Published metric cells">{records.filter((record) => record.dimension === dimension).length.toLocaleString("en-AU")}</td>
             </tr>
           ))}
         </tbody>

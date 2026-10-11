@@ -95,6 +95,7 @@ export type SearchPartition = {
 export type Aggregate = {
   source_id: string;
   source_record_id: string;
+  source_retrieval_time?: string;
   regulator: string;
   reporting_scheme: string;
   reporting_period_start: string;
@@ -115,6 +116,7 @@ export type RegulatoryAction = {
   source_record_id: string;
   source_url: string;
   source_revision: string;
+  source_retrieval_time?: string;
   regulator: string;
   matter_id: string;
   entity: { source_name: string; normalized_name: string; role: string };

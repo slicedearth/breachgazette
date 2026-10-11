@@ -19,6 +19,14 @@ for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, async () => { a
 try {
   await cp(fileURLToPath(fixture), data, { recursive: true });
   const publication = await read("publication.json");
+  const aggregateTemplate = publication.aggregates.find((record) => record.source_id === "oaic_ndb");
+  publication.aggregates = [
+    ...publication.aggregates.filter((record) => record.source_id !== "oaic_ndb"),
+    ...Array.from({ length: 305 }, (_, index) => ({ ...aggregateTemplate,
+      source_record_id: `fixture-metric-${String(index + 1).padStart(3, "0")}`,
+      category: `Example metric ${String(index + 1).padStart(3, "0")}`,
+    })),
+  ];
   const manifest = await read("search-manifest.json");
   const partition = await read(`search-partitions/${manifest.partitions[0].asset}.json`);
   const records = Array.from({ length: 120 }, (_, index) => {

@@ -1,0 +1,13 @@
+---
+import Hero from "../components/Hero.astro";
+import RegulatoryTimeline from "../components/RegulatoryTimeline.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getPublication } from "../lib/data";
+const publication = getPublication();
+---
+<BaseLayout title="Regulatory actions" description="Selected official data-breach investigations, proceedings and decisions, with their legal status preserved." section="The regulatory record">
+  <Hero eyebrow="Investigations & decisions" title="The action, and its status."
+    intro="Selected data-breach matters from official regulator publications. Follow the dated events, read the decision and keep the legal status in view."
+    warning="An allegation is not a finding. Administrative fines are not court judgments. This is a reviewed selection, not a complete enforcement register or a ranking of countries." />
+  <RegulatoryTimeline records={publication.regulatory_actions} policies={publication.policies} />
+</BaseLayout>

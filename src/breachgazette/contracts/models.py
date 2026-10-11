@@ -245,6 +245,8 @@ class SourceRegulatoryRecord(RecordProvenance):
             raise ValueError("ambiguous regulatory status cannot be published")
         if self.allegation and self.finding:
             raise ValueError("one regulatory action cannot be both allegation and finding")
+        if self.legal_status == LegalStatus.ADMINISTRATIVE_FINE and not self.finding:
+            raise ValueError("an imposed administrative fine must retain the regulator finding")
         if (
             self.legal_status
             in {

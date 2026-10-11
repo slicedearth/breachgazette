@@ -67,6 +67,18 @@ nav a { text-decoration: none; font-size: .88rem; font-weight: 700; }
   border-bottom-color: var(--vermilion);
 }
 .nav-toggle { display: none; }
+.record-links { gap: .5rem 1.5rem; margin-top: 1rem; }
+.record-links a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: underline; }
+.source-metric-index { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem; }
+.source-metric-index article { padding: 1.5rem 0; border-top: 3px double var(--ink); min-width: 0; }
+.source-metric-index h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); line-height: 1.2; }
+.source-metric-index p { line-height: 1.6; }
+.source-metric-index a { overflow-wrap: break-word; }
+.metric-dimension { display: block; margin-top: .5rem; font-size: .78rem; font-weight: 400; color: var(--muted); }
+@media (min-width: 761px) and (max-width: 1000px) {
+  .masthead nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) { .source-metric-index { grid-template-columns: minmax(0, 1fr); gap: 1rem; } }
 .nav-toggle__icon {
   display: grid;
   width: 1.15rem;

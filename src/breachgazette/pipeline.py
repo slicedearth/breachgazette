@@ -20,7 +20,12 @@ from breachgazette.clients import (
     UnitedKingdomIcoAdapter,
     WashingtonAdapter,
 )
+from breachgazette.clients.annual_reports import FranceCnilAnnualAdapter, IrelandDpcAdapter
 from breachgazette.clients.base import AdapterResult
+from breachgazette.clients.european_regulatory import (
+    FranceRegulatoryAdapter,
+    UnitedKingdomRegulatoryAdapter,
+)
 from breachgazette.compare import compare_records
 from breachgazette.contracts import (
     NotificationChange,
@@ -55,6 +60,10 @@ ADAPTERS: dict[str, AdapterFactory] = {
     "france_cnil": CnilAdapter,
     "united_kingdom_ico": UnitedKingdomIcoAdapter,
     "netherlands_ap": NetherlandsApAdapter,
+    "ireland_dpc": IrelandDpcAdapter,
+    "france_cnil_annual": FranceCnilAnnualAdapter,
+    "france_cnil_regulatory": FranceRegulatoryAdapter,
+    "united_kingdom_ico_regulatory": UnitedKingdomRegulatoryAdapter,
 }
 
 

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "rights_reviewed_on": "2026-07-26",
+  "rights_reviewed_on": "2026-10-11",
   "source_id": "ireland_dpc",
   "name": "Ireland DPC data breach statistics",
   "country": "Ireland",
@@ -20,16 +20,16 @@
   "counts_may_be_estimates": false,
   "duplicate_notifications_may_be_consolidated": false,
   "notifier_may_differ_from_affected_entity": false,
-  "source_licence": "The Data Protection Commission permits reuse of public-sector information subject to attribution, accuracy, non-misleading presentation, and other stated conditions.",
-  "attribution": "Data Protection Commission, Ireland",
-  "redistribution_decision": "deferred",
-  "correction_process": "Recheck the official annual report and reuse conditions after the regulator's HTTPS certificate chain can be validated by the bounded client.",
+  "source_licence": "The Data Protection Commission permits public-sector information reuse subject to attribution, accuracy, non-misleading presentation and its other conditions. Terms: https://www.dataprotection.ie/en/who-we-are/corporate-governance/re-use-public-sector-information",
+  "attribution": "Data Protection Commission, Ireland, Annual Report 2025. Copyright Data Protection Commission.",
+  "redistribution_decision": "approved_with_conditions",
+  "correction_process": "Recheck the official annual report and its valid-notification definition. A new reporting year requires review of the fixed source and parser. Preserve attribution and the source's public-sector information reuse conditions.",
   "source_url": "https://dataprotection.ie/en/data-protection-commission-publishes-2025-annual-report",
-  "implemented": false,
+  "implemented": true,
   "limitations": [
-    "The reviewed official HTTPS service did not provide a certificate chain that the bounded standards-based client could validate.",
-    "TLS verification will not be disabled or bypassed to collect this source.",
-    "No records are published until secure retrieval succeeds and the report schema is fixed and tested.",
+    "Only the reviewed 2025 valid-notification headline is collected, not every annual report measure.",
+    "Secure retrieval uses normal certificate verification and fails closed on transport or schema changes.",
+    "Valid notifications are not the same measure as all submissions received.",
     "Annual counts are notifications, not automatically unique real-world incidents."
   ]
 }

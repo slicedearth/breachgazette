@@ -13,8 +13,8 @@ const base = import.meta.env.BASE_URL;
 const metrics = [
   ["Public notifications", publication.stats.public_notifications ?? 0, "latest/"],
   ["Anonymous notification rows", publication.stats.anonymized_notification_rows ?? 0, "jurisdictions/"],
-  ["Aggregate metrics", publication.stats.aggregate_metrics ?? 0, "australia/"],
-  ["Regulatory actions", publication.stats.regulatory_actions ?? 0, "australia/regulatory-actions/"],
+  ["Aggregate metrics", publication.stats.aggregate_metrics ?? 0, "aggregates/"],
+  ["Regulatory actions", publication.stats.regulatory_actions ?? 0, "regulatory-actions/"],
 ] as const;
 const changes = [
   ["First observed", publication.update_digest.counts.records_first_observed, "Not present in the previous comparable snapshot."],
@@ -86,8 +86,8 @@ const changes = [
     <div class="reading-guide">
       <article><span class="guide-number" aria-hidden="true">I.</span><h3>Named notifications</h3><p>Public notices name an organisation or agency. Its role, reporting threshold and source date matter.</p><a href={`${base}latest/`}>Read the notices</a></article>
       <article><span class="guide-number" aria-hidden="true">II.</span><h3>Anonymous reports</h3><p>French and UK reporting data appears as grouped counts. It is not used to identify organisations or link incidents.</p><a href={`${base}jurisdictions/`}>Browse the country views</a></article>
-      <article><span class="guide-number" aria-hidden="true">III.</span><h3>Published statistics</h3><p>Regulators report totals for particular periods and populations. These figures do not become named incident records.</p><a href={`${base}source-coverage/`}>Compare the measures</a></article>
-      <article><span class="guide-number" aria-hidden="true">IV.</span><h3>Regulator actions</h3><p>An investigation is not a finding. Allegations, undertakings, orders and decisions retain their stated legal status.</p><a href={`${base}australia/regulatory-actions/`}>Follow OAIC actions</a></article>
+      <article><span class="guide-number" aria-hidden="true">III.</span><h3>Published statistics</h3><p>Regulators report totals for particular periods and populations. These figures do not become named incident records.</p><a href={`${base}aggregates/`}>Read the measures</a></article>
+      <article><span class="guide-number" aria-hidden="true">IV.</span><h3>Regulator actions</h3><p>An investigation is not a finding. Allegations, undertakings, orders and decisions retain their stated legal status.</p><a href={`${base}regulatory-actions/`}>Follow regulatory actions</a></article>
     </div>
   </section>
 </BaseLayout>

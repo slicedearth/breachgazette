@@ -2,6 +2,34 @@
   "schema_version": "1.0",
   "schedule_utc": "23 17 * * 1",
   "sources": {
+    "ireland_dpc": {
+      "source_id": "ireland_dpc",
+      "stale_after_hours": 4380,
+      "minimum_records": 1,
+      "minimum_retained_fraction": 1.0,
+      "maximum_growth_factor": 1.0
+    },
+    "france_cnil_annual": {
+      "source_id": "france_cnil_annual",
+      "stale_after_hours": 4380,
+      "minimum_records": 1,
+      "minimum_retained_fraction": 1.0,
+      "maximum_growth_factor": 1.0
+    },
+    "france_cnil_regulatory": {
+      "source_id": "france_cnil_regulatory",
+      "stale_after_hours": 240,
+      "minimum_records": 1,
+      "minimum_retained_fraction": 1.0,
+      "maximum_growth_factor": 2.0
+    },
+    "united_kingdom_ico_regulatory": {
+      "source_id": "united_kingdom_ico_regulatory",
+      "stale_after_hours": 240,
+      "minimum_records": 1,
+      "minimum_retained_fraction": 1.0,
+      "maximum_growth_factor": 2.0
+    },
     "california": {
       "source_id": "california",
       "stale_after_hours": 240,
