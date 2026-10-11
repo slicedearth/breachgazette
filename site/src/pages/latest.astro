@@ -279,8 +279,10 @@ const staticPage = getNotificationPage(getAllNotifications(), 1);
         if (hasFilters() && currentPage > 1) parameters.set("page", String(currentPage));
         if (requestedRecordId) parameters.set("record", requestedRecordId);
         const fragment = parameters.toString();
+        const staticAnchor = !fragment && window.location.hash === "#notification-results"
+          ? "#notification-results" : "";
         const nextUrl =
-          `${window.location.pathname}${window.location.search}${fragment ? `#${fragment}` : ""}`;
+          `${window.location.pathname}${window.location.search}${fragment ? `#${fragment}` : staticAnchor}`;
         if (mode === "push") window.history.pushState(null, "", nextUrl);
         else window.history.replaceState(null, "", nextUrl);
         copySearchButton.disabled = !hasFilters();

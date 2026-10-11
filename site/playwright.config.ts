@@ -14,7 +14,7 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:41733",
     trace: "retain-on-failure",
   },
-  webServer: {
+  webServer: [{
     command:
       "BREACHGAZETTE_TEST_BUILD=1 " +
       "BREACHGAZETTE_SITE_DATA_DIR=../tests/fixtures/site " +
@@ -22,5 +22,10 @@ export default defineConfig({
     port: 41733,
     reuseExistingServer: false,
     timeout: 30_000,
-  },
+  }, {
+    command: "BREACHGAZETTE_TEST_BUILD=1 node scripts/serve-navigation-test-build.mjs",
+    port: 41735,
+    reuseExistingServer: false,
+    timeout: 60_000,
+  }],
 });
