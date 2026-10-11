@@ -1,0 +1,16 @@
+---
+import { getNotificationPaginationItems } from "../lib/notifications";
+interface Props { current: number; count: number; root: string; }
+const { current, count, root } = Astro.props;
+const href = (page: number) => `${import.meta.env.BASE_URL}${root}${page === 1 ? "" : `${page}/`}#metrics`;
+---
+{count > 1 && <nav class="pagination" aria-label="Aggregate metric pages">
+  {current > 1 && <a class="pagination__step" href={href(current - 1)} rel="prev">Previous</a>}
+  <span class="pagination__status">Page {current} of {count}</span>
+  <ol class="pagination__pages">
+    {getNotificationPaginationItems(current, count, 1).map((page) => page === null
+      ? <li class="pagination__ellipsis" aria-hidden="true">…</li>
+      : <li>{page === current ? <span aria-current="page"><span class="visually-hidden">Page </span>{page}</span> : <a href={href(page)} aria-label={`Go to metric page ${page}`}>{page}</a>}</li>)}
+  </ol>
+  {current < count && <a class="pagination__step" href={href(current + 1)} rel="next">Next</a>}
+</nav>}

@@ -34,9 +34,22 @@ publications, names, logos, or third-party material.
   reviewed publication. Breach Gazette retains only five attributed factual
   annual values and does not reproduce the regulator's prose or documents.
 - **Ireland DPC:** the reviewed public-sector information terms permit reuse
-  subject to attribution, accuracy, and non-misleading presentation. Collection
-  remains deferred because the official HTTPS certificate chain cannot
-  currently be validated; TLS verification is never disabled.
+  subject to attribution, accuracy, non-misleading presentation and the other
+  stated conditions. The 2025 valid-notification headline is collected with
+  ordinary certificate validation. Copyright DPC and the annual-report source
+  remain attributed. See the [reuse terms](https://www.dataprotection.ie/en/who-we-are/corporate-governance/re-use-public-sector-information).
+- **UK regulatory decisions:** official text is covered by the
+  [Open Government Licence v3.0](https://ico.org.uk/global/copyright-and-re-use-of-materials/)
+  except where stated otherwise. Each event retains the publication title,
+  publication date, source link and attribution. No images or logos are reused.
+- **French annual statistics and regulatory decisions:** article text has a
+  [CC BY-ND 4.0 boundary](https://www.cnil.fr/fr/mentions-legales), distinct from
+  the anonymous dataset's open-data licence. Only factual statistics and
+  decision metadata are retained, with project-authored summaries. Articles,
+  decisions, report pages and images are not reproduced or adapted. Title,
+  source link, publication date and retrieval time identify the source.
+  The annual headline retains CNIL's exclusion of two major incident groups;
+  it is not presented as all notifications received or added to grouped counts.
 - **Texas:** the public listing exposes organization and address fields through
   a stateful hosted application. No stable export or source-specific
   redistribution licence was identified, so no records are collected.

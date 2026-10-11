@@ -47,15 +47,26 @@ an allegation into a finding.
 | Massachusetts OCABR | Named notifications | Reviewed 2024 through 2026 annual reports, without notice letters |
 | France CNIL | Anonymized notification summaries | Complete published CSV through December 2025; raw row combinations are not retained or published |
 | UK ICO | Anonymized report summaries | Unique report-reference aggregates from Q2 2019; raw rows, Q1 2019, and unresolved period conflicts are excluded |
+| UK ICO regulatory actions | Selected administrative decisions | Reviewed data-security enforcement publications; fines are not court judgments |
+| France CNIL regulatory actions | Selected administrative decisions | Factual decision metadata and original summaries; no decision documents or adapted article text |
+| France CNIL annual statistics | National aggregate | Adjusted 2025 headline, with the regulator's two-incident exclusion preserved |
+| Ireland DPC | National aggregate | Valid breach notifications in the 2025 annual report; normal HTTPS certificate verification |
 | Netherlands AP | National aggregate | Five attributed annual values for 2024 and 2025; source prose and documents are not redistributed |
 | HHS OCR | Deferred | No stable bounded machine-readable public-list contract verified |
-| Ireland DPC | Deferred | Reuse conditions are compatible, but the official HTTPS certificate chain cannot currently be validated |
 | Texas Attorney General | Deferred | Stateful listing with transient request tokens, address fields, and no reviewed stable export or redistribution licence |
 | Maine Attorney General | Deferred | Official database currently unavailable; no unofficial mirror is substituted |
 
 Aggregate and anonymized rows never become named incident records. A named
 notifier is not silently relabelled as the entity where an event occurred.
 Cross-jurisdiction relationships remain explainable candidates until reviewed.
+
+The main navigation links to global regulatory-action and aggregate-metric views.
+The regulatory timeline can be filtered by source and legal status. Aggregate
+cells are paginated within each source, without a cross-country total or a
+silent result cap. Country pages and source policies link to their records.
+Annual-report adapters use fixed reviewed editions. Curated regulatory adapters
+recheck existing official pages; they do not automatically discover or approve
+new legal matters. Later editions and decisions require a source review.
 
 ## Architecture
 

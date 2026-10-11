@@ -1,0 +1,54 @@
+---
+import type { GetStaticPaths, Page } from "astro";
+import Hero from "../../../components/Hero.astro";
+import RecordPagination from "../../../components/RecordPagination.astro";
+import SourceNote from "../../../components/SourceNote.astro";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { getPublication } from "../../../lib/data";
+import { date, label } from "../../../lib/format";
+import type { Aggregate, SourcePolicy } from "../../../lib/types";
+
+export const getStaticPaths = (({ paginate }) => {
+  const publication = getPublication();
+  return Object.values(publication.policies).filter((policy) => policy.implemented &&
+    ["national_aggregate", "state_aggregate", "anonymized_notification"].includes(policy.publication_level))
+    .flatMap((policy) => paginate(publication.aggregates.filter((record) => record.source_id === policy.source_id)
+      .sort((a, b) => b.reporting_period_start.localeCompare(a.reporting_period_start)
+        || a.dimension.localeCompare(b.dimension) || a.source_record_id.localeCompare(b.source_record_id)),
+    { pageSize: 100, params: { source: policy.source_id }, props: { policy } }));
+}) satisfies GetStaticPaths;
+interface Props { page: Page<Aggregate>; policy: SourcePolicy; }
+const { page, policy } = Astro.props;
+const root = `aggregates/${policy.source_id}/`;
+const notes = [...new Set(page.data.flatMap((record) => record.source_notes))];
+const sourcePublications = [...new Map(page.data.map((record) =>
+  [JSON.stringify([record.source_url, record.source_retrieval_time]), record],
+)).values()];
+---
+<BaseLayout title={`${policy.name}${page.currentPage > 1 ? `: page ${page.currentPage}` : ""}`} description={policy.unit_of_observation} section={`${policy.country} / Aggregate metrics`}>
+  <Hero eyebrow={label(policy.publication_level)} title={policy.name} intro={policy.unit_of_observation} warning={policy.source_population} />
+  <nav class="shell record-links" aria-label="Related records"><a href={`${import.meta.env.BASE_URL}aggregates/`}>All aggregate sources</a><a href={`${import.meta.env.BASE_URL}sources/${policy.source_id}/`}>Source policy and terms</a></nav>
+  <section class="section shell" id="metrics">
+    <div class="section-head"><h2>Published metrics</h2><p>{page.total ? `${page.start + 1} to ${page.end + 1} of ${page.total.toLocaleString()} metric cells` : "This source is not present in the current publication."}</p></div>
+    <p>Rows may describe overlapping populations or dimensions. Do not add them together as a breach total.</p>
+    {page.total > 0 && <div class="table-wrap" tabindex="0" aria-label="Aggregate metrics table">
+      <table aria-label="Published aggregate metrics">
+        <thead><tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">Period</th><th scope="col">Population</th></tr></thead>
+        <tbody>{page.data.map((record) => <tr>
+          <th scope="row" data-label="Measure">{record.parent_category ? `${record.parent_category}: ` : ""}{record.category}<small class="metric-dimension">{label(record.dimension)}</small></th>
+          <td data-label="Value">{typeof record.value.value === "number" ? record.value.value.toLocaleString("en-AU") : record.value.value ?? label(record.value.state)} {record.unit}<small class="metric-dimension">{label(record.value.state)}</small></td>
+          <td data-label="Period">{date(record.reporting_period_start)} to {date(record.reporting_period_end)}</td>
+          <td data-label="Population">{record.population_scope}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>}
+    <RecordPagination current={page.currentPage} count={page.lastPage} root={root} />
+    <div class="prose"><h2>Scope and source notes</h2><ul>{[...new Set([...policy.limitations, ...notes])].map((note) => <li>{note}</li>)}</ul><p>{policy.attribution}</p><p>{policy.source_licence}</p>
+      {sourcePublications.length > 0 && <><h3>Publication trail</h3><ul>{sourcePublications.map((record) => <li>
+        <a href={record.source_url} rel="external noopener noreferrer">Official source publication</a>.
+        {record.source_retrieval_time ? <> Retrieved <time datetime={record.source_retrieval_time}>{date(record.source_retrieval_time)}</time>.</> : " Retrieval date not provided."}
+      </li>)}</ul></>}
+    </div>
+    <SourceNote href={policy.source_url} />
+  </section>
+</BaseLayout>

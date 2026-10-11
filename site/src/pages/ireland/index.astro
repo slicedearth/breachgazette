@@ -1,0 +1,23 @@
+---
+import Hero from "../../components/Hero.astro";
+import SourceNote from "../../components/SourceNote.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+const publication = getPublication();
+const records = publication.aggregates.filter((record) => record.source_id === "ireland_dpc");
+const policy = publication.policies.ireland_dpc;
+---
+<BaseLayout title="Ireland" description="Annual valid breach notification statistics published by Ireland's Data Protection Commission." section="Ireland">
+  <Hero eyebrow="National aggregate reporting" title="Ireland’s annual breach notifications"
+    intro="The Data Protection Commission publishes an annual count of valid breach notifications. It is a reporting measure, not a count of unique incidents."
+    warning="Valid notifications differ from all submissions. These figures do not identify organisations and are not comparable with differently defined country totals." />
+  <section class="section shell">
+    {records.length ? records.map((record) => <article class="card">
+      <p class="eyebrow">{record.reporting_period_start.slice(0, 4)} reporting year</p>
+      <h2>{typeof record.value.value === "number" ? record.value.value.toLocaleString("en-AU") : "Not published"} valid notifications</h2>
+      <p>{record.population_scope}</p>
+    </article>) : <p class="notice">This source is not present in the current publication.</p>}
+    <nav class="record-links" aria-label="Irish records"><a href={`${import.meta.env.BASE_URL}aggregates/ireland_dpc/`}>Annual metrics and source notes</a><a href={`${import.meta.env.BASE_URL}sources/ireland_dpc/`}>Source policy and terms</a></nav>
+    <SourceNote href={policy?.source_url ?? null} />
+  </section>
+</BaseLayout>

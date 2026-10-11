@@ -1,0 +1,19 @@
+schema_version: "1.0"
+source_id: france_cnil_regulatory
+reviewed_at: "2026-10-11"
+entries:
+  - event_id: france-cnil-regulatory-mobius-2025-12-11
+    matter_id: fr-cnil-san-2025-014
+    entity: MOBIUS SOLUTIONS LTD
+    official_url: https://www.cnil.fr/fr/violation-de-donnees-sanction-dun-million-deuros-lencontre-de-la-societe-mobius-solutions-ltd
+    expected_markers:
+      - MOBIUS SOLUTIONS LTD
+      - 11 décembre 2025
+      - million
+      - sous-traitant
+    source_title: "Violation de données : sanction d’un million d’euros à l’encontre de la société MOBIUS SOLUTIONS LTD"
+    publication_date: "2025-12-19"
+    event_date: "2025-12-11"
+    legal_status: administrative_fine
+    status_wording: Administrative fine imposed by the regulator
+    summary: CNIL imposed a €1 million administrative fine on MOBIUS SOLUTIONS LTD for breaches of processor obligations. The decision followed a notification involving data belonging to users of DEEZER. The named respondent is the processor, not DEEZER; no court judgment or appeal outcome is asserted here.

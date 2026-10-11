@@ -1,0 +1,118 @@
+---
+import type { RegulatoryAction, SourcePolicy } from "../lib/types";
+import { date, label } from "../lib/format";
+interface Props {
+  records: RegulatoryAction[];
+  policies: Record<string, SourcePolicy>;
+  name?: string;
+}
+const { records: input, policies, name = "Regulatory action timeline" } = Astro.props;
+const records = [...input].sort((a, b) =>
+  b.source_reported_event_date.localeCompare(a.source_reported_event_date)
+  || a.source_record_id.localeCompare(b.source_record_id),
+);
+const sources = [...new Set(records.map((record) => record.source_id))].sort();
+const base = import.meta.env.BASE_URL;
+---
+
+<section class="section shell" data-regulatory-timeline>
+  <div class="filters" data-regulatory-filters hidden>
+    {sources.length > 1 && <label>Source
+      <select name="regulatory-source">
+        <option value="">All sources</option>
+        {sources.map((source) => <option value={source}>{policies[source]?.country}: {policies[source]?.name ?? source}</option>)}
+      </select>
+    </label>}
+    <label>Legal status
+      <select name="legal-status">
+        <option value="">All legal statuses</option>
+        {[...new Set(records.map((record) => record.legal_status))].sort().map((status) => <option value={status}>{label(status)}</option>)}
+      </select>
+    </label>
+  </div>
+  <p class="timeline-count" aria-live="polite" data-regulatory-count>{records.length} source-backed {records.length === 1 ? "event" : "events"}.</p>
+  <p class="notice" data-regulatory-empty hidden={records.length > 0}>No events match these filters. Try another source or legal status.</p>
+  <ol class="regulatory-timeline" role="list" aria-label={name}>
+    {records.map((record) => (
+      <li data-regulatory-event data-source={record.source_id} data-legal-status={record.legal_status}>
+        <div class="regulatory-timeline__date"><time datetime={record.source_reported_event_date}>{date(record.source_reported_event_date)}</time><span>Event date</span></div>
+        <article>
+          <p class="regulatory-timeline__source">{policies[record.source_id]?.country} / {record.regulator}</p>
+          <span class="pill">{label(record.legal_status)}</span>
+          <h2><a href={`${base}matters/${record.source_record_id}/`}>{record.entity.source_name}</a></h2>
+          <p><strong>{record.status_wording}</strong></p>
+          <p>{record.summary}</p>
+          <p class="regulatory-timeline__boundary">{record.allegation ? "The regulator alleges; no finding is represented." : record.legal_status === "administrative_fine" ? "A regulator-issued fine, not a court judgment. Later appeal outcomes are not inferred." : record.finding ? "This record represents a source-backed court or determination outcome." : "No adverse finding is implied by this status."}</p>
+          <p class="regulatory-timeline__links"><a href={record.source_url} rel="external noopener noreferrer">Official publication</a><a href={`${base}sources/${record.source_id}/`}>Source scope and terms</a></p>
+        </article>
+      </li>
+    ))}
+  </ol>
+</section>
+
+<script>
+  const root = document.querySelector<HTMLElement>("[data-regulatory-timeline]");
+  const controls = root?.querySelector<HTMLElement>("[data-regulatory-filters]");
+  const count = root?.querySelector<HTMLElement>("[data-regulatory-count]");
+  const empty = root?.querySelector<HTMLElement>("[data-regulatory-empty]");
+  const status = controls?.querySelector<HTMLSelectElement>('[name="legal-status"]');
+  const source = controls?.querySelector<HTMLSelectElement>('[name="regulatory-source"]');
+  if (root && controls && count && empty && status) {
+    const events = [...root.querySelectorAll<HTMLElement>("[data-regulatory-event]")];
+    controls.hidden = false;
+    const filter = () => {
+      let visible = 0;
+      for (const event of events) {
+        event.hidden = Boolean(
+          (status.value && event.dataset.legalStatus !== status.value)
+          || (source?.value && event.dataset.source !== source.value),
+        );
+        if (!event.hidden) visible += 1;
+      }
+      count.textContent = `${visible} source-backed ${visible === 1 ? "event" : "events"}.`;
+      empty.hidden = visible > 0;
+    };
+    const restore = () => {
+      const params = new URLSearchParams(window.location.hash.slice(1));
+      for (const [control, key] of [[source, "source"], [status, "status"]] as const) {
+        if (control) {
+          const value = params.get(key) ?? "";
+          control.value = [...control.options].some((option) => option.value === value) ? value : "";
+        }
+      }
+      filter();
+    };
+    controls.addEventListener("change", () => {
+      const params = new URLSearchParams();
+      if (source?.value) params.set("source", source.value);
+      if (status.value) params.set("status", status.value);
+      history.replaceState(null, "", `${location.pathname}${location.search}${params.size ? `#${params}` : ""}`);
+      filter();
+    });
+    window.addEventListener("hashchange", restore);
+    restore();
+  }
+</script>
+
+<style>
+  [data-regulatory-filters][hidden] { display: none; }
+  .timeline-count { font: .82rem ui-monospace, monospace; padding-bottom: 1rem; border-bottom: 3px double var(--ink); }
+  .regulatory-timeline { list-style: none; margin: 0; padding: 0; }
+  .regulatory-timeline > li { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: 2rem; padding: 2rem 0; border-bottom: 1px solid var(--line); }
+  .regulatory-timeline > li[hidden] { display: none; }
+  .regulatory-timeline__date { padding-top: .15rem; font-family: ui-monospace, monospace; }
+  .regulatory-timeline__date time { display: block; color: var(--vermilion); font-weight: 700; }
+  .regulatory-timeline__date span { display: block; margin-top: .5rem; color: var(--muted); font-size: .7rem; }
+  article { min-width: 0; max-width: 52rem; }
+  h2 { font-size: clamp(1.55rem, 3vw, 2.25rem); line-height: 1.2; margin: .8rem 0; overflow-wrap: break-word; }
+  article p { line-height: 1.6; }
+  .regulatory-timeline__source { color: var(--muted); font-size: .8rem; margin: 0 0 .8rem; }
+  .regulatory-timeline__boundary { font-size: .85rem; border-left: 2px solid var(--vermilion); padding-left: .85rem; }
+  .regulatory-timeline__links { display: flex; flex-wrap: wrap; gap: .3rem 1.5rem; font-size: .85rem; }
+  .regulatory-timeline__links a { display: inline-flex; align-items: center; min-height: 44px; }
+  @media (max-width: 600px) {
+    .regulatory-timeline > li { grid-template-columns: minmax(0, 1fr); gap: .9rem; padding: 1.4rem 0; }
+    .regulatory-timeline__date { display: flex; flex-wrap: wrap; align-items: baseline; gap: .6rem; }
+    .regulatory-timeline__date span { margin: 0; }
+  }
+</style>

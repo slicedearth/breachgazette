@@ -54,6 +54,10 @@ const populatedDimensions = dimensions.filter(
     intro="CNIL publishes notification-level fields without organization names. Breach Gazette validates the complete published file, then retains and publishes only grouped counts."
     warning="Rows are notifications, not unique breach incidents. One processor incident can generate many separate controller notifications, and the latest three months are excluded by the official source."
   />
+  <nav class="shell record-links" aria-label="French records">
+    <a href={`${import.meta.env.BASE_URL}aggregates/france_cnil_annual/`}>Annual aggregate metrics</a>
+    <a href={`${import.meta.env.BASE_URL}regulatory-actions/#source=france_cnil_regulatory`}>Regulatory actions</a>
+  </nav>
   <section class="section shell">
     <div class="stat-grid" aria-label="CNIL publication summary">
       <article>

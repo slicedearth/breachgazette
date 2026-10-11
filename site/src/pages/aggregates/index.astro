@@ -1,0 +1,29 @@
+---
+import Hero from "../../components/Hero.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublication } from "../../lib/data";
+import { label } from "../../lib/format";
+const publication = getPublication();
+const policies = Object.values(publication.policies).filter((policy) => policy.implemented &&
+  ["national_aggregate", "state_aggregate", "anonymized_notification"].includes(policy.publication_level))
+  .sort((a, b) => a.country.localeCompare(b.country) || a.name.localeCompare(b.name));
+---
+<BaseLayout title="Aggregate metrics" description="Official reporting-period statistics and grouped anonymous summaries, kept separate by source and measure." section="The statistical record">
+  <Hero eyebrow="Periods, populations & measures" title="Read the numbers in context."
+    intro="National statistics, state reports and grouped anonymous summaries. Choose a source to see every published metric with its reporting period and population."
+    warning="These measures are not additive. Different reporting thresholds, adjustments and repeated notifications rule out a meaningful cross-country breach total." />
+  <section class="section shell">
+    <div class="source-metric-index">
+      {policies.map((policy) => {
+        const count = publication.aggregates.filter((record) => record.source_id === policy.source_id).length;
+        return <article>
+          <p class="eyebrow">{policy.country} / {label(policy.publication_level)}</p>
+          <h2><a href={`${import.meta.env.BASE_URL}aggregates/${policy.source_id}/`}>{policy.name}</a></h2>
+          <p>{policy.unit_of_observation}</p>
+          <p>{count ? `${count.toLocaleString()} published metric ${count === 1 ? "cell" : "cells"}` : "Not present in this publication"}</p>
+          <a href={`${import.meta.env.BASE_URL}sources/${policy.source_id}/`}>Scope, attribution and limitations</a>
+        </article>;
+      })}
+    </div>
+  </section>
+</BaseLayout>

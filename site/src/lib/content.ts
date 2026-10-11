@@ -62,7 +62,9 @@ export const informationPages = {
     intro: "The project’s MIT licence does not relicense official source material.",
     sections: [
       ["Attribution", "OAIC and NSW IPC materials retain their official attribution and source links. Washington, California, and Massachusetts material remains subject to each government source’s terms and documented conditions. CNIL grouped metrics retain CNIL attribution and the Open Licence 2.0 boundary."],
-      ["Legal status", "Investigations, allegations, enforceable undertakings, determinations, judgments, and orders are not interchangeable. Each timeline record keeps exact source-backed status."],
+      ["Annual statistics", "Irish annual figures retain the DPC's valid-notification definition and reuse conditions. The French annual headline retains CNIL's source-defined adjustment and is not added to anonymous grouped counts."],
+      ["Regulatory publications", "UK decision records retain publication titles, dates and attribution under the Open Government Licence v3.0. French records retain factual decision metadata and original summaries, not adapted CNIL article text. CNIL's article terms are distinct from its open-data licence. Each source policy records the applicable boundary."],
+      ["Legal status", "Investigations, allegations, enforceable undertakings, administrative fines, determinations, judgments and orders are not interchangeable. A regulator-issued fine is not a court judgment or proof that no appeal is possible."],
       ["Logos and marks", "No regulator logos or source images are reproduced. Organization and regulator names identify source records and may be trademarks of their owners."],
     ],
   },

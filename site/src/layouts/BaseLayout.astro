@@ -42,6 +42,7 @@ const isJurisdiction = [
   "france/",
   "netherlands/",
   "united-kingdom/",
+  "ireland/",
 ]
   .some((path) => isCurrent(path));
 ---
@@ -101,9 +102,10 @@ const isJurisdiction = [
         <nav id="primary-navigation" aria-label="Primary">
           <a href={`${base}latest/`} aria-current={isCurrent("latest/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">01</span> Notifications</a>
           <a href={`${base}jurisdictions/`} aria-current={isJurisdiction ? "page" : undefined}><span class="nav-index" aria-hidden="true">02</span> Jurisdictions</a>
-          <a href={`${base}source-coverage/`} aria-current={isCurrent("source-coverage/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">03</span> Compare sources</a>
-          <a href={`${base}sources/`} aria-current={isCurrent("sources/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">04</span> Sources</a>
-          <a href={`${base}methodology/`} aria-current={isCurrent("methodology/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">05</span> Methodology</a>
+          <a href={`${base}regulatory-actions/`} aria-current={isCurrent("regulatory-actions/") || isCurrent("matters/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">03</span> Regulatory actions</a>
+          <a href={`${base}aggregates/`} aria-current={isCurrent("aggregates/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">04</span> Aggregate metrics</a>
+          <a href={`${base}sources/`} aria-current={isCurrent("sources/") || isCurrent("source-coverage/") || isCurrent("source-health/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">05</span> Sources</a>
+          <a href={`${base}methodology/`} aria-current={isCurrent("methodology/") ? "page" : undefined}><span class="nav-index" aria-hidden="true">06</span> Methodology</a>
         </nav>
       </div>
     </header>

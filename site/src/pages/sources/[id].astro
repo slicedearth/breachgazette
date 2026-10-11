@@ -14,6 +14,11 @@ const { policy } = Astro.props;
 const pagePublication = getPublication();
 const health = pagePublication.source_health.sources.find((source) => source.source_id === policy.source_id);
 const snapshot = pagePublication.manifest.source_snapshots.find((item) => item.source_id === policy.source_id);
+const recordPath = policy.publication_level === "regulatory_action"
+  ? `regulatory-actions/#source=${policy.source_id}`
+  : ["national_aggregate", "state_aggregate", "anonymized_notification"].includes(policy.publication_level)
+    ? `aggregates/${policy.source_id}/`
+    : `latest/#source=${policy.source_id}`;
 ---
 
 <BaseLayout title={policy.name} description={policy.unit_of_observation} section="Source methodology">
@@ -23,6 +28,7 @@ const snapshot = pagePublication.manifest.source_snapshots.find((item) => item.s
     intro={policy.unit_of_observation}
     warning={policy.public_window}
   />
+  {policy.implemented && <nav class="shell record-links" aria-label="Source records"><a href={`${import.meta.env.BASE_URL}${recordPath}`}>Browse this source’s records</a></nav>}
   <section class="section shell">
     <DefinitionGrid items={[
       { term: "Regulator", description: policy.regulator },

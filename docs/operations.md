@@ -417,6 +417,16 @@ let the complete `main` CI finish, and the publication workflow builds and check
 the site. Scheduled collection uses the same publication gate after committing
 its verified private generation.
 
+Adding a required source needs a successful collection cycle before publication.
+The previous private generation has no snapshot for that source, so an immediate
+offline deployment preflight is expected to fail. After the reviewed code reaches
+protected `main` and passes CI, allow the scheduled update to collect all required
+sources, or obtain approval for a manual update. The update stages new records,
+runs health, quality and privacy checks, and promotes only a complete passing
+generation. It then requests publication through the existing protected-main
+gate. Keep the last published site in place until that succeeds; do not remove
+the required-source check or treat a local source-read test as production state.
+
 For a deliberate publication, use the release command from a clean checkout at
 the exact protected `main` revision. It needs Node 24, authenticated `gh`, the
 locked Python environment at `.venv`, and a clean, already-authorised local copy

@@ -10,6 +10,11 @@ from pathlib import Path
 import yaml
 
 import breachgazette
+from breachgazette.clients.european_regulatory import (
+    DecisionManifest,
+    FranceRegulatoryAdapter,
+    UnitedKingdomRegulatoryAdapter,
+)
 from breachgazette.clients.oaic_regulatory import OaicRegulatoryAdapter
 from breachgazette.contracts import NormalizedNotification
 from breachgazette.monitoring import load_monitoring_catalogue
@@ -35,6 +40,12 @@ def main() -> None:
     regulatory = yaml.safe_load(OaicRegulatoryAdapter().manifest_path.read_text(encoding="utf-8"))
     if regulatory["schema_version"] != "1.0" or not regulatory["entries"]:
         raise RuntimeError("packaged regulatory catalogue is incomplete")
+    for adapter in (FranceRegulatoryAdapter(), UnitedKingdomRegulatoryAdapter()):
+        manifest = DecisionManifest.model_validate(
+            yaml.safe_load(adapter.manifest_path.read_text(encoding="utf-8"))
+        )
+        if manifest.source_id != adapter.source_id:
+            raise RuntimeError("packaged regulatory source identity is inconsistent")
     marker = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
     if marker["manifest"]["dataset_class"] != "test_fixture":
         raise RuntimeError("installed smoke input must be explicitly synthetic")

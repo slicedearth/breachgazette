@@ -62,6 +62,10 @@ const populatedDimensions = dimensions.filter(
     intro="The ICO publishes report-level characteristics without organization names. Breach Gazette groups workbook rows by their source reference, excludes unresolved period conflicts, and retains only aggregate counts."
     warning="The figures cover reports received by the ICO, not every UK breach. Category totals can exceed unique reports because one report can hold multiple characteristics."
   />
+  <nav class="shell record-links" aria-label="UK records">
+    <a href={`${import.meta.env.BASE_URL}aggregates/united_kingdom_ico/`}>Browse all grouped metrics</a>
+    <a href={`${import.meta.env.BASE_URL}regulatory-actions/#source=united_kingdom_ico_regulatory`}>Regulatory actions</a>
+  </nav>
   <section class="section shell">
     <div class="stat-grid" aria-label="ICO publication summary">
       <article>

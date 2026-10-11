@@ -17,6 +17,7 @@ from breachgazette.contracts import (
     SourceHealthReport,
     SourceMonitoringPolicy,
     SourceNotificationRecord,
+    SourceRegulatoryRecord,
     UpdateCheckpoint,
 )
 from breachgazette.contracts.enums import (
@@ -25,7 +26,7 @@ from breachgazette.contracts.enums import (
     ValueOrigin,
     ValueState,
 )
-from breachgazette.contracts.models import ObservedValue
+from breachgazette.contracts.models import ObservedValue, RecordProvenance
 from breachgazette.monitoring import (
     SourceDriftError,
     build_source_health_report,
@@ -64,11 +65,14 @@ def test_source_policy_catalogue_is_complete() -> None:
         "united_kingdom_ico",
         "netherlands_ap",
         "ireland_dpc",
+        "france_cnil_annual",
+        "france_cnil_regulatory",
+        "united_kingdom_ico_regulatory",
         "texas",
         "maine",
         "hhs",
     }
-    deferred = {"hhs", "ireland_dpc", "texas", "maine"}
+    deferred = {"hhs", "texas", "maine"}
     assert all(policies[source_id].implemented is False for source_id in deferred)
     assert all(str(policy.source_url).startswith("https://") for policy in policies.values())
     monitoring = load_monitoring_catalogue()
@@ -532,6 +536,12 @@ def test_production_builder_emits_minimised_real_publication(
         "united_kingdom_ico",
         "netherlands_ap",
     )
+    source_ids += (
+        "ireland_dpc",
+        "france_cnil_annual",
+        "france_cnil_regulatory",
+        "united_kingdom_ico_regulatory",
+    )
     observed = datetime.now(UTC)
     monitoring = MonitoringCatalogue(
         schedule_utc="23 17 * * 1",
@@ -562,6 +572,64 @@ def test_production_builder_emits_minimised_real_publication(
     )
     for index, source_id in enumerate(source_ids):
         checksum = (f"{index + 1:x}" * 64)[:64]
+        if source_id in {
+            "ireland_dpc",
+            "france_cnil_annual",
+            "france_cnil_regulatory",
+            "united_kingdom_ico_regulatory",
+        }:
+            provenance = notification_factory(source_id=source_id).model_dump(
+                include=set(RecordProvenance.model_fields),
+            )
+            provenance["source_record_id"] = f"fixture-{source_id}"
+            if source_id.endswith("regulatory"):
+                new_record = SourceRegulatoryRecord(
+                    **provenance,
+                    regulator="Example Regulator",
+                    matter_id="example",
+                    entity={
+                        "source_name": "Example Processor",
+                        "normalized_name": "example",
+                        "role": "regulator_named_entity",
+                        "origin": "manually_curated",
+                    },
+                    legal_status="administrative_fine",
+                    finding=True,
+                    source_title="Synthetic decision",
+                    source_publication_date=date(2025, 12, 1),
+                    source_reported_event_date=date(2025, 11, 30),
+                    status_wording="Administrative fine",
+                    summary="Synthetic regulator decision.",
+                )
+            else:
+                new_record = SourceAggregateRecord(
+                    **provenance,
+                    regulator="Example Regulator",
+                    reporting_scheme="Example scheme",
+                    publication_level="national_aggregate",
+                    reporting_period_start=date(2025, 1, 1),
+                    reporting_period_end=date(2025, 12, 31),
+                    dimension="valid_notifications",
+                    category="Annual headline",
+                    value=ObservedValue(value=2, origin="source_observed"),
+                    unit="notifications",
+                    population_scope="Synthetic annual population",
+                )
+            store.write_records(source_id, [new_record])
+            store.write_snapshot(
+                source_snapshot(
+                    source_id=source_id,
+                    retrieved_at=observed,
+                    revision=f"revision-{source_id}",
+                    checksum=checksum,
+                    completeness="selective",
+                    discovered=1,
+                    accepted=1,
+                    rejected=0,
+                    bounded_limit=10,
+                )
+            )
+            continue
         if source_id in {"france_cnil", "united_kingdom_ico", "netherlands_ap"}:
             is_uk = source_id == "united_kingdom_ico"
             is_netherlands = source_id == "netherlands_ap"
@@ -681,7 +749,7 @@ def test_production_builder_emits_minimised_real_publication(
     output = tmp_path / "publication"
     result = build_site_data(data_root=root, output=output)
     assert result["quality_passed"] is True
-    assert result["records"]["notifications"] == len(source_ids) - 3
+    assert result["records"]["notifications"] == len(source_ids) - 7
     assert result["records"]["anonymized_notification_rows"] == 2
     assert (output / "publication.json").is_file()
     publication = json.loads((output / "publication.json").read_text(encoding="utf-8"))
@@ -691,15 +759,15 @@ def test_production_builder_emits_minimised_real_publication(
     assert len(publication["source_health_history"]["snapshots"]) == 1
     assert not (output / "notifications.json").exists()
     assert (output / "search-manifest.json").is_file()
-    search_manifest = json.loads(
-        (output / "search-manifest.json").read_text(encoding="utf-8")
-    )
-    assert search_manifest["record_count"] == len(source_ids) - 3
-    assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids) - 3
+    search_manifest = json.loads((output / "search-manifest.json").read_text(encoding="utf-8"))
+    assert search_manifest["record_count"] == len(source_ids) - 7
+    assert len(list((output / "search-partitions").glob("*.json"))) == len(source_ids) - 7
     for metadata in search_manifest["partitions"]:
         encoded = (
-            output / "search-partitions" / f"{metadata['asset']}.json"
-        ).read_bytes().removesuffix(b"\n")
+            (output / "search-partitions" / f"{metadata['asset']}.json")
+            .read_bytes()
+            .removesuffix(b"\n")
+        )
         assert metadata["bytes"] == len(encoded)
         assert metadata["sha256"] == sha256_hex(encoded)
     manifest = publication.pop("manifest")

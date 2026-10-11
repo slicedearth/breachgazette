@@ -20,6 +20,10 @@ REQUIRED_SOURCES = {
     "france_cnil",
     "united_kingdom_ico",
     "netherlands_ap",
+    "ireland_dpc",
+    "france_cnil_annual",
+    "france_cnil_regulatory",
+    "united_kingdom_ico_regulatory",
 }
 
 
