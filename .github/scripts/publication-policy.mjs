@@ -4,6 +4,13 @@ import { pathToFileURL } from "node:url";
 export const REPOSITORY = "slicedearth/breachgazette";
 const SHA = /^[0-9a-f]{40}$/;
 
+export function requireExpectedSource(revision, expectedSource = "", releaseId = "") {
+  if ((releaseId && !SHA.test(expectedSource)) ||
+      (expectedSource && (!SHA.test(expectedSource) || expectedSource !== revision))) {
+    throw new Error("Publication source does not match the approved release revision.");
+  }
+}
+
 export function requireTrustedPublication({ repository, revision, ref, event, branch, workflow, runs, triggerRun }) {
   if (
     repository !== REPOSITORY || !SHA.test(revision ?? "") ||
@@ -32,11 +39,12 @@ export function requireTrustedPublication({ repository, revision, ref, event, br
 
 export function verifyPublication(env = process.env, api = (path) => JSON.parse(
   execFileSync("gh", ["api", path], { encoding: "utf8", timeout: 30_000, maxBuffer: 5_000_000 }),
-)) {
-  const revision = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+), getRevision = () => execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()) {
+  const revision = getRevision();
   if (env.GITHUB_REPOSITORY !== REPOSITORY || !SHA.test(revision)) {
     throw new Error("Publication repository or source revision is invalid.");
   }
+  requireExpectedSource(revision, env.PUBLICATION_EXPECTED_SOURCE, env.PUBLICATION_RELEASE_ID);
   const prefix = `repos/${REPOSITORY}`;
   const branch = api(`${prefix}/branches/main`);
   const workflow = api(`${prefix}/actions/workflows/ci.yml`);

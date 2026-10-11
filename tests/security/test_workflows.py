@@ -168,6 +168,26 @@ def test_ci_covers_private_catalogue_contracts_and_all_browser_engines() -> None
     assert "language: [python, javascript-typescript]" in codeql
 
 
+def test_publication_source_binding_precedes_private_access_and_deployment() -> None:
+    workflow = yaml.safe_load((WORKFLOW_ROOT / "netlify.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["build-and-deploy"]["steps"]
+    gates = [index for index, step in enumerate(steps)
+             if step.get("run") == "node .github/scripts/publication-policy.mjs"]
+    assert len(gates) == 2
+    for index in gates:
+        assert steps[index]["env"]["PUBLICATION_EXPECTED_SOURCE"] == "${{ inputs.expected_source }}"
+        assert steps[index]["env"]["PUBLICATION_RELEASE_ID"] == "${{ inputs.release_id }}"
+    names = [step["name"] for step in steps]
+    assert gates[0] < names.index("Mint read-only private-state token")
+    assert gates[1] < names.index("Deploy audited static tree")
+    provenance = steps[names.index("Create deployment provenance record")]["run"]
+    assert 'schema_version: "1.1"' in provenance
+    assert "data_revision: $data_revision" in provenance
+    assert "steps.revisions.outputs.data_revision" in provenance
+    assert '"$GITHUB_RUN_ID"' in provenance
+    assert '"$GITHUB_RUN_ATTEMPT"' in provenance
+
+
 def test_netlify_build_is_explicit_budgeted_and_receives_only_public_output() -> None:
     workflow = (WORKFLOW_ROOT / "netlify.yml").read_text(encoding="utf-8")
     assert "workflow_call:" in workflow

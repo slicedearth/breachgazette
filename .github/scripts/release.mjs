@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -13,6 +13,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{1
 const STAGES = ["prepared", "pausing", "paused", "dispatching", "waiting", "verified", "complete"];
 const PREFIX = `repos/${REPOSITORY}`;
 const FLAG = "BREACHGAZETTE_SCHEDULE_ENABLED";
+const ARTIFACT_LIMIT = 128 * 1024 * 1024;
+const WORKFLOW_REF = `${REPOSITORY}/.github/workflows/netlify.yml@refs/heads/main`;
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
@@ -28,8 +30,10 @@ export function validateReceipt(receipt, source, state) {
   if (STAGES.indexOf(receipt.stage) >= STAGES.indexOf("waiting")) {
     requireValue(Number.isSafeInteger(receipt.runId) && receipt.runId > 0, "Receipt has no run identity.");
   }
+  if (receipt.provenance) requireProvenance(receipt.provenance, receipt);
   if (STAGES.indexOf(receipt.stage) >= STAGES.indexOf("verified")) {
-    requireValue(DIGEST.test(receipt.checksum), "Receipt has no publication identity.");
+    requireProvenance(receipt.provenance, receipt);
+    requireValue(receipt.checksum === receipt.provenance.checksum, "Receipt has no bound publication identity.");
   }
   return receipt;
 }
@@ -50,7 +54,7 @@ export async function advance(receipt, io) {
   requireValue(snapshot.source === receipt.source && snapshot.state === receipt.state,
     "Production inputs changed. Stop and review a new release.");
   if (receipt.stage === "complete") return receipt;
-  const save = (fields) => { Object.assign(receipt, fields); io.save(receipt); return receipt; };
+  const save = (fields) => { io.save({ ...receipt, ...fields }); Object.assign(receipt, fields); return receipt; };
   const stable = async () => {
     const current = await io.inspect();
     requireValue(current.source === receipt.source && current.state === receipt.state &&
@@ -77,7 +81,7 @@ export async function advance(receipt, io) {
     await io.preflight();
     await stable();
     save({ stage: "dispatching", dispatchedAt: io.now() });
-    await io.dispatch(receipt.id, receipt.state);
+    await io.dispatch(receipt.id, receipt.source, receipt.state);
     return receipt;
   }
   if (receipt.stage === "dispatching") {
@@ -91,10 +95,18 @@ export async function advance(receipt, io) {
   requireRun(run, receipt, snapshot.workflow);
   if (run.status !== "completed") return receipt;
   requireValue(run.conclusion === "success", "Deployment failed. Collection remains paused; inspect the run before starting a new release.");
-  const identity = await io.verifyLive(receipt.source);
-  requireValue(DIGEST.test(identity.checksum), "Live publication has no valid checksum.");
-  if (receipt.stage === "waiting") return save({ stage: "verified", checksum: identity.checksum });
-  requireValue(identity.checksum === receipt.checksum, "Live publication changed before schedule restoration.");
+  const provenance = await io.provenance(run, receipt);
+  requireProvenance(provenance, receipt);
+  if (receipt.provenance) {
+    requireValue(JSON.stringify(provenance) === JSON.stringify(receipt.provenance), "Recorded deployment provenance changed.");
+  } else {
+    // Save expected evidence before contacting the endpoint under verification.
+    save({ provenance });
+  }
+  const identity = await io.verifyLive(receipt.source, provenance.checksum);
+  requireValue(identity.checksum === provenance.checksum, "Live publication changed from the recorded deployment.");
+  if (receipt.stage === "waiting") return save({ stage: "verified", checksum: provenance.checksum });
+  requireValue(receipt.checksum === provenance.checksum, "Receipt publication identity changed.");
   requireValue(!snapshot.enabled || receipt.wasEnabled, "Schedule setting changed before restoration.");
   requireValue(!snapshot.busy, "Another update or publication is running. Do not resume collection yet.");
   await stable();
@@ -104,20 +116,85 @@ export async function advance(receipt, io) {
 
 function command(program, args, options = {}) {
   try {
-    return execFileSync(program, args, { cwd: ROOT, encoding: "utf8", timeout: 60_000,
-      maxBuffer: 8_000_000, stdio: ["pipe", "pipe", "pipe"], ...options }).trim();
+    const result = execFileSync(program, args, { cwd: ROOT, encoding: "utf8", timeout: 60_000,
+      maxBuffer: 8_000_000, stdio: ["pipe", "pipe", "pipe"], ...options });
+    return typeof result === "string" ? result.trim() : result;
   } catch {
     // Child diagnostics may contain private paths, records or credential-bearing URLs.
     throw new Error("A required command failed. Review it privately; no automatic recovery was attempted.");
   }
 }
 
-function api(path, body, method) {
+export function api(path, body, method, run = command) {
   const args = ["api", path];
   if (method) args.push("--method", method);
   if (body) args.push("--input", "-");
-  const result = command("gh", args, body ? { input: JSON.stringify(body) } : {});
+  const result = run("gh", args, body ? { input: JSON.stringify(body) } : {});
   return result ? JSON.parse(result) : null;
+}
+
+export function dispatchRelease(id, source, state, request = api) {
+  requireValue(UUID.test(id) && SHA.test(source) && SHA.test(state), "Invalid release dispatch inputs.");
+  return request(`${PREFIX}/actions/workflows/netlify.yml/dispatches`,
+    { ref: "main", inputs: { expected_source: source, data_ref: state, release_id: id } }, "POST");
+}
+
+export function requireProvenance(evidence, receipt) {
+  requireValue(evidence?.version === "1.1" && evidence.runId === receipt.runId && evidence.runAttempt === 1 &&
+    evidence.source === receipt.source && evidence.state === receipt.state && evidence.workflowRef === WORKFLOW_REF &&
+    Number.isSafeInteger(evidence.artifactId) && evidence.artifactId > 0 &&
+    /^sha256:[0-9a-f]{64}$/.test(evidence.artifactDigest) && DIGEST.test(evidence.archiveSha256) &&
+    DIGEST.test(evidence.checksum), "Deployment provenance does not match the approved release.");
+}
+
+export function readProvenanceArchive(bytes) {
+  return JSON.parse(command(join(ROOT, ".venv/bin/python"),
+    [join(ROOT, ".github/scripts/read_provenance.py")], { input: bytes }));
+}
+
+export async function readRunProvenance(run, receipt, {
+  request = api,
+  download = (id) => command("gh", ["api", `${PREFIX}/actions/artifacts/${id}/zip`],
+    { encoding: null, maxBuffer: ARTIFACT_LIMIT }),
+  readArchive = readProvenanceArchive,
+} = {}) {
+  requireValue(run.id === receipt.runId && run.run_attempt === 1 && run.head_sha === receipt.source &&
+    run.status === "completed" && run.conclusion === "success", "Provenance requires the recorded successful run.");
+  const name = `deployment-${receipt.source}`;
+  const inventory = await request(`${PREFIX}/actions/runs/${receipt.runId}/artifacts?name=${name}&per_page=100`);
+  requireValue(Array.isArray(inventory?.artifacts) && inventory.total_count === inventory.artifacts.length,
+    "Deployment provenance inventory is unavailable or incomplete.");
+  const matches = inventory.artifacts.filter((artifact) => artifact.name === name);
+  requireValue(matches.length === 1, "Exactly one deployment provenance artifact is required.");
+  const artifact = matches[0];
+  requireValue(Number.isSafeInteger(artifact.id) && artifact.id > 0 && artifact.expired === false &&
+    Number.isFinite(Date.parse(artifact.expires_at)) && Date.parse(artifact.expires_at) > Date.now() &&
+    Number.isSafeInteger(artifact.size_in_bytes) && artifact.size_in_bytes > 0 && artifact.size_in_bytes <= ARTIFACT_LIMIT &&
+    /^sha256:[0-9a-f]{64}$/.test(artifact.digest) && artifact.workflow_run?.id === receipt.runId &&
+    artifact.workflow_run.head_sha === receipt.source && artifact.workflow_run.head_branch === "main",
+  "Deployment provenance artifact is expired, invalid or belongs to another run.");
+  if (receipt.provenance) {
+    requireProvenance(receipt.provenance, receipt);
+    requireValue(receipt.provenance.artifactId === artifact.id && receipt.provenance.artifactDigest === artifact.digest,
+      "Recorded deployment provenance artifact changed.");
+    return receipt.provenance;
+  }
+  const bytes = await download(artifact.id);
+  requireValue(Buffer.isBuffer(bytes) && bytes.length <= ARTIFACT_LIMIT &&
+    `sha256:${createHash("sha256").update(bytes).digest("hex")}` === artifact.digest,
+  "Deployment provenance artifact digest does not match.");
+  const record = await readArchive(bytes);
+  requireValue(record?.schema_version === "1.1" && record.workflow?.run_id === String(receipt.runId) &&
+    record.workflow.run_attempt === "1" && record.workflow.ref === WORKFLOW_REF &&
+    record.source_revision === receipt.source && record.data_revision === receipt.state &&
+    record.subject?.name === "breachgazette-site.zip" && record.assurance?.signed === false,
+  "Deployment provenance record does not match the approved release.");
+  const evidence = { version: record.schema_version, runId: receipt.runId, runAttempt: 1,
+    source: record.source_revision, state: record.data_revision, workflowRef: record.workflow.ref,
+    artifactId: artifact.id, artifactDigest: artifact.digest, archiveSha256: record.subject.sha256,
+    checksum: record.publication_checksum };
+  requireProvenance(evidence, receipt);
+  return evidence;
 }
 
 export function receiptPath(value) {
@@ -140,13 +217,24 @@ export function receiptPath(value) {
   return path;
 }
 
-export function saveReceipt(path, receipt) {
+export function saveReceipt(path, receipt, fs = { openSync, writeFileSync, fsyncSync, closeSync, renameSync }) {
   receiptPath(path);
+  const contents = `${JSON.stringify(receipt, null, 2)}\n`;
+  requireValue(Buffer.byteLength(contents) <= 4096, "Receipt exceeds its size limit.");
   const temporary = `${path}.${randomUUID()}.tmp`;
+  let file;
+  let directory;
   try {
-    writeFileSync(temporary, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600, flag: "wx" });
-    renameSync(temporary, path);
+    file = fs.openSync(temporary, "wx", 0o600);
+    fs.writeFileSync(file, contents);
+    fs.fsyncSync(file);
+    fs.closeSync(file); file = undefined;
+    fs.renameSync(temporary, path);
+    directory = fs.openSync(dirname(path), "r");
+    fs.fsyncSync(directory);
   } finally {
+    if (file !== undefined) fs.closeSync(file);
+    if (directory !== undefined) fs.closeSync(directory);
     if (existsSync(temporary)) unlinkSync(temporary);
   }
 }
@@ -165,11 +253,12 @@ async function response(url) {
   return { bytes: Buffer.concat(chunks), headers: result.headers };
 }
 
-export async function verifyLive(origin, source, get = response) {
+export async function verifyLive(origin, source, checksum, get = response) {
+  requireValue(DIGEST.test(checksum), "An expected publication checksum is required.");
   requireValue(/^https:\/\/[a-z0-9.-]+\/?$/.test(origin), "Production origin must be HTTPS without a path.");
   origin = origin.replace(/\/$/, "");
-  const identity = JSON.parse((await get(`${origin}/data/publication.json?release=${source}`)).bytes);
-  requireValue(identity.source_revision === source && DIGEST.test(identity.publication_checksum) &&
+  const identity = JSON.parse((await get(`${origin}/data/publication.json?publication=${checksum}`)).bytes);
+  requireValue(identity.source_revision === source && identity.publication_checksum === checksum &&
     Number.isSafeInteger(identity.record_counts?.notifications) && identity.record_counts.notifications > 0,
   "Live publication does not match the release.");
   const { bytes } = await get(`${origin}/data/notifications/manifest.json`);
@@ -237,11 +326,11 @@ function runtime(source, state, dataRoot, path) {
         Object.values(report.checks).every((value) => value === true), "Offline state compatibility or publication gate failed.");
     },
     setEnabled: async (enabled) => api(`${PREFIX}/actions/variables/${FLAG}`, { name: FLAG, value: String(enabled) }, "PATCH"),
-    dispatch: async (id, revision) => api(`${PREFIX}/actions/workflows/netlify.yml/dispatches`,
-      { ref: "main", inputs: { data_ref: revision, release_id: id } }, "POST"),
+    dispatch: dispatchRelease,
     runs: async () => api(`${PREFIX}/actions/workflows/netlify.yml/runs?event=workflow_dispatch&per_page=100`).workflow_runs,
     run: async (id) => api(`${PREFIX}/actions/runs/${id}`),
-    verifyLive: (revision) => verifyLive(origin, revision),
+    provenance: readRunProvenance,
+    verifyLive: (revision, checksum) => verifyLive(origin, revision, checksum),
     now: () => new Date().toISOString(),
     save: (receipt) => saveReceipt(path, receipt),
   };
