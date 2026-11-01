@@ -22,12 +22,12 @@
     "test:build-budget": "node --test scripts/tests/build-budget.test.mjs"
   },
   "devDependencies": {
-    "@astrojs/check": "0.9.10",
+    "@astrojs/check": "0.9.12",
     "@astrojs/sitemap": "3.7.4",
-    "@axe-core/playwright": "4.13.0",
-    "@playwright/test": "1.64.0",
-    "@types/estree": "1.0.9",
-    "astro": "7.3.8",
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.64.1",
+    "@types/estree": "1.0.10",
+    "astro": "7.4.4",
     "sharp": "0.35.5",
     "typescript": "6.0.3"
   }
