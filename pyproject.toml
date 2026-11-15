@@ -1,5 +1,5 @@
 [build-system]
-requires = ["editables==0.6", "hatchling==1.32.4"]
+requires = ["editables==0.6", "hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -17,21 +17,21 @@ dependencies = [
   "httpcore==1.0.9",
   "openpyxl==3.1.5",
   "pdfplumber==0.11.10",
-  "pydantic==2.14.0",
+  "pydantic==2.14.3",
   "PyYAML==6.0.3",
-  "typer==0.27.3",
+  "typer==0.29.1",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "click==8.5.0",
-  "hypothesis==6.168.5",
-  "mypy==2.4.0",
+  "click==8.5.1",
+  "hypothesis==6.170.15",
+  "mypy==2.4.1",
   "pip-audit==2.10.1",
-  "pytest==9.1.1",
+  "pytest==9.2.0",
   "pytest-cov==7.1.0",
   "respx==0.23.1",
-  "ruff==0.17.0",
+  "ruff==0.17.5",
   "types-PyYAML==6.0.12.20260906",
 ]
 
